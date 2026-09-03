@@ -5,7 +5,8 @@ import {
   Flame,
   MapPin,
   CheckCircle2,
-  AlertCircle,
+  AlertTriangle,
+  XCircle,
   TrendingUp,
   Award,
   Users,
@@ -18,8 +19,9 @@ import {
   Lock,
   Unlock,
   Printer,
-  Smartphone,
-  Monitor,
+  Navigation,
+  Eye,
+  Crosshair,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,15 +38,27 @@ import {
   Legend,
 } from "recharts";
 
-type ActiveTab = "layar1" | "layar2" | "layar3" | "layar4" | "layar5" | "layar6" | "ai";
+type ActiveTab =
+  | "siswa_beranda"
+  | "siswa_presensi"
+  | "siswa_input_nilai"
+  | "siswa_grafik"
+  | "admin_pendaftaran"
+  | "admin_penilaian"
+  | "admin_ujian"
+  | "ai_showcase";
 
 export default function MockupPage() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>("layar1");
+  const [activeTab, setActiveTab] = useState<ActiveTab>("siswa_presensi");
 
-  // State Layar 1 (Presensi Simulator)
-  const [gpsState, setGpsState] = useState<"outside" | "inside" | "done">("inside");
+  // State Layar Presensi (Live GPS Geofence Simulator)
+  const [gpsDistance, setGpsDistance] = useState<number>(35); // default 35 meter (dalam radius)
+  const [hasCheckedIn, setHasCheckedIn] = useState<boolean>(false);
 
-  // State Layar 2 (Input Nilai Mandiri)
+  // State Grafik Tren (Interactive Focus / Opacity Filter)
+  const [focusedCriteria, setFocusedCriteria] = useState<string>("all");
+
+  // State Input Nilai Mandiri
   const [checkedCriteria, setCheckedCriteria] = useState<{ [key: string]: boolean }>({
     root: true,
     hotpass: true,
@@ -53,15 +67,15 @@ export default function MockupPage() {
     gerinda: false,
   });
   const [scores, setScores] = useState<{ [key: string]: number }>({
-    root: 82,
+    root: 84,
     hotpass: 78,
     filler: 75,
-    capping: 70,
-    gerinda: 85,
+    capping: 72,
+    gerinda: 88,
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // State Layar 4 (Pendaftaran 2-Step)
+  // State Admin Pendaftaran 2-Step
   const [checklists, setChecklists] = useState<{ [key: string]: boolean }>({
     ijazah: true,
     ktp: true,
@@ -70,10 +84,12 @@ export default function MockupPage() {
     suket_sehat: true,
   });
 
-  // State Layar 6 (Gate-Check Simulator)
+  // State Layar Ujian & Gate-Check
   const [gateCondition, setGateCondition] = useState<"locked" | "unlocked">("unlocked");
 
-  // Sample data untuk grafik Recharts (Layar 3)
+  const allChecklistsPassed = Object.values(checklists).every(Boolean);
+
+  // Data time-series grafik Recharts
   const chartData = [
     { tanggal: "20 Ags", root: 65, hotpass: 70, filler: null, capping: null, gerinda: 80 },
     { tanggal: "22 Ags", root: 72, hotpass: 74, filler: 68, capping: 60, gerinda: 82 },
@@ -83,22 +99,31 @@ export default function MockupPage() {
     { tanggal: "03 Sep", root: 88, hotpass: 85, filler: 84, capping: 82, gerinda: 92 },
   ];
 
-  const allChecklistsPassed = Object.values(checklists).every(Boolean);
+  // Helper opacity untuk filter grafik
+  const getLineOpacity = (key: string) => {
+    if (focusedCriteria === "all" || focusedCriteria === key) return 1;
+    return 0.15;
+  };
+
+  const getLineWidth = (key: string) => {
+    if (focusedCriteria === key) return 3.5;
+    return 2;
+  };
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-[#F9FAFB] flex flex-col font-sans">
       {/* Top Header & Navigation Bar */}
-      <header className="sticky top-0 z-50 bg-[#111827]/90 backdrop-blur-md border-b border-[#1F2937] px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 bg-[#111827]/95 backdrop-blur-md border-b border-[#1F2937] px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-[#DC2626]/20 border border-[#DC2626]/40 flex items-center justify-center text-[#DC2626]">
+          <div className="h-9 w-9 rounded-xl bg-[#DC2626]/20 border border-[#DC2626]/40 flex items-center justify-center text-[#DC2626]">
             <Flame className="h-5 w-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-base tracking-tight text-[#F9FAFB]">LPKS SUMBU HIDUP</span>
-              <Badge variant="spark">MOCKUP VISUAL TAHAP 3</Badge>
+              <span className="font-bold text-sm tracking-tight text-[#F9FAFB]">LPKS SUMBU HIDUP</span>
+              <Badge variant="spark" className="text-[10px]">MOCKUP VISUAL TAHAP 3</Badge>
             </div>
-            <p className="text-xs text-[#9CA3AF]">
+            <p className="text-[11px] text-[#9CA3AF]">
               Sistem Manajemen Pelatihan Pengelasan — Verifikasi Antarmuka
             </p>
           </div>
@@ -106,121 +131,103 @@ export default function MockupPage() {
 
         {/* Tab Switcher */}
         <nav className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-1 lg:pb-0 scrollbar-none">
-          <Button
-            size="sm"
-            variant={activeTab === "layar1" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar1")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Smartphone className="h-3.5 w-3.5" />
-            Layar 1: Siswa Presensi
-          </Button>
+          <div className="flex items-center gap-1 bg-[#0B0F17] p-1 rounded-lg border border-[#1F2937]">
+            <span className="text-[10px] uppercase font-bold text-[#9CA3AF] px-2">Portal Siswa:</span>
+            <Button
+              size="sm"
+              variant={activeTab === "siswa_beranda" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("siswa_beranda")}
+              className="h-7 text-xs px-2.5"
+            >
+              Beranda
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "siswa_presensi" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("siswa_presensi")}
+              className="h-7 text-xs px-2.5"
+            >
+              <MapPin className="h-3 w-3 mr-1 text-[#DC2626]" />
+              Presensi GPS
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "siswa_input_nilai" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("siswa_input_nilai")}
+              className="h-7 text-xs px-2.5"
+            >
+              Input Nilai
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "siswa_grafik" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("siswa_grafik")}
+              className="h-7 text-xs px-2.5"
+            >
+              <TrendingUp className="h-3 w-3 mr-1 text-[#10B981]" />
+              Grafik Tren
+            </Button>
+          </div>
 
-          <Button
-            size="sm"
-            variant={activeTab === "layar2" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar2")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Smartphone className="h-3.5 w-3.5" />
-            Layar 2: Siswa Input Nilai
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "layar3" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar3")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <TrendingUp className="h-3.5 w-3.5" />
-            Layar 3: Grafik Tren
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "layar4" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar4")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            Layar 4: Admin Pendaftaran
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "layar5" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar5")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Users className="h-3.5 w-3.5" />
-            Layar 5: Admin Penilaian & Excel
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "layar6" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("layar6")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Award className="h-3.5 w-3.5" />
-            Layar 6: Ujian & Gate-Check
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "ai" ? "spark" : "ghost"}
-            onClick={() => setActiveTab("ai")}
-            className="flex items-center gap-1.5 whitespace-nowrap text-xs"
-          >
-            <Bot className="h-3.5 w-3.5" />
-            Showcase AI
-          </Button>
+          <div className="flex items-center gap-1 bg-[#0B0F17] p-1 rounded-lg border border-[#1F2937]">
+            <span className="text-[10px] uppercase font-bold text-[#9CA3AF] px-2">Superadmin:</span>
+            <Button
+              size="sm"
+              variant={activeTab === "admin_pendaftaran" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("admin_pendaftaran")}
+              className="h-7 text-xs px-2.5"
+            >
+              <Users className="h-3 w-3 mr-1" />
+              Pendaftaran
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "admin_penilaian" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("admin_penilaian")}
+              className="h-7 text-xs px-2.5"
+            >
+              <FileSpreadsheet className="h-3 w-3 mr-1 text-[#10B981]" />
+              Penilaian &amp; Excel
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "admin_ujian" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("admin_ujian")}
+              className="h-7 text-xs px-2.5"
+            >
+              <Award className="h-3 w-3 mr-1 text-[#F59E0B]" />
+              Gate-Check
+            </Button>
+            <Button
+              size="sm"
+              variant={activeTab === "ai_showcase" ? "spark" : "ghost"}
+              onClick={() => setActiveTab("ai_showcase")}
+              className="h-7 text-xs px-2.5"
+            >
+              <Bot className="h-3 w-3 mr-1 text-[#38BDF8]" />
+              AI Showcase
+            </Button>
+          </div>
         </nav>
       </header>
 
       {/* Main Content Area */}
       <main className="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full">
+
         {/* =========================================================================
-            LAYAR 1: PORTAL SISWA — BERANDA & PRESENSI GPS (MOBILE VIEW)
+            PORTAL SISWA — BERANDA (DASHBOARD SISWA)
             ========================================================================= */}
-        {activeTab === "layar1" && (
+        {activeTab === "siswa_beranda" && (
           <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
-              <div>
-                <h2 className="text-base font-bold text-[#F9FAFB]">
-                  Layar 1: Portal Siswa — Beranda & Live GPS Geofencing (Mobile UI)
-                </h2>
-                <p className="text-xs text-[#9CA3AF]">
-                  Simulasikan status jarak GPS siswa terhadap bengkel las LPKS (Batas radius: 100m)
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-[#9CA3AF]">Simulator Sinyal GPS:</span>
-                <Button
-                  size="sm"
-                  variant={gpsState === "outside" ? "danger" : "outline"}
-                  onClick={() => setGpsState("outside")}
-                >
-                  Luar Radius (145m)
-                </Button>
-                <Button
-                  size="sm"
-                  variant={gpsState === "inside" ? "emerald" : "outline"}
-                  onClick={() => setGpsState("inside")}
-                >
-                  Dalam Radius (35m)
-                </Button>
-                <Button
-                  size="sm"
-                  variant={gpsState === "done" ? "spark" : "outline"}
-                  onClick={() => setGpsState("done")}
-                >
-                  Sudah Absen
-                </Button>
-              </div>
+            <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
+              <h2 className="text-base font-bold text-[#F9FAFB]">
+                Portal Siswa — Beranda &amp; Evaluasi Mingguan AI
+              </h2>
+              <p className="text-xs text-[#9CA3AF]">
+                Halaman beranda terpisah dari halaman presensi GPS. Berisi ringkasan personal, status kelayakan ujian, dan narasi perkembangan AI.
+              </p>
             </div>
 
-            {/* Mobile Phone Mockup Frame */}
             <div className="flex justify-center">
               <div className="w-full max-w-sm rounded-[36px] border-[6px] border-[#1F2937] bg-[#0B0F17] overflow-hidden shadow-2xl p-5 space-y-4">
                 {/* Mobile Top Bar */}
@@ -232,7 +239,7 @@ export default function MockupPage() {
                   </div>
                 </div>
 
-                {/* Greeting & Header */}
+                {/* Profile Banner */}
                 <div className="flex items-center justify-between pt-1">
                   <div>
                     <span className="text-xs text-[#9CA3AF]">Selamat pagi,</span>
@@ -247,103 +254,265 @@ export default function MockupPage() {
                   </div>
                 </div>
 
-                {/* GPS Presensi Card (Fokus Utama) */}
-                <Card className="border-[#374151] bg-[#111827]">
-                  <CardHeader className="pb-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-[#DC2626]" />
-                        <CardTitle className="text-sm">Presensi Harian</CardTitle>
-                      </div>
-                      <Badge variant="outline" className="text-[11px]">
-                        Radius 100m
-                      </Badge>
+                {/* Status Ringkasan Cepat */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div className="p-3 rounded-xl bg-[#111827] border border-[#1F2937]">
+                    <span className="text-[11px] text-[#9CA3AF] block">Kehadiran Bulan Ini</span>
+                    <span className="text-lg font-bold text-[#F9FAFB] block mt-0.5">24 Hari</span>
+                    <div className="flex items-center gap-1 text-[10px] text-[#10B981] mt-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>Presensi 100%</span>
                     </div>
-                    <CardDescription>Validasi koordinat GPS bengkel pelatihan</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3 pt-2">
-                    {gpsState === "outside" && (
-                      <>
-                        <div className="p-3 rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/30 text-xs text-[#F43F5E] flex items-start gap-2">
-                          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold">Di luar jangkauan (145 meter)</span>
-                            <p className="text-[11px] text-[#FCA5A5] mt-0.5">
-                              Mendekatlah ke area bengkel las LPKS untuk mengaktifkan tombol presensi.
-                            </p>
-                          </div>
-                        </div>
-                        <Button disabled className="w-full h-12 text-sm" variant="spark">
-                          <MapPin className="h-4 w-4 mr-2" />
-                          ABSEN SEKARANG (TERKUNCI)
-                        </Button>
-                      </>
-                    )}
+                  </div>
 
-                    {gpsState === "inside" && (
-                      <>
-                        <div className="p-3 rounded-lg bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-start gap-2">
-                          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                          <div>
-                            <span className="font-semibold">Dalam jangkauan bengkel (35 meter)</span>
-                            <p className="text-[11px] text-[#6EE7B7] mt-0.5">
-                              Sinyal GPS terverifikasi. Anda dapat melakukan presensi sekarang.
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          className="w-full h-12 text-sm font-bold animate-pulse shadow-lg shadow-[#10B981]/20"
-                          variant="emerald"
-                          onClick={() => setGpsState("done")}
-                        >
-                          <MapPin className="h-4 w-4 mr-2" />
-                          📍 ABSEN SEKARANG (HADIR)
-                        </Button>
-                      </>
-                    )}
-
-                    {gpsState === "done" && (
-                      <div className="p-4 rounded-xl bg-[#10B981]/15 border border-[#10B981]/40 text-center space-y-1">
-                        <CheckCircle2 className="h-8 w-8 text-[#10B981] mx-auto mb-1" />
-                        <span className="font-bold text-sm text-[#10B981]">Anda Sudah Hadir</span>
-                        <p className="text-xs text-[#D1D5DB]">Tercatat hari ini pukul 07:45:12 WIB</p>
-                        <Badge variant="outline" className="mt-2 text-[10px]">
-                          Jarak: 34 meter
-                        </Badge>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+                  <div className="p-3 rounded-xl bg-[#111827] border border-[#1F2937]">
+                    <span className="text-[11px] text-[#9CA3AF] block">Status Keuangan</span>
+                    <span className="text-lg font-bold text-[#10B981] block mt-0.5">LUNAS</span>
+                    <div className="flex items-center gap-1 text-[10px] text-[#9CA3AF] mt-1">
+                      <span>Sisa: Rp 0</span>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Ringkasan Kelayakan Ujian */}
                 <Card className="border-[#1F2937] bg-[#111827]">
                   <CardHeader className="p-3 pb-1">
                     <CardTitle className="text-xs text-[#9CA3AF] flex items-center justify-between">
                       <span>Status Kelayakan Ujian Internal</span>
-                      <span className="text-[#10B981] font-bold">4 / 5 Kriteria</span>
+                      <span className="text-[#10B981] font-bold">4 dari 5 Lulus</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 pt-2">
                     <div className="w-full bg-[#1F2937] h-2 rounded-full overflow-hidden">
                       <div className="bg-[#DC2626] h-full w-[80%]" />
                     </div>
-                    <p className="text-[11px] text-[#9CA3AF] mt-2">
-                      Tinggal kriteria <span className="text-[#F87171] font-semibold">Capping (78)</span>{" "}
-                      untuk memenuhi syarat ujian.
-                    </p>
+                    <div className="flex items-center gap-1 text-[11px] text-[#F59E0B] mt-2">
+                      <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                      <span>Tinggal kriteria Capping (78) yang perlu mencapai ≥ 80.</span>
+                    </div>
                   </CardContent>
                 </Card>
 
                 {/* AI Weekly Insight Card */}
-                <div className="p-3.5 rounded-xl bg-gradient-to-br from-[#1E293B] to-[#111827] border border-[#374151] space-y-1.5">
+                <div className="p-4 rounded-xl bg-gradient-to-br from-[#1E293B] to-[#111827] border border-[#374151] space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-[#F9FAFB]">
                     <Sparkles className="h-3.5 w-3.5 text-[#DC2626]" />
-                    <span>AI Weekly Evaluasi</span>
+                    <span>AI Weekly Progress Insight</span>
                   </div>
-                  <p className="text-[11px] text-[#D1D5DB] leading-relaxed">
-                    &quot;Penetrasi Root Pass meningkat pesat (+10 poin). Perhatikan sudut elektroda saat
-                    Capping agar terbebas dari undercut sebelum jadwal ujian.&quot;
+                  <p className="text-xs text-[#D1D5DB] leading-relaxed">
+                    &quot;Penetrasi Root Pass Anda meningkat pesat (+10 poin). Perhatikan sudut kemiringan elektroda 45° saat Capping agar rigi-rigi las lebih seragam dan siap ujian internal.&quot;
                   </p>
+                  <span className="text-[10px] text-[#9CA3AF] block">Diperbarui: 03 Sep 2026 via Gemini Flash</span>
+                </div>
+
+                {/* Shortcut ke Presensi GPS */}
+                <Button
+                  className="w-full h-11 text-xs font-bold"
+                  variant="outline"
+                  onClick={() => setActiveTab("siswa_presensi")}
+                >
+                  <MapPin className="h-3.5 w-3.5 mr-2 text-[#DC2626]" />
+                  Buka Menu Presensi GPS &amp; Peta
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* =========================================================================
+            PORTAL SISWA — PRESENSI GPS DENGAN LIVE MAP RADAR (PAGE TERSENDIRI)
+            ========================================================================= */}
+        {activeTab === "siswa_presensi" && (
+          <div className="space-y-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
+              <div>
+                <h2 className="text-base font-bold text-[#F9FAFB]">
+                  Portal Siswa — Halaman Presensi GPS &amp; Live Map Geofencing
+                </h2>
+                <p className="text-xs text-[#9CA3AF]">
+                  Halaman khusus presensi mandiri siswa dilengkapi peta radar deteksi lokasi real-time vs titik bengkel LPKS.
+                </p>
+              </div>
+
+              {/* Simulator Jarak GPS */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#9CA3AF]">Simulasi Lokasi Siswa:</span>
+                <Button
+                  size="sm"
+                  variant={gpsDistance > 100 ? "danger" : "outline"}
+                  onClick={() => {
+                    setGpsDistance(145);
+                    setHasCheckedIn(false);
+                  }}
+                  className="text-xs h-8"
+                >
+                  Luar Radius (145m)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={gpsDistance <= 100 && !hasCheckedIn ? "emerald" : "outline"}
+                  onClick={() => {
+                    setGpsDistance(35);
+                    setHasCheckedIn(false);
+                  }}
+                  className="text-xs h-8"
+                >
+                  Dalam Radius (35m)
+                </Button>
+                <Button
+                  size="sm"
+                  variant={hasCheckedIn ? "spark" : "outline"}
+                  onClick={() => setHasCheckedIn(true)}
+                  className="text-xs h-8"
+                >
+                  Sudah Presensi
+                </Button>
+              </div>
+            </div>
+
+            {/* Mobile Phone Mockup Frame */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-sm rounded-[36px] border-[6px] border-[#1F2937] bg-[#0B0F17] overflow-hidden shadow-2xl p-5 space-y-4">
+                {/* Header Presensi */}
+                <div className="flex justify-between items-center pb-2 border-b border-[#1F2937]">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-[#DC2626]" />
+                    <h3 className="font-bold text-sm text-[#F9FAFB]">Presensi Geofencing</h3>
+                  </div>
+                  <Badge variant="outline" className="text-[10px]">
+                    Maks. Radius 100m
+                  </Badge>
+                </div>
+
+                {/* LIVE MAP RADAR CANVAS (PETA VISUAL LOKASI SISWA) */}
+                <div className="relative w-full h-52 rounded-2xl bg-[#0F172A] border border-[#1E293B] overflow-hidden flex items-center justify-center">
+                  {/* Grid peta latar belakang */}
+                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#38BDF8_1px,transparent_1px)] [background-size:16px_16px]" />
+
+                  {/* Lingkaran Radius Toleransi 100m LPKS */}
+                  <div className="absolute h-36 w-36 rounded-full border-2 border-dashed border-[#10B981]/50 bg-[#10B981]/5 flex items-center justify-center">
+                    <span className="text-[9px] text-[#10B981] font-mono mt-16 bg-[#0B0F17]/80 px-1.5 py-0.5 rounded border border-[#10B981]/30">
+                      ZONA 100M LPKS
+                    </span>
+                  </div>
+
+                  {/* Marker Pusat LPKS */}
+                  <div className="absolute flex flex-col items-center z-10">
+                    <div className="h-7 w-7 rounded-full bg-[#DC2626] text-white flex items-center justify-center shadow-lg shadow-[#DC2626]/50">
+                      <Flame className="h-4 w-4" />
+                    </div>
+                    <span className="text-[9px] font-bold text-[#F9FAFB] bg-[#111827] px-1 rounded border border-[#374151] mt-0.5">
+                      Bengkel LPKS
+                    </span>
+                  </div>
+
+                  {/* Marker Posisi Siswa Real-Time */}
+                  <div
+                    className={`absolute flex flex-col items-center transition-all duration-700 z-20 ${
+                      gpsDistance <= 100 ? "translate-x-8 translate-y-6" : "translate-x-28 -translate-y-16"
+                    }`}
+                  >
+                    <div
+                      className={`h-6 w-6 rounded-full flex items-center justify-center text-white shadow-lg animate-bounce ${
+                        gpsDistance <= 100 ? "bg-[#10B981] shadow-[#10B981]/50" : "bg-[#F43F5E] shadow-[#F43F5E]/50"
+                      }`}
+                    >
+                      <Crosshair className="h-3.5 w-3.5" />
+                    </div>
+                    <span className="text-[9px] font-bold text-[#F9FAFB] bg-[#111827] px-1 rounded border border-[#374151] mt-0.5 whitespace-nowrap">
+                      Anda ({gpsDistance}m)
+                    </span>
+                  </div>
+
+                  {/* Garis Jarak antara Siswa dan LPKS */}
+                  <div className="absolute bottom-2 left-2 bg-[#0B0F17]/90 px-2 py-1 rounded-lg border border-[#1F2937] text-[10px] text-[#9CA3AF] flex items-center gap-1.5">
+                    <Navigation className="h-3 w-3 text-[#38BDF8]" />
+                    <span>Jarak: <strong className="text-[#F9FAFB] font-mono">{gpsDistance} meter</strong></span>
+                  </div>
+
+                  <div className="absolute top-2 right-2 bg-[#0B0F17]/90 px-2 py-0.5 rounded text-[9px] text-[#10B981] font-mono border border-[#1F2937]">
+                    GPS AKTIF (LIVE)
+                  </div>
+                </div>
+
+                {/* Status Geofence Card */}
+                {hasCheckedIn ? (
+                  <div className="p-4 rounded-xl bg-[#10B981]/15 border border-[#10B981]/40 text-center space-y-1">
+                    <CheckCircle2 className="h-8 w-8 text-[#10B981] mx-auto mb-1" />
+                    <span className="font-bold text-sm text-[#10B981]">Kehadiran Tercatat Hari Ini</span>
+                    <p className="text-xs text-[#D1D5DB]">Tercatat pada 07:45:12 WIB — Jarak 34 meter</p>
+                    <Badge variant="outline" className="mt-2 text-[10px]">
+                      Created by Siswa (Mandiri)
+                    </Badge>
+                  </div>
+                ) : (
+                  <>
+                    {gpsDistance > 100 ? (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/30 text-xs text-[#F43F5E] flex items-start gap-2">
+                          <XCircle className="h-4 w-4 shrink-0 mt-0.5 text-[#F43F5E]" />
+                          <div>
+                            <span className="font-semibold">Di Luar Area Bengkel ({gpsDistance}m)</span>
+                            <p className="text-[11px] text-[#FCA5A5] mt-0.5">
+                              Tombol presensi terkunci. Anda harus berada dalam radius 100 meter dari bengkel las LPKS.
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button disabled className="w-full h-12 text-sm font-semibold" variant="spark">
+                          <Lock className="h-4 w-4 mr-2" />
+                          ABSEN SEKARANG (TERKUNCI)
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-lg bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-start gap-2">
+                          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-[#10B981]" />
+                          <div>
+                            <span className="font-semibold">Dalam Area Bengkel ({gpsDistance}m)</span>
+                            <p className="text-[11px] text-[#6EE7B7] mt-0.5">
+                              Koordinat GPS valid. Silakan tekan tombol di bawah untuk mencatat kehadiran.
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          className="w-full h-12 text-sm font-bold animate-pulse shadow-lg shadow-[#10B981]/20"
+                          variant="emerald"
+                          onClick={() => setHasCheckedIn(true)}
+                        >
+                          <MapPin className="h-4 w-4 mr-2" />
+                          📍 ABSEN SEKARANG (HADIR)
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Log Riwayat Presensi Singkat */}
+                <div className="pt-2 border-t border-[#1F2937]">
+                  <span className="text-[11px] font-bold text-[#9CA3AF] uppercase block mb-2">
+                    Riwayat Presensi Minggu Ini:
+                  </span>
+                  <div className="space-y-1.5 text-xs">
+                    {[
+                      { tgl: "03 Sep", jam: "07:45 WIB", jarak: "34m", status: "Hadir" },
+                      { tgl: "02 Sep", jam: "07:48 WIB", jarak: "42m", status: "Hadir" },
+                      { tgl: "01 Sep", jam: "07:40 WIB", jarak: "28m", status: "Hadir" },
+                    ].map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded-lg bg-[#111827] border border-[#1F2937]"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-[#10B981]" />
+                          <span className="font-mono text-[11px] text-[#F9FAFB]">{item.tgl}</span>
+                          <span className="text-[#9CA3AF] text-[11px]">{item.jam}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[#6B7280]">{item.jarak}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -351,17 +520,16 @@ export default function MockupPage() {
         )}
 
         {/* =========================================================================
-            LAYAR 2: PORTAL SISWA — FORM INPUT NILAI MANDIRI (MOBILE VIEW)
+            PORTAL SISWA — FORM INPUT NILAI MANDIRI
             ========================================================================= */}
-        {activeTab === "layar2" && (
+        {activeTab === "siswa_input_nilai" && (
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
               <h2 className="text-base font-bold text-[#F9FAFB]">
-                Layar 2: Portal Siswa — Form Input Nilai Mandiri Praktek
+                Portal Siswa — Form Input Nilai Praktek Mandiri
               </h2>
               <p className="text-xs text-[#9CA3AF]">
-                Siswa mencatat skor yang diberikan instruktur saat praktek. Kriteria yang tidak dinilai
-                tidak dicentang dan tidak bernilai 0.
+                Siswa menginput nilai per kriteria yang diberikan instruktur setelah latihan. Kriteria yang tidak dinilai tidak dicentang (tidak bernilai 0).
               </p>
             </div>
 
@@ -374,18 +542,19 @@ export default function MockupPage() {
 
                 <div className="space-y-3">
                   <label className="text-xs text-[#9CA3AF] block font-medium">
-                    Pilih Kriteria yang Dinilai Hari Ini:
+                    Pilih Kriteria yang Dinilai Instruktur Hari Ini:
                   </label>
 
                   {[
                     { id: "root", label: "Root Pass (Penetrasi Awal)", min: 80 },
-                    { id: "hotpass", label: "Hot Pass (Pengisi Lapis 2)", min: 80 },
-                    { id: "filler", label: "Filler Pass (Pengisian Kampuh)", min: 80 },
-                    { id: "capping", label: "Capping Pass (Lapis Penutup)", min: 80 },
+                    { id: "hotpass", label: "Hot Pass (Lapis 2)", min: 80 },
+                    { id: "filler", label: "Filler Pass (Pengisian)", min: 80 },
+                    { id: "capping", label: "Capping Pass (Penutup)", min: 80 },
                     { id: "gerinda", label: "Gerinda & Bevel Prep", min: 80 },
                   ].map((item) => {
                     const isChecked = checkedCriteria[item.id] || false;
                     const val = scores[item.id] || 0;
+                    const isPassed = val >= item.min;
 
                     return (
                       <div
@@ -417,7 +586,7 @@ export default function MockupPage() {
                         {isChecked && (
                           <div className="mt-2.5 flex items-center justify-between gap-3 pt-2 border-t border-[#1F2937]">
                             <span className="text-xs text-[#D1D5DB]">Nilai dari Instruktur:</span>
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="number"
                                 min={0}
@@ -431,13 +600,19 @@ export default function MockupPage() {
                                 }
                                 className="w-16 h-8 text-center text-sm font-bold bg-[#1F2937] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                               />
-                              <span
-                                className={`text-xs font-bold ${
-                                  val >= 80 ? "text-[#10B981]" : "text-[#F59E0B]"
-                                }`}
-                              >
-                                {val >= 80 ? "✓ Lulus" : "! Kurang"}
-                              </span>
+
+                              {/* Indikator dengan Icon Lucide (Bukan teks / karakter mentah) */}
+                              {isPassed ? (
+                                <div className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded border border-[#10B981]/30 text-[11px] font-semibold">
+                                  <CheckCircle2 className="h-3.5 w-3.5" />
+                                  <span>Lulus</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1 text-[#F59E0B] bg-[#F59E0B]/15 px-2 py-0.5 rounded border border-[#F59E0B]/30 text-[11px] font-semibold">
+                                  <AlertTriangle className="h-3.5 w-3.5" />
+                                  <span>Kurang</span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -447,8 +622,9 @@ export default function MockupPage() {
                 </div>
 
                 {savedSuccess ? (
-                  <div className="p-3 rounded-lg bg-[#10B981]/15 border border-[#10B981]/40 text-center text-xs text-[#10B981] font-semibold">
-                    ✓ 2 Nilai Harian Berhasil Disimpan & Masuk Grafik Tren!
+                  <div className="p-3 rounded-lg bg-[#10B981]/15 border border-[#10B981]/40 text-center text-xs text-[#10B981] font-semibold flex items-center justify-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Nilai Praktek Berhasil Disimpan &amp; Masuk Grafik Tren!</span>
                   </div>
                 ) : (
                   <Button
@@ -468,31 +644,52 @@ export default function MockupPage() {
         )}
 
         {/* =========================================================================
-            LAYAR 3: PORTAL SISWA — TRANSKRIP & GRAFIK TREN (RECHARTS)
+            PORTAL SISWA — GRAFIK TREN DENGAN FILTER FOKUS KRITERIA
             ========================================================================= */}
-        {activeTab === "layar3" && (
+        {activeTab === "siswa_grafik" && (
           <div className="space-y-6">
-            <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] flex items-center justify-between">
+            <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-[#F9FAFB]">
-                  Layar 3: Transkrip Nilai & Grafik Tren Progres Belajar (Recharts)
+                  Portal Siswa — Grafik Tren Fluktuasi Nilai (Filter Kriteria Interaktif)
                 </h2>
                 <p className="text-xs text-[#9CA3AF]">
-                  Visualisasi multi-line chart perkembangan per kriteria dengan garis referensi kelulusan (80).
+                  Pilih kriteria untuk menonjolkan garis tertentu agar warna tidak bertabrakan (garis lain akan meredup/transparan).
                 </p>
               </div>
-              <Badge variant="spark">Target: Minimal 80</Badge>
+              <Badge variant="spark">Ambang Kelulusan: 80</Badge>
             </div>
 
             <Card className="border-[#1F2937]">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
                 <div>
-                  <CardTitle className="text-sm">Grafik Metrik Pengelasan (Fajar Pratama — 01.0004)</CardTitle>
+                  <CardTitle className="text-sm">Perkembangan Kompetensi: Fajar Pratama (01.0004)</CardTitle>
                   <CardDescription>Program: SMAW 6G Pipa Industri</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">Multi-Line Series</Badge>
-                  <Badge variant="success">Ambang Batas: 80</Badge>
+
+                {/* Filter Kriteria Toggle Buttons (Solusi Anti Tabrakan Warna) */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-[#9CA3AF] mr-1 flex items-center gap-1">
+                    <Eye className="h-3.5 w-3.5" /> Fokus:
+                  </span>
+                  {[
+                    { id: "all", label: "Semua Kriteria", color: "#F9FAFB" },
+                    { id: "root", label: "Root Pass", color: "#38BDF8" },
+                    { id: "hotpass", label: "Hot Pass", color: "#F59E0B" },
+                    { id: "filler", label: "Filler Pass", color: "#A78BFA" },
+                    { id: "capping", label: "Capping Pass", color: "#F43F5E" },
+                    { id: "gerinda", label: "Gerinda", color: "#10B981" },
+                  ].map((btn) => (
+                    <Button
+                      key={btn.id}
+                      size="sm"
+                      variant={focusedCriteria === btn.id ? "spark" : "outline"}
+                      onClick={() => setFocusedCriteria(btn.id)}
+                      className="h-7 text-xs px-2.5"
+                    >
+                      {btn.label}
+                    </Button>
+                  ))}
                 </div>
               </CardHeader>
               <CardContent>
@@ -515,15 +712,18 @@ export default function MockupPage() {
                         y={80}
                         stroke="#DC2626"
                         strokeDasharray="4 4"
-                        label={{ value: "Batas Lulus (80)", fill: "#DC2626", fontSize: 10 }}
+                        strokeWidth={2}
+                        label={{ value: "Ambang Lulus (80)", fill: "#DC2626", fontSize: 10 }}
                       />
+
                       <Line
                         type="monotone"
                         dataKey="root"
                         name="Root Pass"
                         stroke="#38BDF8"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={getLineWidth("root")}
+                        strokeOpacity={getLineOpacity("root")}
+                        dot={{ r: focusedCriteria === "root" ? 6 : 3, fill: "#38BDF8" }}
                         connectNulls
                       />
                       <Line
@@ -531,8 +731,9 @@ export default function MockupPage() {
                         dataKey="hotpass"
                         name="Hot Pass"
                         stroke="#F59E0B"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={getLineWidth("hotpass")}
+                        strokeOpacity={getLineOpacity("hotpass")}
+                        dot={{ r: focusedCriteria === "hotpass" ? 6 : 3, fill: "#F59E0B" }}
                         connectNulls
                       />
                       <Line
@@ -540,8 +741,9 @@ export default function MockupPage() {
                         dataKey="filler"
                         name="Filler Pass"
                         stroke="#A78BFA"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={getLineWidth("filler")}
+                        strokeOpacity={getLineOpacity("filler")}
+                        dot={{ r: focusedCriteria === "filler" ? 6 : 3, fill: "#A78BFA" }}
                         connectNulls
                       />
                       <Line
@@ -549,8 +751,9 @@ export default function MockupPage() {
                         dataKey="capping"
                         name="Capping Pass"
                         stroke="#F43F5E"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={getLineWidth("capping")}
+                        strokeOpacity={getLineOpacity("capping")}
+                        dot={{ r: focusedCriteria === "capping" ? 6 : 3, fill: "#F43F5E" }}
                         connectNulls
                       />
                       <Line
@@ -558,32 +761,43 @@ export default function MockupPage() {
                         dataKey="gerinda"
                         name="Gerinda"
                         stroke="#10B981"
-                        strokeWidth={2}
-                        dot={{ r: 4 }}
+                        strokeWidth={getLineWidth("gerinda")}
+                        strokeOpacity={getLineOpacity("gerinda")}
+                        dot={{ r: focusedCriteria === "gerinda" ? 6 : 3, fill: "#10B981" }}
                         connectNulls
                       />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
 
-                {/* Status Tabel Kelayakan Kompetensi */}
+                {/* Status Rekap Kompetensi dengan Icon Lucide Resmi */}
                 <div className="mt-6 border-t border-[#1F2937] pt-4">
                   <h4 className="text-xs font-bold text-[#F9FAFB] uppercase tracking-wider mb-3">
-                    Rekap Status Kompetensi 5 Kriteria:
+                    Status Kompetensi 5 Kriteria Praktek:
                   </h4>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                     {[
-                      { nama: "Root Pass", max: 88, status: "Lulus" },
-                      { nama: "Hot Pass", max: 85, status: "Lulus" },
-                      { nama: "Filler Pass", max: 84, status: "Lulus" },
-                      { nama: "Capping Pass", max: 82, status: "Lulus" },
-                      { nama: "Gerinda", max: 92, status: "Lulus" },
+                      { nama: "Root Pass", max: 88, status: "Lulus", isPassed: true },
+                      { nama: "Hot Pass", max: 85, status: "Lulus", isPassed: true },
+                      { nama: "Filler Pass", max: 84, status: "Lulus", isPassed: true },
+                      { nama: "Capping Pass", max: 78, status: "Kurang", isPassed: false },
+                      { nama: "Gerinda", max: 92, status: "Lulus", isPassed: true },
                     ].map((k) => (
                       <div key={k.nama} className="p-3 rounded-lg bg-[#0B0F17] border border-[#1F2937]">
                         <span className="text-xs text-[#9CA3AF] block">{k.nama}</span>
                         <div className="flex items-center justify-between mt-1">
                           <span className="text-base font-bold text-[#F9FAFB]">{k.max}</span>
-                          <Badge variant="success">✓ Lulus</Badge>
+                          {k.isPassed ? (
+                            <div className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded text-[11px] font-semibold">
+                              <CheckCircle2 className="h-3 w-3" />
+                              <span>Lulus</span>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1 text-[#F59E0B] bg-[#F59E0B]/15 px-2 py-0.5 rounded text-[11px] font-semibold">
+                              <AlertTriangle className="h-3 w-3" />
+                              <span>Kurang</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -595,21 +809,21 @@ export default function MockupPage() {
         )}
 
         {/* =========================================================================
-            LAYAR 4: SUPERADMIN — PENDAFTARAN SISWA 2-TAHAP (DESKTOP VIEW)
+            SUPERADMIN — PENDAFTARAN SISWA DENGAN AUTO NO INDUK MENONJOL
             ========================================================================= */}
-        {activeTab === "layar4" && (
+        {activeTab === "admin_pendaftaran" && (
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
               <h2 className="text-base font-bold text-[#F9FAFB]">
-                Layar 4: Superadmin — Form Pendaftaran 2-Tahap (Continuous Enrollment)
+                Layar 4: Superadmin — Form Pendaftaran Siswa 2-Tahap
               </h2>
               <p className="text-xs text-[#9CA3AF]">
-                Tahap 1 (Verifikasi Berkas Fisik) wajib tuntas 100% sebelum Tahap 2 (Form Biodata & Auto No Induk) aktif.
+                Tahap 1 verifikasi 5 berkas fisik wajib. Nomor induk digenerate secara otomatis dan ditampilkan menonjol kepada admin.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Kolom Kiri: Tahap 1 (Checklist Berkas Fisik) */}
+              {/* Kolom Kiri: Checklist Berkas Fisik */}
               <Card className="border-[#1F2937] lg:col-span-1">
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -618,7 +832,7 @@ export default function MockupPage() {
                   </div>
                   <CardTitle className="text-sm">Checklist 5 Berkas Fisik</CardTitle>
                   <CardDescription>
-                    Centang berkas asli/fotokopi yang telah diserahkan calon siswa di kantor.
+                    Calon siswa menyerahkan berkas asli/fotokopi di kantor pendaftaran.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -626,8 +840,8 @@ export default function MockupPage() {
                     { id: "ijazah", label: "Fotokopi Ijazah Terakhir (2 lembar)" },
                     { id: "ktp", label: "Fotokopi KTP Calon Siswa (2 lembar)" },
                     { id: "kk", label: "Fotokopi Kartu Keluarga (2 lembar)" },
-                    { id: "foto", label: "Pas Foto 3x4 Background Merah (3 lbr)" },
-                    { id: "suket_sehat", label: "Surat Keterangan Sehat Dokter (1 lbr)" },
+                    { id: "foto", label: "Pas Foto 3x4 Background Merah (3 lembar)" },
+                    { id: "suket_sehat", label: "Surat Keterangan Sehat Dokter (1 lembar)" },
                   ].map((doc) => (
                     <label
                       key={doc.id}
@@ -652,11 +866,11 @@ export default function MockupPage() {
                     {allChecklistsPassed ? (
                       <div className="p-2.5 rounded-lg bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 shrink-0" />
-                        <span>5 Berkas Lengkap. Form Biodata Terbuka.</span>
+                        <span>5 Berkas Fisik Lengkap. Form Biodata Terbuka.</span>
                       </div>
                     ) : (
                       <div className="p-2.5 rounded-lg bg-[#F59E0B]/10 border border-[#F59E0B]/30 text-xs text-[#F59E0B] flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <AlertTriangle className="h-4 w-4 shrink-0" />
                         <span>Lengkapi seluruh 5 berkas untuk membuka form.</span>
                       </div>
                     )}
@@ -664,7 +878,7 @@ export default function MockupPage() {
                 </CardContent>
               </Card>
 
-              {/* Kolom Kanan: Tahap 2 (Form Biodata & Auto No Induk) */}
+              {/* Kolom Kanan: Form Biodata & Banner Nomor Induk Besar */}
               <Card
                 className={`border-[#1F2937] lg:col-span-2 transition-opacity ${
                   allChecklistsPassed ? "opacity-100" : "opacity-40 pointer-events-none"
@@ -673,51 +887,66 @@ export default function MockupPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary">Tahap 2</Badge>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[#9CA3AF]">Auto-Generated Nomor Induk:</span>
-                      <Badge variant="spark" className="text-xs font-mono font-bold">
-                        01.0005
-                      </Badge>
-                    </div>
+                    <span className="text-xs text-[#10B981]">Siap Didaftarkan</span>
                   </div>
-                  <CardTitle className="text-sm">Biodata Calon Siswa Baru</CardTitle>
-                  <CardDescription>
-                    Nomor Induk digenerate otomatis menggunakan pessimistic locking di database.
-                  </CardDescription>
+                  <CardTitle className="text-sm">Biodata Siswa Baru</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* CALLOUT NOMOR INDUK BESAR & MENONJOL (SESUAI REQUEST USER) */}
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-[#1F2937] to-[#111827] border-l-4 border-[#DC2626] border-y border-r border-[#374151] flex flex-wrap items-center justify-between gap-4 shadow-lg">
+                    <div>
+                      <span className="text-[11px] uppercase tracking-wider font-bold text-[#F87171] block">
+                        NOMOR INDUK SISWA OTOMATIS TERBIT:
+                      </span>
+                      <span className="text-3xl font-mono font-extrabold text-[#F9FAFB] tracking-wider block mt-1">
+                        01.0005
+                      </span>
+                      <p className="text-xs text-[#9CA3AF] mt-0.5">
+                        Format: <code className="text-[#F9FAFB] font-mono">kode_program.urutan</code> (Pessimistic Locking anti-tabrakan)
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      <Badge variant="spark" className="text-xs py-1 px-3">
+                        Program: SMAW 6G
+                      </Badge>
+                      <span className="block text-[11px] text-[#9CA3AF] mt-1">Status: Calon Siswa Aktif</span>
+                    </div>
+                  </div>
+
+                  {/* Form Grid Lengkap */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
                         Program Pelatihan:
                       </label>
-                      <select className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none">
-                        <option value="01">01 — SMAW 6G Pipa (Rp 8.500.000)</option>
-                        <option value="02">02 — GTAW 6G (Rp 9.500.000)</option>
-                        <option value="03">03 — GMAW 3G (Rp 7.500.000)</option>
+                      <select className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none">
+                        <option value="01">01 — SMAW 6G Pipa Industri (Rp 8.500.000)</option>
+                        <option value="02">02 — GTAW / TIG 6G (Rp 9.500.000)</option>
+                        <option value="03">03 — GMAW / MIG 3G (Rp 7.500.000)</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Nama Lengkap Siswa:
+                        Nama Lengkap:
                       </label>
                       <input
                         type="text"
                         defaultValue="Budi Santoso"
-                        className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        NIK (Tepat 16 Digit):
+                        NIK (16 Digit Wajib):
                       </label>
                       <input
                         type="text"
                         defaultValue="3201234567890005"
                         maxLength={16}
-                        className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
                       />
                     </div>
 
@@ -728,36 +957,95 @@ export default function MockupPage() {
                       <input
                         type="email"
                         defaultValue="budi.santoso@gmail.com"
-                        className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Nomor WhatsApp / HP:
+                        Tempat &amp; Tanggal Lahir:
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          defaultValue="Bandung"
+                          placeholder="Tempat"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                        />
+                        <input
+                          type="date"
+                          defaultValue="2003-04-12"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                        No. WhatsApp / HP:
                       </label>
                       <input
                         type="text"
-                        defaultValue="081234567891"
-                        className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        defaultValue="081234567895"
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
                       />
                     </div>
 
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Tanggal Masuk Pelatihan:
+                        Nama Orang Tua (Ayah / Ibu):
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          defaultValue="Sutrisno"
+                          placeholder="Nama Ayah"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          defaultValue="Sri Wahyuni"
+                          placeholder="Nama Ibu"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                        Pendidikan Terakhir &amp; NISN:
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          defaultValue="SMK Teknik Mesin"
+                          placeholder="Pendidikan"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                        />
+                        <input
+                          type="text"
+                          defaultValue="0034567891"
+                          placeholder="NISN"
+                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                        Alamat Lengkap Siswa:
                       </label>
                       <input
-                        type="date"
-                        defaultValue="2026-09-03"
-                        className="w-full h-10 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        type="text"
+                        defaultValue="Jl. Raya Barat Industri No. 45, RT 02/04, Bandung"
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
                   </div>
 
-                  <div className="pt-2 flex justify-end">
-                    <Button variant="spark" size="md">
-                      Daftarkan Siswa & Terbitkan No Induk 01.0005
+                  <div className="pt-3 flex justify-end">
+                    <Button variant="spark" size="md" className="font-bold text-xs h-11 px-6">
+                      Daftarkan Siswa &amp; Terbitkan No Induk 01.0005
                     </Button>
                   </div>
                 </CardContent>
@@ -767,17 +1055,17 @@ export default function MockupPage() {
         )}
 
         {/* =========================================================================
-            LAYAR 5: SUPERADMIN — MANAJEMEN PENILAIAN HARIAN (DESKTOP VIEW)
+            SUPERADMIN — MANAJEMEN PENILAIAN & TOOLBAR EXCEL
             ========================================================================= */}
-        {activeTab === "layar5" && (
+        {activeTab === "admin_penilaian" && (
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-[#F9FAFB]">
-                  Layar 5: Superadmin — Monitoring Penilaian & Toolbar Excel
+                  Layar 5: Superadmin — Monitoring Penilaian Harian &amp; Bulk Excel
                 </h2>
                 <p className="text-xs text-[#9CA3AF]">
-                  Instrutur memantau nilai yang diinput mandiri oleh siswa, mengoreksi, atau import/export masal.
+                  Instruktur memantau nilai yang diinput mandiri oleh siswa, mengoreksi, atau import/export masal spreadsheet.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -803,12 +1091,13 @@ export default function MockupPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 bg-[#111827] border border-[#1F2937] rounded-xl">
               <input
                 type="text"
-                placeholder="Cari siswa / nomor induk..."
+                placeholder="Cari nama siswa / nomor induk..."
                 className="h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
               />
               <select className="h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none">
                 <option>Semua Program (SMAW, GTAW, GMAW)</option>
-                <option>SMAW 6G</option>
+                <option>01 — SMAW 6G</option>
+                <option>02 — GTAW 6G</option>
               </select>
               <input
                 type="date"
@@ -824,9 +1113,10 @@ export default function MockupPage() {
                   <thead className="bg-[#0B0F17] text-[#9CA3AF] border-b border-[#1F2937]">
                     <tr>
                       <th className="p-3.5">Tanggal</th>
-                      <th className="p-3.5">Siswa</th>
-                      <th className="p-3.5">Kriteria</th>
-                      <th className="p-3.5 text-center">Nilai</th>
+                      <th className="p-3.5">Nomor Induk &amp; Siswa</th>
+                      <th className="p-3.5">Kriteria Praktek</th>
+                      <th className="p-3.5 text-center">Nilai (0-100)</th>
+                      <th className="p-3.5">Status Evaluasi</th>
                       <th className="p-3.5">Sumber Input</th>
                       <th className="p-3.5 text-right">Aksi</th>
                     </tr>
@@ -835,62 +1125,77 @@ export default function MockupPage() {
                     {[
                       {
                         tgl: "03 Sep 2026",
-                        nama: "Fajar Pratama (01.0004)",
+                        nama: "Fajar Pratama",
+                        noInduk: "01.0004",
                         kriteria: "Root Pass",
                         skor: 88,
                         creator: "siswa",
                       },
                       {
                         tgl: "03 Sep 2026",
-                        nama: "Fajar Pratama (01.0004)",
+                        nama: "Fajar Pratama",
+                        noInduk: "01.0004",
                         kriteria: "Hot Pass",
                         skor: 85,
                         creator: "siswa",
                       },
                       {
                         tgl: "03 Sep 2026",
-                        nama: "Budi Santoso (01.0002)",
+                        nama: "Budi Santoso",
+                        noInduk: "01.0002",
                         kriteria: "Capping Pass",
                         skor: 74,
                         creator: "superadmin",
                       },
                       {
                         tgl: "02 Sep 2026",
-                        nama: "Hendra Wijaya (01.0003)",
-                        kriteria: "Gerinda",
+                        nama: "Hendra Wijaya",
+                        noInduk: "01.0003",
+                        kriteria: "Gerinda Akhir",
                         skor: 92,
                         creator: "siswa",
                       },
-                    ].map((row, idx) => (
-                      <tr key={idx} className="hover:bg-[#1F2937]/40 transition-colors">
-                        <td className="p-3.5 font-mono text-[#9CA3AF]">{row.tgl}</td>
-                        <td className="p-3.5 font-semibold text-[#F9FAFB]">{row.nama}</td>
-                        <td className="p-3.5 text-[#D1D5DB]">{row.kriteria}</td>
-                        <td className="p-3.5 text-center">
-                          <span
-                            className={`font-bold px-2 py-0.5 rounded ${
-                              row.skor >= 80
-                                ? "bg-[#10B981]/20 text-[#10B981]"
-                                : "bg-[#F59E0B]/20 text-[#F59E0B]"
-                            }`}
-                          >
+                    ].map((row, idx) => {
+                      const isLulus = row.skor >= 80;
+                      return (
+                        <tr key={idx} className="hover:bg-[#1F2937]/40 transition-colors">
+                          <td className="p-3.5 font-mono text-[#9CA3AF]">{row.tgl}</td>
+                          <td className="p-3.5">
+                            <span className="font-semibold text-[#F9FAFB] block">{row.nama}</span>
+                            <span className="font-mono text-[10px] text-[#9CA3AF]">{row.noInduk}</span>
+                          </td>
+                          <td className="p-3.5 text-[#D1D5DB] font-medium">{row.kriteria}</td>
+                          <td className="p-3.5 text-center font-mono font-bold text-sm text-[#F9FAFB]">
                             {row.skor}
-                          </span>
-                        </td>
-                        <td className="p-3.5">
-                          {row.creator === "siswa" ? (
-                            <Badge variant="secondary">Mandiri Siswa</Badge>
-                          ) : (
-                            <Badge variant="spark">Instruktur LPKS</Badge>
-                          )}
-                        </td>
-                        <td className="p-3.5 text-right space-x-2">
-                          <Button size="sm" variant="ghost" className="h-7 text-xs">
-                            Koreksi
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="p-3.5">
+                            {isLulus ? (
+                              <div className="inline-flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded text-[11px] font-semibold">
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>≥ 80 (Lulus)</span>
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1 text-[#F59E0B] bg-[#F59E0B]/15 px-2 py-0.5 rounded text-[11px] font-semibold">
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>&lt; 80 (Kurang)</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3.5">
+                            {row.creator === "siswa" ? (
+                              <Badge variant="secondary">Mandiri Siswa</Badge>
+                            ) : (
+                              <Badge variant="spark">Instruktur LPKS</Badge>
+                            )}
+                          </td>
+                          <td className="p-3.5 text-right space-x-2">
+                            <Button size="sm" variant="ghost" className="h-7 text-xs">
+                              Koreksi
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -899,17 +1204,17 @@ export default function MockupPage() {
         )}
 
         {/* =========================================================================
-            LAYAR 6: SUPERADMIN — UJIAN INTERNAL & GATE-CHECK SERTIFIKAT (DESKTOP)
+            SUPERADMIN — UJIAN & GATE-CHECK SERTIFIKAT
             ========================================================================= */}
-        {activeTab === "layar6" && (
+        {activeTab === "admin_ujian" && (
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h2 className="text-base font-bold text-[#F9FAFB]">
-                  Layar 6: Superadmin — Ujian Internal & Panel Gate-Check Sertifikat
+                  Layar 6: Superadmin — Ujian Internal &amp; Panel Gate-Check Sertifikat
                 </h2>
                 <p className="text-xs text-[#9CA3AF]">
-                  Simulasikan 2 kondisi gate: Sertifikat terkunci (syarat belum terpenuhi) vs Terbuka siap cetak PDF.
+                  Simulasikan 2 kondisi gate: Sertifikat terkunci (syarat belum terpenuhi) vs Terbuka siap cetak PDF resmi.
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -918,14 +1223,16 @@ export default function MockupPage() {
                   size="sm"
                   variant={gateCondition === "locked" ? "danger" : "outline"}
                   onClick={() => setGateCondition("locked")}
+                  className="text-xs"
                 >
                   <Lock className="h-3.5 w-3.5 mr-1" />
-                  Terkunci (Belum Lunas / Nilai &lt; 80)
+                  Terkunci (Cicilan / Nilai &lt; 80)
                 </Button>
                 <Button
                   size="sm"
                   variant={gateCondition === "unlocked" ? "emerald" : "outline"}
                   onClick={() => setGateCondition("unlocked")}
+                  className="text-xs"
                 >
                   <Unlock className="h-3.5 w-3.5 mr-1" />
                   Terbuka (Lunas &amp; Lulus)
@@ -939,7 +1246,7 @@ export default function MockupPage() {
                 <CardHeader>
                   <CardTitle className="text-sm">Penilaian Ujian Akhir Internal</CardTitle>
                   <CardDescription>
-                    Siswa: Fajar Pratama (01.0004) — Program: SMAW 6G Pipa
+                    Siswa: Fajar Pratama (01.0004) — Program: SMAW 6G Pipa Industri
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -951,36 +1258,49 @@ export default function MockupPage() {
                       { key: "filler", label: "Filler Pass", val: gateCondition === "unlocked" ? 80 : 74 },
                       { key: "capping", label: "Capping Pass", val: gateCondition === "unlocked" ? 88 : 85 },
                       { key: "gerinda", label: "Gerinda Akhir", val: gateCondition === "unlocked" ? 90 : 88 },
-                    ].map((u) => (
-                      <div key={u.key} className="p-3 bg-[#0B0F17] border border-[#1F2937] rounded-lg">
-                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                          {u.label}
-                        </label>
-                        <div className="flex items-center justify-between">
-                          <input
-                            type="number"
-                            readOnly
-                            value={u.val}
-                            className="w-16 h-8 text-center font-bold bg-[#1F2937] rounded text-sm text-[#F9FAFB]"
-                          />
-                          <Badge variant={u.val >= 80 ? "success" : "danger"}>
-                            {u.val >= 80 ? "≥ 80" : "< 80"}
-                          </Badge>
+                    ].map((u) => {
+                      const isPassed = u.val >= 80;
+                      return (
+                        <div key={u.key} className="p-3 bg-[#0B0F17] border border-[#1F2937] rounded-lg">
+                          <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                            {u.label}
+                          </label>
+                          <div className="flex items-center justify-between">
+                            <input
+                              type="number"
+                              readOnly
+                              value={u.val}
+                              className="w-16 h-8 text-center font-bold bg-[#1F2937] rounded text-sm text-[#F9FAFB] font-mono"
+                            />
+                            {isPassed ? (
+                              <div className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                <CheckCircle2 className="h-3 w-3" />
+                                <span>≥ 80</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-[#F43F5E] bg-[#F43F5E]/15 px-2 py-0.5 rounded text-[10px] font-semibold">
+                                <XCircle className="h-3 w-3" />
+                                <span>&lt; 80</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  <div className="p-3 rounded-lg bg-[#0B0F17] border border-[#1F2937] flex items-center justify-between text-xs">
+                  <div className="p-3.5 rounded-lg bg-[#0B0F17] border border-[#1F2937] flex items-center justify-between text-xs">
                     <span className="text-[#9CA3AF]">Status Evaluasi Kelulusan Ujian:</span>
                     {gateCondition === "unlocked" ? (
-                      <Badge variant="success" className="text-xs font-bold">
-                        ✓ LULUS UJIAN INTERNAL (Semua kriteria ≥ 80)
-                      </Badge>
+                      <div className="flex items-center gap-1.5 text-[#10B981] font-bold">
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>LULUS UJIAN INTERNAL (Semua kriteria ≥ 80)</span>
+                      </div>
                     ) : (
-                      <Badge variant="danger" className="text-xs font-bold">
-                        ✕ BELUM LULUS (Filler Pass = 74 &lt; 80)
-                      </Badge>
+                      <div className="flex items-center gap-1.5 text-[#F43F5E] font-bold">
+                        <XCircle className="h-4 w-4" />
+                        <span>BELUM LULUS (Filler Pass = 74 &lt; 80)</span>
+                      </div>
                     )}
                   </div>
                 </CardContent>
@@ -999,28 +1319,40 @@ export default function MockupPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Syarat 1: Keuangan */}
-                  <div className="p-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] space-y-1">
+                  <div className="p-3.5 rounded-lg border border-[#1F2937] bg-[#0B0F17] space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#9CA3AF]">Syarat 1: Keuangan</span>
+                      <span className="text-[#9CA3AF] font-medium">Syarat 1: Keuangan</span>
                       {gateCondition === "unlocked" ? (
-                        <Badge variant="success">LUNAS (Rp 0 sisa)</Badge>
+                        <div className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded text-[11px] font-bold">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>LUNAS (Rp 0 sisa)</span>
+                        </div>
                       ) : (
-                        <Badge variant="warning">CICIL (Sisa Rp 3.5jt)</Badge>
+                        <div className="flex items-center gap-1 text-[#F59E0B] bg-[#F59E0B]/15 px-2 py-0.5 rounded text-[11px] font-bold">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span>CICIL (Sisa Rp 3.5jt)</span>
+                        </div>
                       )}
                     </div>
                     <p className="text-[11px] text-[#6B7280]">
-                      Total Biaya Program: Rp 8.500.000
+                      Biaya Program: Rp 8.500.000 — Pembayaran masuk valid
                     </p>
                   </div>
 
                   {/* Syarat 2: Ujian */}
-                  <div className="p-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] space-y-1">
+                  <div className="p-3.5 rounded-lg border border-[#1F2937] bg-[#0B0F17] space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-[#9CA3AF]">Syarat 2: Ujian Internal</span>
+                      <span className="text-[#9CA3AF] font-medium">Syarat 2: Ujian Internal</span>
                       {gateCondition === "unlocked" ? (
-                        <Badge variant="success">LULUS (Semua ≥ 80)</Badge>
+                        <div className="flex items-center gap-1 text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded text-[11px] font-bold">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>LULUS (Semua ≥ 80)</span>
+                        </div>
                       ) : (
-                        <Badge variant="danger">BELUM LULUS</Badge>
+                        <div className="flex items-center gap-1 text-[#F43F5E] bg-[#F43F5E]/15 px-2 py-0.5 rounded text-[11px] font-bold">
+                          <XCircle className="h-3 w-3" />
+                          <span>BELUM LULUS</span>
+                        </div>
                       )}
                     </div>
                     <p className="text-[11px] text-[#6B7280]">
@@ -1060,17 +1392,17 @@ export default function MockupPage() {
         {/* =========================================================================
             SHOWCASE: ASISTEN ANALITIK AI (GOOGLE GEMINI FLASH)
             ========================================================================= */}
-        {activeTab === "ai" && (
+        {activeTab === "ai_showcase" && (
           <div className="space-y-6">
             <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
               <div className="flex items-center gap-2">
                 <Bot className="h-5 w-5 text-[#DC2626]" />
                 <h2 className="text-base font-bold text-[#F9FAFB]">
-                  Showcase: Asisten Analitik AI (RAG Gemini Flash)
+                  Showcase: Asisten Analitik AI (RAG Google Gemini Flash)
                 </h2>
               </div>
               <p className="text-xs text-[#9CA3AF] mt-1">
-                Instruktur dapat menanyakan pertanyaan analitik bebas seputar performa bengkel dan siswa.
+                Instruktur dapat menanyakan pertanyaan analitik bebas seputar performa bengkel, nilai, dan absensi siswa.
               </p>
             </div>
 
