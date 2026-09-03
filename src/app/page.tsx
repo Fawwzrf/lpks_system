@@ -1,69 +1,108 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Flame, MapPin, TrendingUp, Award, ArrowRight, Bot, Monitor } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen bg-[#0B0F17] text-[#F9FAFB] flex flex-col font-sans">
+      {/* Navbar */}
+      <header className="border-b border-[#1F2937] bg-[#111827]/70 backdrop-blur-md px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-[#DC2626]/20 border border-[#DC2626]/40 flex items-center justify-center text-[#DC2626]">
+            <Flame className="h-5 w-5" />
+          </div>
+          <div>
+            <span className="font-bold text-sm tracking-tight text-[#F9FAFB]">LPKS SUMBU HIDUP</span>
+            <span className="block text-[10px] text-[#9CA3AF]">Sistem Pelatihan Pengelasan Terpadu</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+
+        <div className="flex items-center gap-3">
+          <Link href="/mockup">
+            <Button size="sm" variant="spark">
+              <Monitor className="h-3.5 w-3.5 mr-1.5" />
+              Buka Mockup Visual (Tahap 3)
+            </Button>
+          </Link>
+        </div>
+      </header>
+
+      {/* Hero Section */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center max-w-4xl mx-auto space-y-6">
+        <Badge variant="spark" className="text-xs px-3 py-1">
+          Tahap 3 SDLC: Desain UI/UX &amp; Mockup Visual
+        </Badge>
+
+        <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#F9FAFB] leading-tight">
+          Sistem Manajemen Pelatihan Pengelasan{" "}
+          <span className="text-[#DC2626]">Sumbu Hidup</span>
+        </h1>
+
+        <p className="text-sm sm:text-base text-[#9CA3AF] max-w-2xl leading-relaxed">
+          Platform berbasis web Next.js 15 &amp; Supabase untuk otomasi operasional LPKS: pendaftaran berkas fisik,
+          presensi GPS geofencing radius 100m, penilaian praktek 5 kriteria pengelasan, kalkulasi keuangan cicil/lunas,
+          dan penerbitan sertifikat resmi ber-gate check.
+        </p>
+
+        {/* Action Button */}
+        <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
+          <Link href="/mockup">
+            <Button size="lg" variant="spark" className="font-bold shadow-xl shadow-[#DC2626]/20">
+              Jelajahi Mockup Interaktif 6 Layar
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </Link>
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
+            href="https://github.com/Fawwzrf/lpks_system"
             target="_blank"
             rel="noopener noreferrer"
+            className="inline-flex items-center justify-center font-medium rounded-lg transition-colors border border-[#374151] bg-transparent text-[#F9FAFB] hover:bg-[#1F2937] px-6 h-12 text-sm"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+            Lihat di GitHub
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        </div>
+
+        {/* Feature Grid Highlights */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-12 text-left w-full">
+          <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] space-y-2">
+            <MapPin className="h-5 w-5 text-[#DC2626]" />
+            <h3 className="font-bold text-sm text-[#F9FAFB]">Presensi Geofencing</h3>
+            <p className="text-xs text-[#9CA3AF] leading-relaxed">
+              Validasi jarak koordinat GPS bengkel (radius 100m) dengan perlindungan rate limit 3 percobaan/hari.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] space-y-2">
+            <TrendingUp className="h-5 w-5 text-[#10B981]" />
+            <h3 className="font-bold text-sm text-[#F9FAFB]">Grafik Tren Nilai</h3>
+            <p className="text-xs text-[#9CA3AF] leading-relaxed">
+              Visualisasi tren Recharts multi-kriteria (Root, Hotpass, Filler, Capping, Gerinda) dengan garis ambang 80.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] space-y-2">
+            <Award className="h-5 w-5 text-[#F59E0B]" />
+            <h3 className="font-bold text-sm text-[#F9FAFB]">Gate-Check Sertifikat</h3>
+            <p className="text-xs text-[#9CA3AF] leading-relaxed">
+              Pencetakan PDF resmi otomatis terkunci oleh server sampai syarat keuangan lunas dan ujian $\ge 80$ terpenuhi.
+            </p>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#111827] border border-[#1F2937] space-y-2">
+            <Bot className="h-5 w-5 text-[#38BDF8]" />
+            <h3 className="font-bold text-sm text-[#F9FAFB]">AI RAG Showcase</h3>
+            <p className="text-xs text-[#9CA3AF] leading-relaxed">
+              Asisten analitik berbasis Google Gemini Flash untuk pertanyaan data operasional bahasa alami.
+            </p>
+          </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-[#1F2937] py-6 px-4 text-center text-xs text-[#6B7280]">
+        LPKS Pengelasan Sumbu Hidup &copy; {new Date().getFullYear()} &mdash; Arsitektur Monolitik Modal Rp 0 (Vercel &amp; Supabase Free Tier)
+      </footer>
     </div>
   );
 }
