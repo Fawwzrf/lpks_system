@@ -22,7 +22,9 @@ import {
   Navigation,
   Eye,
   Crosshair,
+  CornerDownLeft,
 } from "lucide-react";
+import { handleEnterToNextField } from "@/lib/form-utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -534,10 +536,19 @@ export default function MockupPage() {
             </div>
 
             <div className="flex justify-center">
-              <div className="w-full max-w-sm rounded-[36px] border-[6px] border-[#1F2937] bg-[#0B0F17] overflow-hidden shadow-2xl p-5 space-y-4">
+              <div
+                data-form-container="true"
+                className="w-full max-w-sm rounded-[36px] border-[6px] border-[#1F2937] bg-[#0B0F17] overflow-hidden shadow-2xl p-5 space-y-4"
+              >
                 <div className="flex items-center justify-between pb-2 border-b border-[#1F2937]">
                   <h3 className="font-bold text-sm text-[#F9FAFB]">Input Nilai Praktek</h3>
                   <Badge variant="secondary">03 Sep 2026</Badge>
+                </div>
+
+                {/* Keyboard Navigation Tip */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#111827] border border-[#1F2937] text-[10px] text-[#9CA3AF]">
+                  <CornerDownLeft className="h-3 w-3 text-[#10B981] shrink-0" />
+                  <span>Tekan <strong className="text-[#F9FAFB] font-mono">Enter</strong> pada kolom skor untuk langsung lompat &amp; seleksi kriteria berikutnya.</span>
                 </div>
 
                 <div className="space-y-3">
@@ -592,6 +603,7 @@ export default function MockupPage() {
                                 min={0}
                                 max={100}
                                 value={val}
+                                onKeyDown={handleEnterToNextField}
                                 onChange={(e) =>
                                   setScores({
                                     ...scores,
@@ -891,7 +903,7 @@ export default function MockupPage() {
                   </div>
                   <CardTitle className="text-sm">Biodata Siswa Baru</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent data-form-container="true" className="space-y-4">
                   {/* CALLOUT NOMOR INDUK BESAR & MENONJOL (SESUAI REQUEST USER) */}
                   <div className="p-4 rounded-xl bg-gradient-to-r from-[#1F2937] to-[#111827] border-l-4 border-[#DC2626] border-y border-r border-[#374151] flex flex-wrap items-center justify-between gap-4 shadow-lg">
                     <div>
@@ -914,13 +926,24 @@ export default function MockupPage() {
                     </div>
                   </div>
 
+                  {/* Keyboard Navigation Tip */}
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0B0F17] border border-[#1F2937] text-xs text-[#9CA3AF]">
+                    <CornerDownLeft className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
+                    <span>
+                      <strong>Mode Input Cepat:</strong> Tekan <strong className="text-[#F9FAFB] font-mono">Enter</strong> di setiap kolom untuk langsung beralih dan memilih teks pada kolom berikutnya tanpa perlu menggunakan mouse.
+                    </span>
+                  </div>
+
                   {/* Form Grid Lengkap */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
                     <div>
                       <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
                         Program Pelatihan:
                       </label>
-                      <select className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none">
+                      <select
+                        onKeyDown={handleEnterToNextField}
+                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                      >
                         <option value="01">01 — SMAW 6G Pipa Industri (Rp 8.500.000)</option>
                         <option value="02">02 — GTAW / TIG 6G (Rp 9.500.000)</option>
                         <option value="03">03 — GMAW / MIG 3G (Rp 7.500.000)</option>
@@ -934,6 +957,7 @@ export default function MockupPage() {
                       <input
                         type="text"
                         defaultValue="Budi Santoso"
+                        onKeyDown={handleEnterToNextField}
                         className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
@@ -946,6 +970,7 @@ export default function MockupPage() {
                         type="text"
                         defaultValue="3201234567890005"
                         maxLength={16}
+                        onKeyDown={handleEnterToNextField}
                         className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
                       />
                     </div>
@@ -957,6 +982,7 @@ export default function MockupPage() {
                       <input
                         type="email"
                         defaultValue="budi.santoso@gmail.com"
+                        onKeyDown={handleEnterToNextField}
                         className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
@@ -970,11 +996,13 @@ export default function MockupPage() {
                           type="text"
                           defaultValue="Bandung"
                           placeholder="Tempat"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
                         />
                         <input
                           type="date"
                           defaultValue="2003-04-12"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
                         />
                       </div>
@@ -987,6 +1015,7 @@ export default function MockupPage() {
                       <input
                         type="text"
                         defaultValue="081234567895"
+                        onKeyDown={handleEnterToNextField}
                         className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
                       />
                     </div>
@@ -1000,12 +1029,14 @@ export default function MockupPage() {
                           type="text"
                           defaultValue="Sutrisno"
                           placeholder="Nama Ayah"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
                         />
                         <input
                           type="text"
                           defaultValue="Sri Wahyuni"
                           placeholder="Nama Ibu"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
                         />
                       </div>
@@ -1020,12 +1051,14 @@ export default function MockupPage() {
                           type="text"
                           defaultValue="SMK Teknik Mesin"
                           placeholder="Pendidikan"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
                         />
                         <input
                           type="text"
                           defaultValue="0034567891"
                           placeholder="NISN"
+                          onKeyDown={handleEnterToNextField}
                           className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none font-mono"
                         />
                       </div>
@@ -1038,13 +1071,19 @@ export default function MockupPage() {
                       <input
                         type="text"
                         defaultValue="Jl. Raya Barat Industri No. 45, RT 02/04, Bandung"
+                        onKeyDown={handleEnterToNextField}
                         className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                       />
                     </div>
                   </div>
 
                   <div className="pt-3 flex justify-end">
-                    <Button variant="spark" size="md" className="font-bold text-xs h-11 px-6">
+                    <Button
+                      variant="spark"
+                      size="md"
+                      data-submit-btn="true"
+                      className="font-bold text-xs h-11 px-6"
+                    >
                       Daftarkan Siswa &amp; Terbitkan No Induk 01.0005
                     </Button>
                   </div>
