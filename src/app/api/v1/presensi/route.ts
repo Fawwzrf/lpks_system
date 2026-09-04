@@ -57,6 +57,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validasi hari: hanya Senin(1), Selasa(2), Rabu(3), Kamis(4), Sabtu(6)
+    // getDay() → 0=Minggu, 1=Sen, 2=Sel, 3=Rab, 4=Kam, 5=Jum, 6=Sab
+    const hariIni = new Date().getDay();
+    const hariAktif = [1, 2, 3, 4, 6]; // Senin–Kamis + Sabtu
+    if (!hariAktif.includes(hariIni)) {
+      return errorResponse(
+        "INVALID_DAY",
+        "Presensi hanya dapat dilakukan pada hari Senin–Kamis dan Sabtu.",
+        400
+      );
+    }
+
     const supabase = await createClient();
 
     // 1. Dapatkan profil siswa berdasarkan auth user aktif

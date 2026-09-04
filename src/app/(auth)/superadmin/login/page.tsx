@@ -2,16 +2,14 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Flame, Eye, EyeOff, Loader2, HelpCircle } from "lucide-react";
+import { ShieldCheck, Eye, EyeOff, Loader2 } from "lucide-react";
 import { handleEnterToNextField } from "@/lib/form-utils";
-import { Modal } from "@/components/ui/modal";
 
-export default function SiswaLoginPage() {
+export default function AdminLoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [forgotOpen, setForgotOpen] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -31,20 +29,14 @@ export default function SiswaLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Username atau kata sandi salah.");
+        setError(data.error ?? "Email atau kata sandi salah.");
         return;
       }
-      if (data.data?.user?.role !== "siswa") {
-        setError("Akun ini bukan akun siswa. Gunakan halaman login admin.");
+      if (data.data?.user?.role !== "superadmin") {
+        setError("Akun ini bukan akun admin. Gunakan halaman login siswa.");
         return;
       }
-
-      // Jika masih password default, arahkan ke halaman ganti sandi dulu
-      if (data.data?.user?.is_password_default) {
-        router.push("/siswa/akun?first_login=true");
-      } else {
-        router.push("/siswa/beranda");
-      }
+      router.push("/superadmin/dashboard");
     } catch {
       setError("Tidak dapat terhubung ke server. Coba lagi.");
     } finally {
@@ -57,10 +49,10 @@ export default function SiswaLoginPage() {
       {/* Logo */}
       <div className="flex flex-col items-center mb-8">
         <div className="h-14 w-14 rounded-2xl bg-[#DC2626]/15 border border-[#DC2626]/30 flex items-center justify-center mb-4">
-          <Flame className="h-7 w-7 text-[#DC2626]" aria-hidden="true" />
+          <ShieldCheck className="h-7 w-7 text-[#DC2626]" aria-hidden="true" />
         </div>
-        <h1 className="text-xl font-bold text-[#F9FAFB] tracking-tight">LPKS Sumbu Hidup</h1>
-        <p className="text-xs text-[#6B7280] mt-1">Portal Siswa — Sistem Manajemen Pelatihan</p>
+        <h1 className="text-xl font-bold text-[#F9FAFB] tracking-tight">Panel Admin</h1>
+        <p className="text-xs text-[#6B7280] mt-1">LPKS Sumbu Hidup — Superadmin Access</p>
       </div>
 
       {/* Card */}
@@ -72,18 +64,18 @@ export default function SiswaLoginPage() {
           className="flex flex-col gap-4"
           noValidate
         >
-          {/* Username */}
+          {/* Email */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="identifier" className="text-xs font-medium text-[#9CA3AF]">
-              Username
+              Email Admin
             </label>
             <input
               id="identifier"
               name="identifier"
-              type="text"
-              autoComplete="username"
+              type="email"
+              autoComplete="email"
               required
-              placeholder="budi42"
+              placeholder="admin@lpks.id"
               data-next="password"
               className="h-9 w-full rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
             />
@@ -133,53 +125,15 @@ export default function SiswaLoginPage() {
             {loading ? (
               <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Masuk...</>
             ) : (
-              "Masuk"
+              "Masuk sebagai Admin"
             )}
           </button>
         </form>
-
-        {/* Forgot password link */}
-        <button
-          type="button"
-          onClick={() => setForgotOpen(true)}
-          className="mt-4 flex items-center gap-1.5 text-[11px] text-[#6B7280] hover:text-[#9CA3AF] transition-colors mx-auto"
-        >
-          <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
-          Lupa kata sandi?
-        </button>
       </div>
 
       <p className="text-center text-[11px] text-[#4B5563] mt-5">
         LPKS Sumbu Hidup &copy; {new Date().getFullYear()}
       </p>
-
-      {/* Forgot Password Modal */}
-      <Modal
-        open={forgotOpen}
-        onClose={() => setForgotOpen(false)}
-        title="Lupa Kata Sandi?"
-        size="sm"
-      >
-        <div className="flex flex-col gap-3 text-center">
-          <div className="h-12 w-12 rounded-2xl bg-[#F59E0B]/15 border border-[#F59E0B]/30 flex items-center justify-center mx-auto">
-            <HelpCircle className="h-6 w-6 text-[#F59E0B]" aria-hidden="true" />
-          </div>
-          <p className="text-xs text-[#D1D5DB] leading-relaxed">
-            Untuk mengatur ulang kata sandi atau mengetahui username Anda, silakan{" "}
-            <strong className="text-[#F9FAFB]">hubungi admin LPKS Sumbu Hidup</strong>{" "}
-            secara langsung.
-          </p>
-          <p className="text-[11px] text-[#6B7280]">
-            Admin dapat mengatur ulang kata sandi Anda dari sistem.
-          </p>
-          <button
-            onClick={() => setForgotOpen(false)}
-            className="h-9 w-full rounded-lg bg-[#1F2937] hover:bg-[#374151] text-xs font-medium text-[#F9FAFB] transition-colors"
-          >
-            Mengerti
-          </button>
-        </div>
-      </Modal>
     </div>
   );
 }

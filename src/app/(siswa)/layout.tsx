@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MapPin, ClipboardList, BarChart2, Wallet, Flame } from "lucide-react";
+import { Home, MapPin, ClipboardList, BarChart2, Wallet, Flame, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -28,10 +28,19 @@ export default function SiswaLayout({ children }: { children: React.ReactNode })
           <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">LPKS Sumbu Hidup</span>
           <span className="text-[10px] text-[#6B7280] block truncate leading-tight">Portal Siswa</span>
         </div>
-        {/* Badge nomor induk */}
-        <div className="font-mono text-[10px] text-[#DC2626] bg-[#DC2626]/10 border border-[#DC2626]/20 rounded-lg px-2 py-1 leading-none shrink-0">
-          LPKS-2025-1042
-        </div>
+        {/* Gear icon — menuju pengaturan akun */}
+        <Link
+          href="/siswa/akun"
+          aria-label="Pengaturan Akun"
+          className={cn(
+            "h-8 w-8 rounded-xl flex items-center justify-center border transition-colors shrink-0",
+            pathname.startsWith("/siswa/akun")
+              ? "border-[#DC2626]/40 bg-[#DC2626]/15 text-[#DC2626]"
+              : "border-[#1F2937] bg-[#0B0F17] text-[#6B7280] hover:text-[#D1D5DB] hover:border-[#374151]"
+          )}
+        >
+          <Settings className="h-4 w-4" aria-hidden="true" />
+        </Link>
       </header>
 
       {/* Page Content */}

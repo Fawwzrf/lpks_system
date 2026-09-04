@@ -44,6 +44,12 @@ const STATUS_COLOR = { Hadir: "text-[#10B981]", Izin: "text-[#F59E0B]", Sakit: "
 
 export default function PresensiSiswaPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Validasi hari: Senin(1)–Kamis(4) + Sabtu(6)
+  const hariIni = new Date().getDay();
+  const isHariAktif = [1, 2, 3, 4, 6].includes(hariIni);
+  const NAMA_HARI = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+
   const [position, setPosition] = useState<GeolocationPosition | null>(null);
   const [geoError, setGeoError] = useState<string | null>(
     typeof window !== "undefined" && !navigator.geolocation
@@ -157,8 +163,25 @@ export default function PresensiSiswaPage() {
     <div className="flex flex-col gap-4">
       <div>
         <h1 className="text-base font-bold text-[#F9FAFB]">Presensi GPS</h1>
-        <p className="text-xs text-[#6B7280] mt-0.5">Absen hanya tersedia di area bengkel (radius 100m).</p>
+        <p className="text-xs text-[#6B7280] mt-0.5">
+          Absen tersedia Senin–Kamis dan Sabtu, di area bengkel (radius 100m).
+        </p>
       </div>
+
+      {/* Banner hari tidak aktif */}
+      {!isHariAktif && (
+        <div className="rounded-xl border border-[#6B7280]/30 bg-[#1F2937] px-4 py-3 flex items-center gap-3">
+          <span className="text-lg" aria-hidden="true">🚫</span>
+          <div>
+            <p className="text-xs font-semibold text-[#D1D5DB]">
+              Hari {NAMA_HARI[hariIni]} — Tidak Ada Sesi
+            </p>
+            <p className="text-[11px] text-[#6B7280] mt-0.5">
+              Presensi hanya bisa dilakukan Senin–Kamis dan Sabtu.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Radar Map */}
       <div className="rounded-xl border border-[#1F2937] bg-[#111827] overflow-hidden">
@@ -197,9 +220,9 @@ export default function PresensiSiswaPage() {
       ) : (
         <button
           onClick={doAbsen}
-          disabled={!inZone || absenLoading}
+          disabled={!inZone || absenLoading || !isHariAktif}
           className="h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
-          aria-disabled={!inZone}
+          aria-disabled={!inZone || !isHariAktif}
         >
           {absenLoading
             ? <><Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...</>

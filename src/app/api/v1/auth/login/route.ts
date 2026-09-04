@@ -5,22 +5,31 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password } = body;
+    const { identifier, password } = body;
+    // identifier = email (untuk admin) ATAU username (untuk siswa)
 
-    if (!email || !password) {
-      return errorResponse("VALIDATION_ERROR", "Email dan kata sandi wajib diisi.", 400);
+    if (!identifier || !password) {
+      return errorResponse("VALIDATION_ERROR", "Identifier dan kata sandi wajib diisi.", 400);
     }
 
     const supabase = await createClient();
+
+    // Tentukan email yang dipakai untuk login:
+    // - Jika mengandung '@', asumsikan email langsung (admin login)
+    // - Jika tidak, asumsikan username siswa → konversi ke username@lpks.id
+    const loginEmail = identifier.includes("@")
+      ? identifier.trim()
+      : `${identifier.trim().toLowerCase()}@lpks.id`;
+
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
+      email: loginEmail,
       password,
     });
 
     if (error || !data.user) {
       return errorResponse(
         "INVALID_CREDENTIALS",
-        "Email atau kata sandi yang Anda masukkan salah.",
+        "Username/email atau kata sandi yang Anda masukkan salah.",
         401
       );
     }
@@ -28,15 +37,19 @@ export async function POST(request: NextRequest) {
     const role = data.user.user_metadata?.role || "siswa";
     const nama = data.user.user_metadata?.nama || data.user.email?.split("@")[0];
 
-    // Jika role siswa, ambil data siswa terkait
     let siswaId = null;
+    let isPasswordDefault = false;
+    let username = null;
+
     if (role === "siswa") {
       const { data: siswa } = await supabase
         .from("siswa")
-        .select("id")
+        .select("id, is_password_default, username")
         .eq("auth_id", data.user.id)
         .single();
       siswaId = siswa?.id || null;
+      isPasswordDefault = siswa?.is_password_default ?? false;
+      username = siswa?.username || null;
     }
 
     return successResponse({
@@ -46,6 +59,8 @@ export async function POST(request: NextRequest) {
         role,
         nama,
         siswa_id: siswaId,
+        username,
+        is_password_default: isPasswordDefault,
       },
       message: "Login berhasil.",
     });
