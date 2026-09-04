@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/database";
+import { formatSuccessPayload, formatErrorPayload } from "./response-format.ts";
 
 export interface ApiErrorDetail {
   code: string;
@@ -9,26 +10,11 @@ export interface ApiErrorDetail {
 }
 
 export function successResponse<T>(data: T, meta?: Record<string, unknown>, status = 200) {
-  return NextResponse.json(
-    {
-      data,
-      ...(meta ? { meta } : {}),
-    },
-    { status }
-  );
+  return NextResponse.json(formatSuccessPayload(data, meta), { status });
 }
 
 export function errorResponse(code: string, message: string, status = 400, details?: unknown) {
-  return NextResponse.json(
-    {
-      error: {
-        code,
-        message,
-        ...(details ? { details } : {}),
-      },
-    },
-    { status }
-  );
+  return NextResponse.json(formatErrorPayload(code, message, details), { status });
 }
 
 export async function getCurrentUser() {
