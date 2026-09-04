@@ -1,28 +1,49 @@
 import { NextRequest } from "next/server";
-import { successResponse, errorResponse, requireAuth, requireSuperadmin } from "@/lib/api-response";
+import { successResponse, errorResponse, requireAuth } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { user, errorResponse: authError } = await requireAuth();
     if (authError) return authError;
 
     const supabase = await createClient();
     const searchParams = request.nextUrl.searchParams;
 
-    const tanggal = searchParams.get("tanggal") || new Date().toISOString().split("T")[0];
-    const siswaId = searchParams.get("siswa_id");
+    const tanggal = searchParams.get("tanggal");
+    let siswaId = searchParams.get("siswa_id");
     const status = searchParams.get("status");
+    const limit = parseInt(searchParams.get("limit") || "50", 10);
+
+    // Jika siswa yang mengakses, batasi hanya ke data miliknya
+    if (user?.role === "siswa") {
+      const { data: selfSiswa } = await supabase
+        .from("siswa")
+        .select("id")
+        .eq("auth_id", user.id)
+        .single();
+      if (!selfSiswa) {
+        return errorResponse("STUDENT_NOT_FOUND", "Data siswa tidak ditemukan.", 404);
+      }
+      siswaId = selfSiswa.id;
+    }
 
     let query = supabase
       .from("presensi")
-      .select("*, siswa:siswa(id, nomor_induk, nama_lengkap, program:master_program(nama))")
-      .eq("tanggal", tanggal);
+      .select("*, siswa:siswa(id, nomor_induk, nama_lengkap, program:master_program(nama))");
+
+    if (tanggal) {
+      query = query.eq("tanggal", tanggal);
+    } else if (user?.role === "superadmin" && !siswaId) {
+      // Default superadmin melihat hari ini jika tanggal tidak diisi
+      const today = new Date().toISOString().split("T")[0];
+      query = query.eq("tanggal", today);
+    }
 
     if (siswaId) query = query.eq("siswa_id", siswaId);
     if (status) query = query.eq("status", status);
 
-    query = query.order("jam", { ascending: false });
+    query = query.order("tanggal", { ascending: false }).order("jam", { ascending: false }).limit(limit);
 
     const { data, error } = await query;
 
@@ -30,7 +51,7 @@ export async function GET(request: NextRequest) {
       return errorResponse("DATABASE_ERROR", "Gagal memuat log presensi.", 500, error.message);
     }
 
-    return successResponse(data, { tanggal });
+    return successResponse(data);
   } catch (err) {
     return errorResponse(
       "INTERNAL_ERROR",

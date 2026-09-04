@@ -67,9 +67,26 @@ function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
+  const [adminUser, setAdminUser] = useState<{ nama?: string; email?: string } | null>(null);
+
+  React.useEffect(() => {
+    async function loadAdmin() {
+      try {
+        const res = await fetch("/api/v1/auth/me");
+        if (res.ok) {
+          const json = await res.json();
+          setAdminUser(json.data?.user);
+        }
+      } catch (e) {
+        console.error("Gagal memuat info admin:", e);
+      }
+    }
+    loadAdmin();
+  }, []);
+
   async function handleLogout() {
     await fetch("/api/v1/auth/logout", { method: "POST" });
-    router.push("/login");
+    router.push("/superadmin/login");
   }
 
   return (
@@ -86,8 +103,12 @@ function Sidebar({
         </div>
         {(!collapsed || isMobile) && (
           <div className="overflow-hidden">
-            <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">LPKS Sumbu Hidup</span>
-            <span className="text-[10px] text-[#6B7280] block truncate leading-tight">Superadmin</span>
+            <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">
+              {adminUser?.nama || "LPKS Sumbu Hidup"}
+            </span>
+            <span className="text-[10px] text-[#6B7280] block truncate leading-tight">
+              {adminUser?.email || "Superadmin"}
+            </span>
           </div>
         )}
         {isMobile && onClose && (

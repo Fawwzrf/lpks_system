@@ -65,3 +65,32 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return errorResponse("VALIDATION_ERROR", "Parameter id wajib disertakan.", 400);
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.from("master_syarat_berkas").delete().eq("id", id);
+
+    if (error) {
+      return errorResponse("DATABASE_ERROR", "Gagal menghapus syarat berkas.", 500, error.message);
+    }
+
+    return successResponse({ deleted_id: id });
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal menghapus data syarat berkas.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+

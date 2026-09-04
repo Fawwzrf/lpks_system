@@ -69,3 +69,35 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return errorResponse("VALIDATION_ERROR", "Parameter id wajib disertakan.", 400);
+    }
+
+    const supabase = await createClient();
+    const { error } = await supabase.from("master_program").delete().eq("id", id);
+
+    if (error) {
+      if (error.code === "23503") {
+        return errorResponse("FK_CONSTRAINT", "Program tidak dapat dihapus karena masih digunakan oleh data siswa.", 409);
+      }
+      return errorResponse("DATABASE_ERROR", "Gagal menghapus program.", 500, error.message);
+    }
+
+    return successResponse({ deleted_id: id });
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal menghapus data program.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+

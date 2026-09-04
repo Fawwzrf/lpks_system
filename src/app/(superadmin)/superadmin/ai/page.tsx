@@ -34,10 +34,12 @@ export default function AiPage() {
       const res = await fetch("/api/v1/ai/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: text.trim() }),
+        body: JSON.stringify({ pertanyaan: text.trim(), query: text.trim() }),
       });
       const data = await res.json();
-      setMessages((prev) => [...prev, { role: "assistant", content: data.answer ?? "Terjadi kesalahan." }]);
+      const reply =
+        data.data?.jawaban || data.data?.answer || data.answer || "Maaf, respon AI tidak valid.";
+      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Tidak dapat menghubungi server AI." }]);
     } finally {
@@ -56,7 +58,9 @@ export default function AiPage() {
         body: JSON.stringify({ type: "weekly" }),
       });
       const data = await res.json();
-      setSummary(data.summary ?? "Gagal menghasilkan ringkasan.");
+      const summaryText =
+        data.data?.summary || data.summary || "Gagal menghasilkan ringkasan mingguan.";
+      setSummary(summaryText);
     } catch {
       setSummary("Tidak dapat menghubungi server AI.");
     } finally {

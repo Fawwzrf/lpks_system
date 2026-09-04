@@ -18,6 +18,26 @@ export default function AkunPage() {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [profile, setProfile] = useState<{ username?: string; nama?: string } | null>(null);
+
+  React.useEffect(() => {
+    async function loadMe() {
+      try {
+        const res = await fetch("/api/v1/auth/me");
+        if (res.ok) {
+          const json = await res.json();
+          const u = json.data?.user;
+          setProfile({
+            username: u?.siswa?.username || u?.username,
+            nama: u?.siswa?.nama_lengkap || u?.nama,
+          });
+        }
+      } catch (err) {
+        console.error("Gagal memuat info profil akun:", err);
+      }
+    }
+    loadMe();
+  }, []);
 
   const match = passwordBaru === konfirmasi;
   const minLength = passwordBaru.length >= 6;
@@ -37,7 +57,7 @@ export default function AkunPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Gagal mengubah kata sandi.");
+        setError(data.error?.message ?? (typeof data.error === "string" ? data.error : "Gagal mengubah kata sandi."));
         return;
       }
       setDone(true);
@@ -84,6 +104,19 @@ export default function AkunPage() {
         <h1 className="text-base font-bold text-[#F9FAFB]">Pengaturan Akun</h1>
         <p className="text-xs text-[#6B7280] mt-0.5">Ganti kata sandi akun siswa Anda.</p>
       </div>
+
+      {profile && (
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] px-4 py-3 flex items-center justify-between text-xs">
+          <div>
+            <p className="text-[10px] text-[#6B7280]">Akun Siswa</p>
+            <p className="font-semibold text-[#F9FAFB]">{profile.nama || "Siswa"}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] text-[#6B7280]">Username Login</p>
+            <p className="font-mono font-bold text-[#DC2626]">{profile.username || "—"}</p>
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5">
         <div className="flex items-center gap-2.5 mb-5">

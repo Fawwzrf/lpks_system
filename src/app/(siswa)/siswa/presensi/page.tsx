@@ -18,29 +18,26 @@ function haversine(lat1: number, lon1: number, lat2: number, lon2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-interface LogEntry {
-  id: number;
+interface PresensiItem {
+  id: string;
   tanggal: string;
-  waktu: string;
+  jam: string;
   status: "Hadir" | "Izin" | "Sakit" | "Alpa";
-  jarak?: number;
+  jarak_meter?: number;
 }
 
-const LOG_DUMMY: LogEntry[] = [
-  { id: 1, tanggal: "Senin, 01 Sep", waktu: "07:52", status: "Hadir", jarak: 45 },
-  { id: 2, tanggal: "Selasa, 02 Sep", waktu: "08:10", status: "Hadir", jarak: 32 },
-  { id: 3, tanggal: "Rabu, 03 Sep", waktu: "—",     status: "Alpa" },
-  { id: 4, tanggal: "Kamis, 04 Sep", waktu: "07:58", status: "Hadir", jarak: 78 },
-  { id: 5, tanggal: "Jumat, 05 Sep", waktu: "08:25", status: "Sakit" },
-];
-
-const STATUS_ICON = {
+const STATUS_ICON: Record<string, React.ReactNode> = {
   Hadir: <CheckCircle2 className="h-3.5 w-3.5 text-[#10B981]" aria-hidden="true" />,
   Izin:  <AlertTriangle className="h-3.5 w-3.5 text-[#F59E0B]" aria-hidden="true" />,
   Sakit: <AlertTriangle className="h-3.5 w-3.5 text-[#38BDF8]" aria-hidden="true" />,
   Alpa:  <XCircle className="h-3.5 w-3.5 text-[#F43F5E]" aria-hidden="true" />,
 };
-const STATUS_COLOR = { Hadir: "text-[#10B981]", Izin: "text-[#F59E0B]", Sakit: "text-[#38BDF8]", Alpa: "text-[#F43F5E]" };
+const STATUS_COLOR: Record<string, string> = {
+  Hadir: "text-[#10B981]",
+  Izin: "text-[#F59E0B]",
+  Sakit: "text-[#38BDF8]",
+  Alpa: "text-[#F43F5E]"
+};
 
 export default function PresensiSiswaPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,6 +47,7 @@ export default function PresensiSiswaPage() {
   const isHariAktif = [1, 2, 3, 4, 6].includes(hariIni);
   const NAMA_HARI = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
 
+  const [bengkelLoc, setBengkelLoc] = useState({ lat: BENGKEL_LAT, lng: BENGKEL_LON, radius: RADIUS_M });
   const [position, setPosition] = useState<GeolocationPosition | null>(null);
   const [geoError, setGeoError] = useState<string | null>(
     typeof window !== "undefined" && !navigator.geolocation
@@ -59,6 +57,57 @@ export default function PresensiSiswaPage() {
   const [distance, setDistance] = useState<number | null>(null);
   const [absenDone, setAbsenDone] = useState(false);
   const [absenLoading, setAbsenLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+  const [riwayat, setRiwayat] = useState<PresensiItem[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [remainingAttempts, setRemainingAttempts] = useState<number>(3);
+
+  // Load initial data: master lokasi, status hari ini, dan riwayat presensi
+  const loadData = useCallback(async () => {
+    try {
+      // 1. Lokasi LPKS
+      const resLokasi = await fetch("/api/v1/master/lokasi");
+      if (resLokasi.ok) {
+        const json = await resLokasi.json();
+        const aktif = json.data?.find((l: { is_active: boolean }) => l.is_active) || json.data?.[0];
+        if (aktif) {
+          setBengkelLoc({
+            lat: Number(aktif.lat),
+            lng: Number(aktif.lng),
+            radius: Number(aktif.radius_meter) || RADIUS_M,
+          });
+        }
+      }
+
+      // 2. Status Presensi Hari Ini
+      const resToday = await fetch("/api/v1/presensi/today");
+      if (resToday.ok) {
+        const json = await resToday.json();
+        if (json.data?.sudah_absen) {
+          setAbsenDone(true);
+        }
+        if (typeof json.data?.sisa_percobaan_hari_ini === "number") {
+          setRemainingAttempts(json.data.sisa_percobaan_hari_ini);
+        }
+      }
+
+      // 3. Riwayat Presensi
+      const resHistory = await fetch("/api/v1/presensi?limit=10");
+      if (resHistory.ok) {
+        const json = await resHistory.json();
+        setRiwayat(json.data || []);
+      }
+    } catch (err) {
+      console.error("Gagal memuat status presensi:", err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   // Radar canvas draw
   const drawRadar = useCallback((dist: number | null) => {
@@ -91,7 +140,7 @@ export default function PresensiSiswaPage() {
     ctx.fillStyle = "#DC2626";
     ctx.fill();
 
-    // Safe zone ring (100m)
+    // Safe zone ring (radius toleransi)
     ctx.beginPath();
     ctx.arc(cx, cy, maxR * 0.5, 0, Math.PI * 2);
     ctx.strokeStyle = "rgba(220,38,38,0.35)";
@@ -104,14 +153,15 @@ export default function PresensiSiswaPage() {
     ctx.fillStyle = "#6B7280";
     ctx.font = "10px system-ui";
     ctx.textAlign = "left";
-    ctx.fillText("100m", cx + maxR * 0.5 + 4, cy + 4);
-    ctx.fillText("200m", cx + maxR * 1 + 4, cy + 4);
+    ctx.fillText(`${bengkelLoc.radius}m`, cx + maxR * 0.5 + 4, cy + 4);
+    ctx.fillText(`${bengkelLoc.radius * 2}m`, cx + maxR * 1 + 4, cy + 4);
 
     // User pin
     if (dist !== null) {
-      const clampedFraction = Math.min(dist / 200, 1);
+      const maxRange = bengkelLoc.radius * 2;
+      const clampedFraction = Math.min(dist / maxRange, 1);
       const userR = maxR * clampedFraction;
-      const inZone = dist <= RADIUS_M;
+      const inZone = dist <= bengkelLoc.radius;
 
       // Pulse ring
       ctx.beginPath();
@@ -126,7 +176,7 @@ export default function PresensiSiswaPage() {
       ctx.fillStyle = inZone ? "#10B981" : "#F59E0B";
       ctx.fill();
     }
-  }, []);
+  }, [bengkelLoc]);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -134,29 +184,56 @@ export default function PresensiSiswaPage() {
       (pos) => {
         setPosition(pos);
         setGeoError(null);
-        const d = haversine(pos.coords.latitude, pos.coords.longitude, BENGKEL_LAT, BENGKEL_LON);
+        const d = haversine(pos.coords.latitude, pos.coords.longitude, bengkelLoc.lat, bengkelLoc.lng);
         setDistance(Math.round(d));
         drawRadar(d);
       },
-      () => setGeoError("Izin lokasi ditolak atau tidak tersedia."),
+      () => setGeoError("Izin lokasi ditolak atau tidak tersedia. Pastikan GPS aktif."),
       { enableHighAccuracy: true, maximumAge: 5000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [drawRadar]);
+  }, [drawRadar, bengkelLoc]);
 
   useEffect(() => {
     drawRadar(distance);
   }, [distance, drawRadar]);
 
-  const inZone = distance !== null && distance <= RADIUS_M;
+  const inZone = distance !== null && distance <= bengkelLoc.radius;
   const alreadyAbsen = absenDone;
 
   async function doAbsen() {
     if (!inZone || alreadyAbsen || !position) return;
     setAbsenLoading(true);
-    await new Promise((r) => setTimeout(r, 800)); // Tahap 5 → POST /api/v1/presensi
-    setAbsenLoading(false);
-    setAbsenDone(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    try {
+      const res = await fetch("/api/v1/presensi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSubmitError(data.error?.message || "Gagal mencatat presensi.");
+        if (data.error?.code === "ALREADY_CHECKED_IN") {
+          setAbsenDone(true);
+        }
+        return;
+      }
+
+      setSubmitSuccess(data.data?.message || "Presensi berhasil dicatat!");
+      setAbsenDone(true);
+      await loadData();
+    } catch {
+      setSubmitError("Tidak dapat terhubung ke server presensi.");
+    } finally {
+      setAbsenLoading(false);
+    }
   }
 
   return (
@@ -164,7 +241,7 @@ export default function PresensiSiswaPage() {
       <div>
         <h1 className="text-base font-bold text-[#F9FAFB]">Presensi GPS</h1>
         <p className="text-xs text-[#6B7280] mt-0.5">
-          Absen tersedia Senin–Kamis dan Sabtu, di area bengkel (radius 100m).
+          Absen tersedia Senin–Kamis dan Sabtu, di area bengkel (radius {bengkelLoc.radius}m).
         </p>
       </div>
 
@@ -207,10 +284,26 @@ export default function PresensiSiswaPage() {
                 : "Mendeteksi lokasi..."}
           </p>
           <p className="text-[11px] text-[#6B7280]">
-            {inZone ? "Anda berada dalam zona presensi ✓" : "Di luar zona presensi (> 100m)"}
+            {inZone
+              ? `Anda berada dalam zona presensi (maks. ${bengkelLoc.radius}m) ✓`
+              : `Di luar zona presensi (> ${bengkelLoc.radius}m)`}
           </p>
         </div>
       </div>
+
+      {/* Feedback Messages */}
+      {submitError && (
+        <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 text-xs text-[#F43F5E] flex items-center gap-2">
+          <XCircle className="h-4 w-4 shrink-0" />
+          <span>{submitError}</span>
+        </div>
+      )}
+      {submitSuccess && (
+        <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/10 p-3 text-xs text-[#10B981] flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4 shrink-0" />
+          <span>{submitSuccess}</span>
+        </div>
+      )}
 
       {/* Absen Button */}
       {alreadyAbsen ? (
@@ -220,41 +313,51 @@ export default function PresensiSiswaPage() {
       ) : (
         <button
           onClick={doAbsen}
-          disabled={!inZone || absenLoading || !isHariAktif}
+          disabled={!inZone || absenLoading || !isHariAktif || remainingAttempts <= 0}
           className="h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
-          aria-disabled={!inZone || !isHariAktif}
+          aria-disabled={!inZone || !isHariAktif || remainingAttempts <= 0}
         >
           {absenLoading
             ? <><Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...</>
-            : <><MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang</>}
+            : <><MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}</>}
         </button>
       )}
 
       {/* Riwayat Log */}
-      <section aria-label="Riwayat presensi 7 hari terakhir">
+      <section aria-label="Riwayat presensi siswa">
         <h2 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest mb-3 flex items-center gap-2">
           <Clock className="h-3.5 w-3.5" aria-hidden="true" /> Riwayat Presensi
         </h2>
-        <ul className="flex flex-col gap-2">
-          {LOG_DUMMY.map((entry) => (
-            <li
-              key={entry.id}
-              className="flex items-center gap-3 bg-[#111827] rounded-xl border border-[#1F2937] px-4 py-3"
-            >
-              {STATUS_ICON[entry.status]}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-[#D1D5DB] truncate">{entry.tanggal}</p>
-                {entry.jarak && (
-                  <p className="text-[11px] text-[#6B7280]">{entry.jarak} m dari bengkel</p>
-                )}
-              </div>
-              <div className="text-right shrink-0">
-                <p className={`text-xs font-semibold ${STATUS_COLOR[entry.status]}`}>{entry.status}</p>
-                <p className="text-[10px] font-mono text-[#6B7280]">{entry.waktu}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
+        {loadingHistory ? (
+          <div className="flex items-center justify-center py-6 text-xs text-[#6B7280] gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-[#DC2626]" /> Memuat riwayat...
+          </div>
+        ) : riwayat.length === 0 ? (
+          <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-6 text-center text-xs text-[#6B7280]">
+            Belum ada riwayat presensi yang tercatat.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {riwayat.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex items-center gap-3 bg-[#111827] rounded-xl border border-[#1F2937] px-4 py-3"
+              >
+                {STATUS_ICON[entry.status] || STATUS_ICON["Hadir"]}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-[#D1D5DB] truncate">{entry.tanggal}</p>
+                  {typeof entry.jarak_meter === "number" && (
+                    <p className="text-[11px] text-[#6B7280]">{Math.round(entry.jarak_meter)} m dari bengkel</p>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`text-xs font-semibold ${STATUS_COLOR[entry.status] || "text-[#10B981]"}`}>{entry.status}</p>
+                  <p className="text-[10px] font-mono text-[#6B7280]">{entry.jam || "—"}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

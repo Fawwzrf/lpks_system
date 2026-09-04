@@ -31,7 +31,7 @@ export default function SiswaLoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "Username atau kata sandi salah.");
+        setError(data.error?.message ?? (typeof data.error === "string" ? data.error : "Username atau kata sandi salah."));
         return;
       }
       if (data.data?.user?.role !== "siswa") {

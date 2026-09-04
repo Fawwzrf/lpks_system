@@ -16,17 +16,61 @@ const NAV_ITEMS = [
 
 export default function SiswaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [userProfile, setUserProfile] = React.useState<{
+    nama: string;
+    nomor_induk?: string;
+    is_password_default?: boolean;
+  } | null>(null);
+
+  React.useEffect(() => {
+    async function getProfile() {
+      try {
+        const res = await fetch("/api/v1/auth/me");
+        if (res.ok) {
+          const json = await res.json();
+          const u = json.data?.user;
+          setUserProfile({
+            nama: u?.nama || "Siswa",
+            nomor_induk: u?.siswa?.nomor_induk || undefined,
+            is_password_default: u?.siswa?.is_password_default ?? false,
+          });
+        }
+      } catch (e) {
+        console.error("Gagal memuat profil:", e);
+      }
+    }
+    getProfile();
+  }, []);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#0B0F17]">
+      {/* Default Password Warning Banner */}
+      {userProfile?.is_password_default && !pathname.startsWith("/siswa/akun") && (
+        <div className="bg-[#F59E0B]/15 border-b border-[#F59E0B]/30 px-4 py-2 flex items-center justify-between gap-2 text-xs">
+          <span className="text-[#F59E0B] text-[11px]">
+            ⚠️ Anda masih menggunakan kata sandi default. Segera ganti kata sandi demi keamanan akun.
+          </span>
+          <Link
+            href="/siswa/akun"
+            className="text-[11px] font-semibold text-[#F59E0B] underline shrink-0 hover:text-white transition-colors"
+          >
+            Ganti Sekarang
+          </Link>
+        </div>
+      )}
+
       {/* Top Header */}
       <header className="bg-[#111827] border-b border-[#1F2937] px-4 py-3 flex items-center gap-3 shrink-0 sticky top-0 z-10">
         <div className="h-7 w-7 rounded-xl bg-[#DC2626]/15 border border-[#DC2626]/30 flex items-center justify-center">
           <Flame className="h-3.5 w-3.5 text-[#DC2626]" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">LPKS Sumbu Hidup</span>
-          <span className="text-[10px] text-[#6B7280] block truncate leading-tight">Portal Siswa</span>
+          <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">
+            {userProfile?.nama ? userProfile.nama : "LPKS Sumbu Hidup"}
+          </span>
+          <span className="text-[10px] text-[#6B7280] block truncate leading-tight">
+            {userProfile?.nomor_induk ? `No. Induk: ${userProfile.nomor_induk}` : "Portal Siswa"}
+          </span>
         </div>
         {/* Gear icon — menuju pengaturan akun */}
         <Link

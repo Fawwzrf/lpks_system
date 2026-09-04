@@ -9,9 +9,10 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const body = await request.json();
-    const { pertanyaan } = body;
+    const { pertanyaan, query } = body || {};
+    const inputQuestion = (pertanyaan || query || "") as string;
 
-    if (!pertanyaan || typeof pertanyaan !== "string" || pertanyaan.trim().length === 0) {
+    if (!inputQuestion || typeof inputQuestion !== "string" || inputQuestion.trim().length === 0) {
       return errorResponse("VALIDATION_ERROR", "Pertanyaan wajib diisi.", 400);
     }
 
@@ -76,7 +77,7 @@ KONTEKS DATA SISTEM SAAT INI:
 ${JSON.stringify(contextData, null, 2)}
 
 PERTANYAAN INSTRUKTUR/ADMIN:
-"${pertanyaan}"
+"${inputQuestion}"
 
 PANDUAN JAWABAN:
 - Jika data tersedia, sebutkan nama siswa dan nomor induknya secara jelas.
@@ -92,16 +93,19 @@ PANDUAN JAWABAN:
       const jawaban = response.text || "Tidak ada respon teks yang dihasilkan oleh asisten AI.";
 
       return successResponse({
-        pertanyaan,
+        pertanyaan: inputQuestion,
         jawaban,
+        answer: jawaban,
         fallback: false,
       });
     } catch (aiErr) {
       // Graceful Fallback jika API Key belum di-set atau kuota habis
+      const fallbackMsg =
+        "Layanan asisten AI sedang dalam batas kuota atau kunci API belum dikonfigurasi. Anda tetap dapat melihat ringkasan statistik langsung melalui tabel Data Siswa & Transkrip Nilai.";
       return successResponse({
-        pertanyaan,
-        jawaban:
-          "Layanan asisten AI sedang dalam batas kuota atau kunci API belum dikonfigurasi. Anda tetap dapat melihat ringkasan statistik langsung melalui tabel Data Siswa & Transkrip Nilai.",
+        pertanyaan: inputQuestion,
+        jawaban: fallbackMsg,
+        answer: fallbackMsg,
         fallback: true,
         error_detail: aiErr instanceof Error ? aiErr.message : String(aiErr),
       });

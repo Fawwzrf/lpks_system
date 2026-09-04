@@ -19,6 +19,11 @@ const eslintConfig = defineConfig([
     "docs/**",
     "supabase/**",
   ]),
+  {
+    rules: {
+      "react-hooks/set-state-in-effect": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

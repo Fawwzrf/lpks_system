@@ -43,24 +43,29 @@ export async function updateSession(request: NextRequest) {
   const isPublicRoute =
     pathname === "/" ||
     pathname.startsWith("/login") ||
+    pathname.startsWith("/superadmin/login") ||
     pathname.startsWith("/kebijakan-privasi") ||
-    pathname.startsWith("/api/v1/auth/login");
+    pathname.startsWith("/api/"); // API route handlers mengelola auth & response status 401/403 sendiri
 
   // Jika belum login dan mengakses rute terlindungi
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    if (pathname.startsWith("/superadmin")) {
+      url.pathname = "/superadmin/login";
+    } else {
+      url.pathname = "/login";
+    }
     return NextResponse.redirect(url);
   }
 
   // Jika sudah login dan mencoba ke halaman login
-  if (user && pathname.startsWith("/login")) {
+  if (user && (pathname === "/login" || pathname === "/superadmin/login")) {
     const role = user.user_metadata?.role;
     const url = request.nextUrl.clone();
     if (role === "superadmin") {
-      url.pathname = "/admin/dashboard";
+      url.pathname = "/superadmin/dashboard";
     } else {
-      url.pathname = "/siswa/dashboard";
+      url.pathname = "/siswa/beranda";
     }
     return NextResponse.redirect(url);
   }
@@ -69,16 +74,18 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const role = user.user_metadata?.role;
 
-    // Siswa mencoba masuk ke area /admin
-    if (pathname.startsWith("/admin") && role !== "superadmin") {
+    // Siswa mencoba masuk ke area /superadmin
+    if (pathname.startsWith("/superadmin") && role !== "superadmin") {
       const url = request.nextUrl.clone();
-      url.pathname = "/siswa/dashboard";
+      url.pathname = "/siswa/beranda";
       return NextResponse.redirect(url);
     }
 
-    // Admin mencoba masuk ke area /siswa
+    // Admin mencoba masuk ke area /siswa (opsional: izinkan atau redirect ke superadmin dashboard)
     if (pathname.startsWith("/siswa") && role === "superadmin") {
-      // Izinkan admin melihat portal siswa jika diperlukan atau arahkan ke admin dashboard
+      const url = request.nextUrl.clone();
+      url.pathname = "/superadmin/dashboard";
+      return NextResponse.redirect(url);
     }
   }
 
