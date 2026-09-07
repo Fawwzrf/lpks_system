@@ -172,9 +172,28 @@ export default function SiswaPage() {
       key: "nama_lengkap",
       header: "Nama Siswa",
       render: (row: SiswaItem) => (
-        <div>
+        <div className="space-y-1">
           <p className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</p>
-          <p className="text-[11px] text-[#6B7280]">User: {row.username || "—"}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-mono text-[#9CA3AF] bg-[#1F2937]/60 px-1.5 py-0.5 rounded border border-[#374151]/40">
+              User: {row.username || "—"}
+            </span>
+            {row.is_password_default !== false ? (
+              <span
+                className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium"
+                title="Password default sama dengan username"
+              >
+                Pass Default
+              </span>
+            ) : (
+              <span
+                className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium"
+                title="Siswa telah mengganti kata sandi secara mandiri"
+              >
+                Pass Diubah
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -307,9 +326,33 @@ export default function SiswaPage() {
       >
         {selectedSiswa && (
           <form onSubmit={handleSaveCredentials} className="flex flex-col gap-4">
-            <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-3 text-xs">
-              <p className="text-[#9CA3AF]">Nama Siswa: <strong className="text-[#F9FAFB]">{selectedSiswa.nama_lengkap}</strong></p>
-              <p className="text-[#6B7280] mt-0.5">No. Induk: {selectedSiswa.nomor_induk}</p>
+            <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-3 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">Nama Siswa:</span>
+                <strong className="text-[#F9FAFB]">{selectedSiswa.nama_lengkap}</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">No. Induk:</span>
+                <span className="font-mono font-bold text-[#DC2626]">{selectedSiswa.nomor_induk}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">Status Kata Sandi:</span>
+                {selectedSiswa.is_password_default !== false ? (
+                  <span className="text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[11px]">
+                    Default ({selectedSiswa.username})
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px]">
+                    Telah diubah mandiri oleh siswa
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-[#111827] border border-[#1F2937] p-2.5 text-[11px] text-[#9CA3AF] leading-relaxed">
+              <p>
+                <strong className="text-[#D1D5DB]">Keamanan Kata Sandi:</strong> Sesuai standar enkripsi hash (OWASP), password yang telah diubah siswa tersimpan aman dan tidak dapat dilihat dalam teks polos oleh siapapun. Gunakan formulir di bawah untuk mereset kata sandi jika siswa lupa.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

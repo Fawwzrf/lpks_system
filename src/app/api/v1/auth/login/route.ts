@@ -15,11 +15,12 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     // Tentukan email yang dipakai untuk login:
-    // - Jika mengandung '@', asumsikan email langsung (admin login)
-    // - Jika tidak, asumsikan username siswa → konversi ke username@lpks.id
-    const loginEmail = identifier.includes("@")
+    // - Jika mengandung '@' DAN domain setelahnya bukan 'lpks.id', asumsikan email langsung (admin)
+    // - Jika tidak mengandung '@' atau username format "nama@2digit", konversi ke auth email
+    const isAdminEmail = identifier.includes("@") && !identifier.endsWith("@lpks.id") && identifier.split("@").length === 2 && identifier.split("@")[1].includes(".");
+    const loginEmail = isAdminEmail
       ? identifier.trim()
-      : `${identifier.trim().toLowerCase()}@lpks.id`;
+      : `${identifier.trim().toLowerCase().replace("@", "")}@lpks.id`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,

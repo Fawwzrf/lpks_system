@@ -132,18 +132,24 @@ export function isValidScore(score: unknown): boolean {
 }
 
 /**
- * Generator Username Default Siswa: Nama depan (lowercase, alphanumeric) + @2digit random
+ * Generator Username Default Siswa: Nama depan (lowercase, alphanumeric) + @urutan no induk
+ * Format: "budi@0005"
+ * @param urutanNoInduk — nomor urut atau nomor induk siswa (misal: "0005" atau "01.0005")
  */
-export function generateStudentUsername(namaLengkap: string, randomNumber?: number): string {
-  const cleanFirst = namaLengkap
-    .trim()
-    .split(/\s+/)[0]
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "") || "siswa";
+export function generateStudentUsername(namaLengkap: string, urutanNoInduk?: string | number): string {
+  const cleanFirst =
+    namaLengkap.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "siswa";
+  if (urutanNoInduk !== undefined) {
+    const raw = String(urutanNoInduk);
+    const urutanStr = raw.includes(".") ? raw.split(".")[1] : raw;
+    return `${cleanFirst}@${urutanStr}`;
+  }
+  return `${cleanFirst}@0001`;
+}
 
-  const num = randomNumber !== undefined
-    ? String(randomNumber).padStart(2, "0")
-    : String(Math.floor(Math.random() * 90) + 10);
-
-  return `${cleanFirst}@${num}`;
+/**
+ * Generator Password Default Siswa: Disamakan dengan username siswa (misal: "budi@0005")
+ */
+export function generateStudentPassword(username?: string): string {
+  return username || "budi@0001";
 }

@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, CheckCircle2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
 
-export default function AkunPage() {
+function AkunForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isFirstLogin = searchParams.get("first_login") === "true";
@@ -205,5 +205,13 @@ export default function AkunPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function AkunPage() {
+  return (
+    <Suspense fallback={<div className="p-4 text-center text-xs text-[#9CA3AF]">Memuat data...</div>}>
+      <AkunForm />
+    </Suspense>
   );
 }

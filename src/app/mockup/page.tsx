@@ -21,6 +21,9 @@ import {
   Printer,
   Navigation,
   Eye,
+  EyeOff,
+  Copy,
+  Check,
   Crosshair,
   CornerDownLeft,
 } from "lucide-react";
@@ -68,7 +71,7 @@ export default function MockupPage() {
     capping: false,
     gerinda: false,
   });
-  const [scores, setScores] = useState<{ [key: string]: number }>({
+  const [scores, setScores] = useState<{ [key: string]: number | string }>({
     root: 84,
     hotpass: 78,
     filler: 75,
@@ -78,6 +81,31 @@ export default function MockupPage() {
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   // State Admin Pendaftaran 2-Step
+  const [selectedProgram, setSelectedProgram] = useState<string>("01");
+  const [namaSiswa, setNamaSiswa] = useState<string>("Budi Santoso");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [copiedCreds, setCopiedCreds] = useState<boolean>(false);
+  const [registeredSuccess, setRegisteredSuccess] = useState<{
+    nama: string;
+    nomorInduk: string;
+    username: string;
+    passwordDefault: string;
+    programName: string;
+  } | null>(null);
+  const [registeredAccounts, setRegisteredAccounts] = useState<string[]>([
+    "ahmad@0001",
+    "joko@0002",
+    "rizky@0003",
+    "hendra@0004",
+  ]);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  const programMap: { [key: string]: string } = {
+    "01": "SMAW 6G Pipa Industri",
+    "02": "GTAW / TIG 6G",
+    "03": "GMAW / MIG 3G",
+  };
+
   const [checklists, setChecklists] = useState<{ [key: string]: boolean }>({
     ijazah: true,
     ktp: true,
@@ -564,8 +592,8 @@ export default function MockupPage() {
                     { id: "gerinda", label: "Gerinda & Bevel Prep", min: 80 },
                   ].map((item) => {
                     const isChecked = checkedCriteria[item.id] || false;
-                    const val = scores[item.id] || 0;
-                    const isPassed = val >= item.min;
+                    const val = scores[item.id] !== undefined ? scores[item.id] : "";
+                    const isPassed = Number(val || 0) >= item.min;
 
                     return (
                       <div
@@ -604,12 +632,33 @@ export default function MockupPage() {
                                 max={100}
                                 value={val}
                                 onKeyDown={handleEnterToNextField}
-                                onChange={(e) =>
+                                onFocus={(e) => e.target.select()}
+                                onChange={(e) => {
+                                  const raw = e.target.value;
+                                  if (raw === "") {
+                                    setScores({
+                                      ...scores,
+                                      [item.id]: "",
+                                    });
+                                    return;
+                                  }
+                                  let num = parseInt(raw, 10);
+                                  if (isNaN(num)) num = 0;
+                                  if (num > 100) num = 100;
+                                  if (num < 0) num = 0;
                                   setScores({
                                     ...scores,
-                                    [item.id]: parseInt(e.target.value, 10) || 0,
-                                  })
-                                }
+                                    [item.id]: num,
+                                  });
+                                }}
+                                onBlur={() => {
+                                  if (scores[item.id] === "" || scores[item.id] === undefined) {
+                                    setScores({
+                                      ...scores,
+                                      [item.id]: 0,
+                                    });
+                                  }
+                                }}
                                 className="w-16 h-8 text-center text-sm font-bold bg-[#1F2937] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                               />
 
@@ -890,205 +939,400 @@ export default function MockupPage() {
                 </CardContent>
               </Card>
 
-              {/* Kolom Kanan: Form Biodata & Banner Nomor Induk Besar */}
-              <Card
-                className={`border-[#1F2937] lg:col-span-2 transition-opacity ${
-                  allChecklistsPassed ? "opacity-100" : "opacity-40 pointer-events-none"
-                }`}
-              >
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary">Tahap 2</Badge>
-                    <span className="text-xs text-[#10B981]">Siap Didaftarkan</span>
-                  </div>
-                  <CardTitle className="text-sm">Biodata Siswa Baru</CardTitle>
-                </CardHeader>
-                <CardContent data-form-container="true" className="space-y-4">
-                  {/* CALLOUT NOMOR INDUK BESAR & MENONJOL (SESUAI REQUEST USER) */}
-                  <div className="p-4 rounded-xl bg-gradient-to-r from-[#1F2937] to-[#111827] border-l-4 border-[#DC2626] border-y border-r border-[#374151] flex flex-wrap items-center justify-between gap-4 shadow-lg">
-                    <div>
-                      <span className="text-[11px] uppercase tracking-wider font-bold text-[#F87171] block">
-                        NOMOR INDUK SISWA OTOMATIS TERBIT:
-                      </span>
-                      <span className="text-3xl font-mono font-extrabold text-[#F9FAFB] tracking-wider block mt-1">
-                        01.0005
-                      </span>
-                      <p className="text-xs text-[#9CA3AF] mt-0.5">
-                        Format: <code className="text-[#F9FAFB] font-mono">kode_program.urutan</code> (Pessimistic Locking anti-tabrakan)
-                      </p>
+              {/* Kolom Kanan: Form Biodata & Banner Nomor Induk Besar / Kartu Hasil Kredensial */}
+              {registeredSuccess ? (
+                <Card className="border-[#10B981]/40 bg-[#111827] lg:col-span-2 shadow-2xl">
+                  <CardHeader>
+                    <div className="flex items-center gap-3 bg-[#10B981]/15 border border-[#10B981]/30 rounded-xl p-3.5">
+                      <CheckCircle2 className="h-7 w-7 text-[#10B981] shrink-0" />
+                      <div>
+                        <h3 className="text-sm font-bold text-[#F9FAFB]">Pendaftaran Berhasil Diterbitkan!</h3>
+                        <p className="text-xs text-[#9CA3AF]">
+                          Siswa <strong className="text-white">{registeredSuccess.nama}</strong> telah resmi terdaftar pada program <strong className="text-[#38BDF8]">{registeredSuccess.programName}</strong>.
+                        </p>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="rounded-xl border border-[#DC2626]/40 bg-[#0B0F17] p-5 space-y-4">
+                      <div className="flex items-center justify-between border-b border-[#1F2937] pb-3">
+                        <span className="text-xs font-bold text-[#F9FAFB] uppercase tracking-wider flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-[#DC2626]" />
+                          Kredensial Akun Siswa (Otomatis Diterbitkan)
+                        </span>
+                        <Badge variant="spark" className="text-[10px]">Auto-Generated</Badge>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                        <div className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-xl">
+                          <span className="text-[11px] text-[#9CA3AF] block mb-1">Nomor Induk Siswa:</span>
+                          <span className="font-mono text-base font-extrabold text-[#F9FAFB]">{registeredSuccess.nomorInduk}</span>
+                          <p className="text-[10px] text-[#6B7280] mt-0.5">Format: kode_program.urutan</p>
+                        </div>
+
+                        <div className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-xl">
+                          <span className="text-[11px] text-[#9CA3AF] block mb-1">Username Login Siswa:</span>
+                          <span className="font-mono text-base font-extrabold text-[#DC2626]">{registeredSuccess.username}</span>
+                          <p className="text-[10px] text-[#6B7280] mt-0.5">Format: nama@urutan</p>
+                        </div>
+
+                        <div className="p-3.5 bg-[#111827] border border-[#1F2937] rounded-xl">
+                          <span className="text-[11px] text-[#9CA3AF] block mb-1">Password Default:</span>
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-base font-extrabold text-[#10B981]">
+                              {showPassword ? registeredSuccess.passwordDefault : "••••••••"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="text-[#9CA3AF] hover:text-[#F9FAFB] transition-colors p-1"
+                              title={showPassword ? "Sembunyikan" : "Tampilkan"}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
+                          <p className="text-[10px] text-[#6B7280] mt-0.5">Sama dengan Username</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex flex-wrap items-center justify-between gap-3 border-t border-[#1F2937]">
+                        <p className="text-xs text-[#9CA3AF]">
+                          *Format username: <code className="text-[#DC2626]">nama@urutan</code> (misal: budi@0005). Password default dibuat sama dengan username.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const text = `Kredensial Akun Siswa LPKS Sumbu Hidup:\nNama: ${registeredSuccess.nama}\nNo Induk: ${registeredSuccess.nomorInduk}\nProgram: ${registeredSuccess.programName}\nUsername: ${registeredSuccess.username}\nPassword: ${registeredSuccess.passwordDefault}\nURL Login: http://localhost:3000/login`;
+                            navigator.clipboard.writeText(text);
+                            setCopiedCreds(true);
+                            setTimeout(() => setCopiedCreds(false), 2000);
+                          }}
+                          className="text-xs h-8"
+                        >
+                          {copiedCreds ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-[#10B981] mr-1" />
+                              Tersalin ke Clipboard!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3.5 w-3.5 mr-1" />
+                              Salin Kredensial
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
 
-                    <div className="text-right">
-                      <Badge variant="spark" className="text-xs py-1 px-3">
-                        Program: SMAW 6G
-                      </Badge>
-                      <span className="block text-[11px] text-[#9CA3AF] mt-1">Status: Calon Siswa Aktif</span>
+                    {/* PREVIEW VISIBILITAS DI MENU SUPERADMIN / DATA SISWA */}
+                    <div className="p-3.5 rounded-xl bg-[#0B0F17] border border-[#1F2937] space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-[#F9FAFB] flex items-center gap-1.5">
+                          <Users className="h-4 w-4 text-[#DC2626]" />
+                          Visibilitas di Superadmin &rarr; Data Siswa (/superadmin/siswa):
+                        </span>
+                        <Badge variant="outline" className="text-[10px] text-[#10B981] border-[#10B981]/30">
+                          Tersinkronisasi Otomatis
+                        </Badge>
+                      </div>
+
+                      {/* Mockup Baris Tabel Data Siswa */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[11px] border border-[#1F2937] rounded-lg overflow-hidden bg-[#111827]">
+                          <thead className="bg-[#1F2937]/70 text-[#9CA3AF]">
+                            <tr>
+                              <th className="p-2 text-left font-medium">No. Induk</th>
+                              <th className="p-2 text-left font-medium">Nama Siswa &amp; Akun</th>
+                              <th className="p-2 text-left font-medium">Program</th>
+                              <th className="p-2 text-center font-medium">Status Password</th>
+                              <th className="p-2 text-right font-medium">Aksi Admin</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#1F2937] text-[#D1D5DB]">
+                            <tr>
+                              <td className="p-2 font-mono font-bold text-[#DC2626]">{registeredSuccess.nomorInduk}</td>
+                              <td className="p-2">
+                                <span className="font-semibold text-white block">{registeredSuccess.nama}</span>
+                                <span className="text-[#9CA3AF] font-mono text-[10px]">User: {registeredSuccess.username}</span>
+                              </td>
+                              <td className="p-2 text-[10px]">{registeredSuccess.programName}</td>
+                              <td className="p-2 text-center">
+                                <span className="inline-block text-[10px] text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded font-medium">
+                                  Pass Default ({registeredSuccess.passwordDefault})
+                                </span>
+                              </td>
+                              <td className="p-2 text-right">
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#0B0F17] border border-[#374151] text-[10px] text-white font-medium">
+                                  <Lock className="h-3 w-3 text-[#DC2626]" /> Kelola Akun
+                                </span>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Penjelasan Keamanan Password & Update Otomatis */}
+                      <div className="p-2.5 rounded-lg bg-[#111827]/80 border border-[#374151]/50 text-[11px] text-[#9CA3AF] space-y-1 leading-relaxed">
+                        <p className="text-[#F9FAFB] font-medium flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-[#10B981]" />
+                          Apakah password terbaru otomatis update di Superadmin?
+                        </p>
+                        <p>
+                          1. <strong>Password Default:</strong> Superadmin mengetahui password awal siswa karena sama persis dengan username (<code className="text-[#10B981] font-mono">{registeredSuccess.passwordDefault}</code>).
+                        </p>
+                        <p>
+                          2. <strong>Saat Siswa Mengubah Password:</strong> Berdasarkan standar keamanan siber &amp; privasi (OWASP / Enkripsi Hash Satu Arah), teks kata sandi baru <em>tidak disimpan polos</em>, melainkan dienkripsi hash di Supabase Auth. Di tabel Superadmin, statusnya otomatis berubah dari <span className="text-amber-400 font-semibold">&quot;Pass Default&quot;</span> menjadi <span className="text-emerald-400 font-semibold">&quot;Pass Diubah Siswa&quot;</span>.
+                        </p>
+                        <p>
+                          3. <strong>Fitur Reset oleh Superadmin:</strong> Jika siswa lupa password barunya, Superadmin memiliki kontrol penuh melalui tombol <strong>Kelola Akun</strong> untuk mereset/mengganti password siswa secara instan.
+                        </p>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Keyboard Navigation Tip */}
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0B0F17] border border-[#1F2937] text-xs text-[#9CA3AF]">
-                    <CornerDownLeft className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
-                    <span>
-                      <strong>Mode Input Cepat:</strong> Tekan <strong className="text-[#F9FAFB] font-mono">Enter</strong> di setiap kolom untuk langsung beralih dan memilih teks pada kolom berikutnya tanpa perlu menggunakan mouse.
-                    </span>
-                  </div>
-
-                  {/* Form Grid Lengkap */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Program Pelatihan:
-                      </label>
-                      <select
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                    <div className="pt-3 flex justify-between items-center">
+                      <span className="text-xs text-[#6B7280]">Status data tersimpan di direktori siswa.</span>
+                      <Button
+                        variant="spark"
+                        onClick={() => setRegisteredSuccess(null)}
+                        className="text-xs h-10 px-5 font-bold"
                       >
-                        <option value="01">01 — SMAW 6G Pipa Industri (Rp 8.500.000)</option>
-                        <option value="02">02 — GTAW / TIG 6G (Rp 9.500.000)</option>
-                        <option value="03">03 — GMAW / MIG 3G (Rp 7.500.000)</option>
-                      </select>
+                        + Daftarkan Siswa Baru Lainnya
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card
+                  className={`border-[#1F2937] lg:col-span-2 transition-opacity ${
+                    allChecklistsPassed ? "opacity-100" : "opacity-40 pointer-events-none"
+                  }`}
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary">Tahap 2</Badge>
+                      <span className="text-xs text-[#10B981]">Siap Didaftarkan</span>
+                    </div>
+                    <CardTitle className="text-sm">Biodata Siswa Baru</CardTitle>
+                  </CardHeader>
+                  <CardContent data-form-container="true" className="space-y-4">
+                    {/* Pesan Validasi Duplikat Akun */}
+                    {registerError && (
+                      <div className="p-3.5 rounded-xl bg-[#F43F5E]/15 border border-[#F43F5E]/40 text-xs text-[#F43F5E] flex items-center gap-2.5">
+                        <AlertTriangle className="h-4 w-4 shrink-0 text-[#F43F5E]" />
+                        <span className="font-semibold">{registerError}</span>
+                      </div>
+                    )}
+
+                    {/* CALLOUT NOMOR INDUK BESAR & MENONJOL (SESUAI REQUEST USER) */}
+                    <div className="p-4 rounded-xl bg-gradient-to-r from-[#1F2937] to-[#111827] border-l-4 border-[#DC2626] border-y border-r border-[#374151] flex flex-wrap items-center justify-between gap-4 shadow-lg">
+                      <div>
+                        <span className="text-[11px] uppercase tracking-wider font-bold text-[#F87171] block">
+                          NOMOR INDUK SISWA OTOMATIS TERBIT:
+                        </span>
+                        <span className="text-3xl font-mono font-extrabold text-[#F9FAFB] tracking-wider block mt-1">
+                          {selectedProgram}.0005
+                        </span>
+                        <p className="text-xs text-[#9CA3AF] mt-0.5">
+                          Format: <code className="text-[#F9FAFB] font-mono">kode_program.urutan</code> (Pessimistic Locking anti-tabrakan)
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <Badge variant="spark" className="text-xs py-1 px-3">
+                          Program: {programMap[selectedProgram] || "SMAW 6G"}
+                        </Badge>
+                        <span className="block text-[11px] text-[#9CA3AF] mt-1">Status: Calon Siswa Aktif</span>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Nama Lengkap:
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="Budi Santoso"
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
-                      />
+                    {/* Keyboard Navigation Tip */}
+                    <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#0B0F17] border border-[#1F2937] text-xs text-[#9CA3AF]">
+                      <CornerDownLeft className="h-3.5 w-3.5 text-[#10B981] shrink-0" />
+                      <span>
+                        <strong>Mode Input Cepat:</strong> Tekan <strong className="text-[#F9FAFB] font-mono">Enter</strong> di setiap kolom untuk langsung beralih dan memilih teks pada kolom berikutnya tanpa perlu menggunakan mouse.
+                      </span>
                     </div>
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        NIK (16 Digit Wajib):
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="3201234567890005"
-                        maxLength={16}
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
-                      />
-                    </div>
+                    {/* Form Grid Lengkap */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Program Pelatihan:
+                        </label>
+                        <select
+                          value={selectedProgram}
+                          onChange={(e) => setSelectedProgram(e.target.value)}
+                          onKeyDown={handleEnterToNextField}
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        >
+                          <option value="01">01 — SMAW 6G Pipa Industri (Rp 8.500.000)</option>
+                          <option value="02">02 — GTAW / TIG 6G (Rp 9.500.000)</option>
+                          <option value="03">03 — GMAW / MIG 3G (Rp 7.500.000)</option>
+                        </select>
+                      </div>
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Email Siswa:
-                      </label>
-                      <input
-                        type="email"
-                        defaultValue="budi.santoso@gmail.com"
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Tempat &amp; Tanggal Lahir:
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Nama Lengkap:
+                        </label>
                         <input
                           type="text"
-                          defaultValue="Bandung"
-                          placeholder="Tempat"
+                          value={namaSiswa}
+                          onChange={(e) => setNamaSiswa(e.target.value)}
                           onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                         />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          NIK (16 Digit Wajib):
+                        </label>
                         <input
-                          type="date"
-                          defaultValue="2003-04-12"
+                          type="text"
+                          defaultValue="3201234567890005"
+                          maxLength={16}
                           onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Email Siswa:
+                        </label>
+                        <input
+                          type="email"
+                          defaultValue="budi.santoso@gmail.com"
+                          onKeyDown={handleEnterToNextField}
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Tempat &amp; Tanggal Lahir:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            defaultValue="Bandung"
+                            placeholder="Tempat"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          />
+                          <input
+                            type="date"
+                            defaultValue="2003-04-12"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          No. WhatsApp / HP:
+                        </label>
+                        <input
+                          type="text"
+                          defaultValue="081234567895"
+                          onKeyDown={handleEnterToNextField}
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Nama Orang Tua (Ayah / Ibu):
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            defaultValue="Sutrisno"
+                            placeholder="Nama Ayah"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            defaultValue="Sri Wahyuni"
+                            placeholder="Nama Ibu"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Pendidikan Terakhir &amp; NISN:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            defaultValue="SMK Teknik Mesin"
+                            placeholder="Pendidikan"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
+                          />
+                          <input
+                            type="text"
+                            defaultValue="0034567891"
+                            placeholder="NISN"
+                            onKeyDown={handleEnterToNextField}
+                            className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
+                          Alamat Lengkap Siswa:
+                        </label>
+                        <input
+                          type="text"
+                          defaultValue="Jl. Raya Barat Industri No. 45, RT 02/04, Bandung"
+                          onKeyDown={handleEnterToNextField}
+                          className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
                         />
                       </div>
                     </div>
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        No. WhatsApp / HP:
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="081234567895"
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none font-mono"
-                      />
-                    </div>
+                    <div className="pt-3 flex justify-end">
+                      <Button
+                        variant="spark"
+                        size="md"
+                        data-submit-btn="true"
+                        onClick={() => {
+                          const cleanName = (namaSiswa.trim().split(/\s+/)[0] || "siswa").toLowerCase().replace(/[^a-z0-9]/g, "");
+                          const urutan = "0005";
+                          const generatedUsername = `${cleanName}@${urutan}`;
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Nama Orang Tua (Ayah / Ibu):
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          defaultValue="Sutrisno"
-                          placeholder="Nama Ayah"
-                          onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          defaultValue="Sri Wahyuni"
-                          placeholder="Nama Ibu"
-                          onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
-                        />
-                      </div>
-                    </div>
+                          if (registeredAccounts.includes(generatedUsername)) {
+                            setRegisterError(`Validasi Akun Gagal: Username "${generatedUsername}" sudah terdaftar dalam sistem. Pendaftaran ditolak untuk mencegah duplikasi akun.`);
+                            return;
+                          }
 
-                    <div>
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Pendidikan Terakhir &amp; NISN:
-                      </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          defaultValue="SMK Teknik Mesin"
-                          placeholder="Pendidikan"
-                          onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          defaultValue="0034567891"
-                          placeholder="NISN"
-                          onKeyDown={handleEnterToNextField}
-                          className="w-full h-9 px-2 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:outline-none font-mono"
-                        />
-                      </div>
+                          setRegisterError(null);
+                          setRegisteredAccounts((prev) => [...prev, generatedUsername]);
+                          setRegisteredSuccess({
+                            nama: namaSiswa.trim() || "Budi Santoso",
+                            nomorInduk: `${selectedProgram}.${urutan}`,
+                            username: generatedUsername,
+                            passwordDefault: generatedUsername,
+                            programName: programMap[selectedProgram] || "SMAW 6G Pipa Industri",
+                          });
+                        }}
+                        className="font-bold text-xs h-11 px-6"
+                      >
+                        Daftarkan Siswa &amp; Terbitkan No Induk {selectedProgram}.0005
+                      </Button>
                     </div>
-
-                    <div className="sm:col-span-2">
-                      <label className="text-xs text-[#9CA3AF] block font-medium mb-1">
-                        Alamat Lengkap Siswa:
-                      </label>
-                      <input
-                        type="text"
-                        defaultValue="Jl. Raya Barat Industri No. 45, RT 02/04, Bandung"
-                        onKeyDown={handleEnterToNextField}
-                        className="w-full h-9 px-3 text-xs bg-[#0B0F17] border border-[#374151] rounded-lg text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-3 flex justify-end">
-                    <Button
-                      variant="spark"
-                      size="md"
-                      data-submit-btn="true"
-                      className="font-bold text-xs h-11 px-6"
-                    >
-                      Daftarkan Siswa &amp; Terbitkan No Induk 01.0005
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </div>
         )}

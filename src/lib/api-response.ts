@@ -1,7 +1,24 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { UserRole } from "@/types/database";
-import { formatSuccessPayload, formatErrorPayload } from "./response-format.ts";
+
+// ── Format Payload Standar ─────────────────────────────────────────────────
+interface SuccessPayload<T> {
+  data: T;
+  meta?: Record<string, unknown>;
+}
+
+interface ErrorPayload {
+  error: { code: string; message: string; details?: unknown };
+}
+
+function formatSuccessPayload<T>(data: T, meta?: Record<string, unknown>): SuccessPayload<T> {
+  return { data, ...(meta ? { meta } : {}) };
+}
+
+function formatErrorPayload(code: string, message: string, details?: unknown): ErrorPayload {
+  return { error: { code, message, ...(details ? { details } : {}) } };
+}
 
 export interface ApiErrorDetail {
   code: string;

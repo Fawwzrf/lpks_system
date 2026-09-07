@@ -47,8 +47,8 @@ export async function PUT(
     // Build update payload untuk Supabase Auth
     const authUpdate: { email?: string; password?: string } = {};
     if (username) {
-      // Validasi username: hanya alphanumeric
-      const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      // Validasi username: izinkan alphanumeric, @, dot, dash, underscore
+      const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9@._-]/g, "");
       if (cleanUsername.length < 3) {
         return errorResponse("VALIDATION_ERROR", "Username minimal 3 karakter.", 400);
       }
@@ -62,7 +62,7 @@ export async function PUT(
       if (dup) {
         return errorResponse("DUPLICATE_USERNAME", "Username sudah digunakan siswa lain.", 409);
       }
-      authUpdate.email = `${cleanUsername}@lpks.id`;
+      authUpdate.email = `${cleanUsername.replace(/@/g, "")}@lpks.id`;
 
       // Update username di tabel siswa
       await supabase.from("siswa").update({ username: cleanUsername }).eq("id", id);

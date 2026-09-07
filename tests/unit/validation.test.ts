@@ -1,6 +1,6 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { isValidNIK, isValidScore, generateStudentUsername } from "../../src/lib/gate-checks.ts";
+import { isValidNIK, isValidScore, generateStudentUsername, generateStudentPassword } from "../../src/lib/gate-checks.ts";
 
 describe("Validasi Input & Pembuatan Kredensial Unit Tests", () => {
   describe("Validasi NIK 16 Digit", () => {
@@ -59,25 +59,31 @@ describe("Validasi Input & Pembuatan Kredensial Unit Tests", () => {
     });
   });
 
-  describe("Auto-Generation Username Akun Siswa", () => {
-    test("Username menggunakan nama depan huruf kecil dan format @2digit", () => {
-      const username = generateStudentUsername("Budi Santoso", 42);
-      assert.equal(username, "budi@42");
+  describe("Auto-Generation Username & Password Akun Siswa", () => {
+    test("Username menggunakan nama depan huruf kecil dan format @urutan no induk", () => {
+      const username = generateStudentUsername("Budi Santoso", "0005");
+      assert.equal(username, "budi@0005");
+    });
+
+    test("Username dapat mengekstrak urutan dari format lengkap kode.urutan", () => {
+      const username = generateStudentUsername("Ahmad Fauzi", "01.0012");
+      assert.equal(username, "ahmad@0012");
     });
 
     test("Username membersihkan karakter khusus dan spasi", () => {
-      const username = generateStudentUsername("M. Rasyid Al-Farizi", 19);
-      assert.equal(username, "m@19");
-    });
-
-    test("Username acak tetap menghasilkan 2 digit angka di belakang @", () => {
-      const username = generateStudentUsername("Siti Aminah");
-      assert.ok(/^siti@\d{2}$/.test(username), `Username dihasilkan: ${username}`);
+      const username = generateStudentUsername("M. Rasyid Al-Farizi", "0019");
+      assert.equal(username, "m@0019");
     });
 
     test("Jika nama depan kosong atau aneh, gunakan fallback 'siswa'", () => {
-      const username = generateStudentUsername("---", 77);
-      assert.equal(username, "siswa@77");
+      const username = generateStudentUsername("---", "0077");
+      assert.equal(username, "siswa@0077");
+    });
+
+    test("Password default disamakan dengan username siswa", () => {
+      const username = generateStudentUsername("Budi Santoso", "0005");
+      const password = generateStudentPassword(username);
+      assert.equal(password, "budi@0005");
     });
   });
 });

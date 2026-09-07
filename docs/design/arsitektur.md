@@ -31,7 +31,8 @@ flowchart LR
     end
 
     subgraph AI["AI Provider (Free Tier)"]
-        Gemini["Gemini Flash API\n(RAG Query + Weekly Summary)"]
+        Gemini["Gemini 2.5 Flash API\n(RAG Analytics)"]
+        Claude["Claude 3.7 Sonnet API\n(Welding SOP/Consultant)"]
     end
 
     FE -->|REST fetch| API
@@ -56,7 +57,7 @@ flowchart LR
 | **Database** | Supabase PostgreSQL | Free-tier generous (500MB), Row Level Security per-role |
 | **Auth** | Supabase Auth | JWT bawaan, gratis, support custom roles (superadmin/siswa) |
 | **ORM / Query** | Supabase JS Client (`@supabase/supabase-js`) | Native SDK, type-safe dengan `generate-types` |
-| **AI (RAG + Summary)** | Gemini Flash API (`@google/genai`) | Free-tier tersedia, cepat untuk structured-data-to-context RAG |
+| **AI (RAG + Summary)** | Gemini Flash API & Claude Sonnet API | Dual-model. Gemini untuk structured-data query cepat, Claude untuk penalaran SOP Las yang kompleks. |
 | **Excel I/O** | SheetJS (`xlsx`) | Library client/server, parse & generate `.xlsx` tanpa dependensi berat |
 | **PDF Sertifikat** | jsPDF + jsPDF-AutoTable | Generate PDF di sisi client, gratis, tanpa server tambahan |
 | **GPS Geofencing** | Browser Native Geolocation API | Tidak butuh vendor pihak ketiga, nol biaya |

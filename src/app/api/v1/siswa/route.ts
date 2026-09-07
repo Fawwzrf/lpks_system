@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { generateStudentUsername, generateStudentPassword } from "@/lib/gate-checks";
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,36 +62,6 @@ export async function GET(request: NextRequest) {
       err instanceof Error ? err.message : String(err)
     );
   }
-}
-
-// Generate username: namadepan (lowercase, alphanumeric) + 2 digit random (10-99)
-function generateUsername(nama: string): string {
-  const first = nama.trim().split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "");
-  const digits = String(Math.floor(Math.random() * 90) + 10);
-  return `${first}${digits}`;
-}
-
-// Generate password 8 karakter: campuran huruf besar, kecil, angka, diacak
-function generatePassword(): string {
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const lower = "abcdefghjkmnpqrstuvwxyz";
-  const nums = "23456789";
-  const chars = [
-    upper[Math.floor(Math.random() * upper.length)],
-    upper[Math.floor(Math.random() * upper.length)],
-    upper[Math.floor(Math.random() * upper.length)],
-    lower[Math.floor(Math.random() * lower.length)],
-    lower[Math.floor(Math.random() * lower.length)],
-    lower[Math.floor(Math.random() * lower.length)],
-    nums[Math.floor(Math.random() * nums.length)],
-    nums[Math.floor(Math.random() * nums.length)],
-  ];
-  // Fisher-Yates shuffle
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-  return chars.join("");
 }
 
 export async function POST(request: NextRequest) {
@@ -153,21 +124,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2. Generate username unik (retry hingga 5x jika collision)
-    let username = generateUsername(nama_lengkap);
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const { data: existing } = await supabase
-        .from("siswa")
-        .select("id")
-        .eq("username", username)
-        .maybeSingle();
-      if (!existing) break;
-      username = generateUsername(nama_lengkap);
+    // 2. Generate username format "namadepan@urutan_no_induk" (contoh: "budi@0005")
+    const urutan = String(generatedNoInduk).split(".")[1] || "0001";
+    const username = generateStudentUsername(nama_lengkap, urutan);
+
+    // Validasi akun agar tidak duplikat (cek username dan NIK)
+    const { data: existingUser } = await supabase
+      .from("siswa")
+      .select("id, username, nik")
+      .or(`username.eq.${username},nik.eq.${cleanNik}`)
+      .maybeSingle();
+
+    if (existingUser) {
+      const field = existingUser.username === username ? "Username" : "NIK";
+      return errorResponse(
+        "DUPLICATE_ACCOUNT",
+        `${field} tersebut sudah terdaftar dalam sistem. Pendaftaran ditolak untuk mencegah duplikasi akun.`,
+        409
+      );
     }
 
-    const generatedPassword = generatePassword();
-    // Supabase Auth email internal: username@lpks.id (tidak ditampilkan ke siswa)
-    const authEmail = `${username}@lpks.id`;
+    // Password default disamakan dengan username
+    const generatedPassword = generateStudentPassword(username);
+    // Supabase Auth email internal: username tanpa '@' + @lpks.id
+    const authEmail = `${username.replace("@", "")}@lpks.id`;
 
     // 3. Buat Supabase Auth user
     const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({

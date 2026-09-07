@@ -32,6 +32,12 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             "disabled:opacity-50 disabled:cursor-not-allowed",
             className
           )}
+          onFocus={(e) => {
+            if (props.type === "number") {
+              e.target.select();
+            }
+            props.onFocus?.(e);
+          }}
           {...props}
         />
         {hint && !error && (

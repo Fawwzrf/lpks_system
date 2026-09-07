@@ -28,7 +28,7 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
   - **Data Orang Tua:** Nama Ayah, Nama Ibu.
   - **Kontak & Riwayat Pendidikan:** No. HP/WhatsApp, Email, Pendidikan Terakhir, NISN.
   - **Tanggal Masuk:** Tanggal resmi mulai pelatihan.
-- Setelah formulir disubmit, data langsung terdaftar ke database dan masuk ke **Modul Data Siswa** serta siap untuk pencatatan keuangan.
+- Setelah formulir disubmit, data langsung terdaftar ke database dan sistem **secara otomatis menerbitkan kredensial login** (Username berformat `nama@urutan`, contoh `budi@0005`, dan Password Default yang sama persis dengan username). Validasi duplikasi NIK dan username aktif untuk mencegah pembuatan akun ganda.
 
 ### 2. Modul Manajemen Data Siswa (Student Directory & Lifecycle)
 - Sistem HARUS menyediakan manajemen direktori seluruh siswa (CRUD Data Siswa lengkap).
@@ -90,7 +90,7 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
   - **Master Syarat Pendaftaran:** Fleksibilitas untuk menambah/mengubah daftar checklist berkas persyaratan fisik.
 
 ### 8. Modul AI Showcase (AI Engineer Integration)
-- **Asisten Analitik Operasional & Nilai (RAG / Natural Language Query):** Sistem HARUS menyediakan chatbot internal untuk Superadmin yang dapat menjawab pertanyaan analitik berbasis data terstruktur riil (misal: *"Siapa saja siswa aktif di program SMAW 6G yang nilai capping-nya masih di bawah 80?"*, *"Tampilkan siswa yang kehadirannya kurang dari 80% bulan ini"*, atau *"Berapa total pemasukan cicilan minggu ini?"*).
+- **Asisten Analitik Operasional & Konsultan SOP Las (RAG):** Sistem HARUS menyediakan chatbot internal yang menggunakan kapabilitas *Dual-Model* (Gemini 2.5 Flash & Claude 3.7 Sonnet) untuk menjawab pertanyaan operasional, rekap nilai siswa, maupun *Welding SOP / Best Practices* berdasarkan referensi pengelasan.
 - **Ringkasan Progres Otomatis (Weekly Narrative Summary):** Sistem HARUS dapat meng-generate ringkasan naratif perkembangan belajar & kedisiplinan setiap siswa secara otomatis per minggu dalam bahasa natural yang siap diekspor/dikirim ke orang tua atau perusahaan sponsor.
 
 ---
