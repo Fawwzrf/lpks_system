@@ -67,6 +67,7 @@ export default function SiswaPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState("");
   const [importResult, setImportResult] = useState<{ success: boolean; message: string; errors?: { row: number; reason: string }[] } | null>(null);
 
@@ -193,7 +194,8 @@ export default function SiswaPage() {
     e.preventDefault();
     if (!importFile) return;
     setImporting(true);
-    setImportStatus("Mengunggah dan memproses data di server...");
+    setImportProgress(0);
+    setImportStatus("Mempersiapkan data...");
     setImportResult(null);
 
     const formData = new FormData();
@@ -204,27 +206,58 @@ export default function SiswaPage() {
         method: "POST",
         body: formData,
       });
-      const json = await res.json();
 
       if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
         setImportResult({ success: false, message: json.error?.message || "Gagal mengimpor file." });
+        setImporting(false);
         return;
       }
 
-      setImportResult({
-        success: true,
-        message: `Selesai: ${json.data?.imported_count || 0} berhasil, ${json.data?.failed_count || 0} gagal.`,
-        errors: json.data?.errors
-      });
-      await loadSiswa();
-      setTimeout(() => {
-        setImportOpen(false);
-        setImportFile(null);
-        setImportResult(null);
-      }, 2000);
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setImporting(false);
+        return;
+      }
+      const decoder = new TextDecoder();
+      let finalResult = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter(Boolean);
+        
+        for (const line of lines) {
+          try {
+            const data = JSON.parse(line);
+            if (data.type === "progress") {
+              setImportProgress(data.progress);
+              setImportStatus(data.status);
+            } else if (data.type === "done") {
+              finalResult = data.result;
+            } else if (data.type === "error") {
+              setImportResult({ success: false, message: data.message });
+              setImporting(false);
+              return;
+            }
+          } catch(e) {}
+        }
+      }
+
+      setImporting(false);
+
+      if (finalResult) {
+        setImportResult({
+          success: true,
+          message: finalResult.message,
+          errors: finalResult.errors
+        });
+        await loadSiswa();
+      }
     } catch {
       setImportResult({ success: false, message: "Terjadi kesalahan saat mengunggah file." });
-    } finally {
       setImporting(false);
     }
   }
@@ -593,26 +626,35 @@ export default function SiswaPage() {
         size="sm"
       >
         <form onSubmit={handleImport} className="flex flex-col gap-4">
-          <p className="text-xs text-[#9CA3AF] leading-relaxed">
-            Unggah file spreadsheet (.xlsx) sesuai template format LPKS. Gunakan tombol &quot;Template&quot; di atas jika belum memiliki formatnya.
-          </p>
-
-          <input
-            type="file"
-            accept=".xlsx, .csv"
-            onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-            className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
-          />
+          {!importing && !importResult && (
+            <>
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                Unggah file spreadsheet (.xlsx) sesuai template format LPKS. Gunakan tombol &quot;Template&quot; di atas jika belum memiliki formatnya.
+              </p>
+              <input
+                type="file"
+                accept=".xlsx, .csv"
+                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
+              />
+            </>
+          )}
 
           {importing && (
-            <div className="flex flex-col justify-center items-center py-6 gap-3">
-              <div className="relative">
-                <Loader2 className="h-10 w-10 animate-spin text-[#DC2626]" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <KeyRound className="h-4 w-4 animate-pulse text-[#F9FAFB]" />
+            <div className="flex flex-col justify-center items-center py-8 gap-4">
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90">
+                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-[#1F2937]" />
+                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent"
+                    strokeDasharray={2 * Math.PI * 36}
+                    strokeDashoffset={2 * Math.PI * 36 * (1 - importProgress / 100)}
+                    className="text-[#DC2626] transition-all duration-300 ease-out" />
+                </svg>
+                <div className="absolute flex flex-col items-center">
+                  <span className="text-lg font-bold text-[#F9FAFB]">{importProgress}%</span>
                 </div>
               </div>
-              <div className="text-xs font-medium text-[#F9FAFB] animate-pulse">
+              <div className="text-xs font-medium text-[#F9FAFB]">
                 {importStatus}
               </div>
               <p className="text-[10px] text-[#9CA3AF] text-center px-4">
@@ -622,25 +664,25 @@ export default function SiswaPage() {
           )}
 
           {!importing && importResult && (
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-3 py-2">
               <div
-                className={`rounded-lg p-3 text-xs flex items-center gap-2 ${
+                className={`rounded-lg p-3 text-xs flex items-start gap-2.5 ${
                   importResult.success && (!importResult.errors || importResult.errors.length === 0)
                     ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
                     : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
                 }`}
               >
                 {importResult.success && (!importResult.errors || importResult.errors.length === 0) ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
                 ) : (
-                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 )}
-                <span>{importResult.message}</span>
+                <span className="leading-relaxed font-medium">{importResult.message}</span>
               </div>
               {importResult.errors && importResult.errors.length > 0 && (
-                <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-32 overflow-y-auto">
+                <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-40 overflow-y-auto">
                   <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">Rincian Baris Gagal:</span>
-                  <ul className="list-disc pl-4 space-y-1 text-[10px] text-[#F43F5E]/90">
+                  <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#F43F5E]/90">
                     {importResult.errors.map((err, idx) => (
                       <li key={idx}>
                         <b>Baris {err.row}:</b> {err.reason}
@@ -653,12 +695,21 @@ export default function SiswaPage() {
           )}
 
           <div className="flex items-center gap-2 justify-end pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)} disabled={importing}>
-              Tutup
-            </Button>
-            <Button type="submit" size="sm" disabled={!importFile || importing}>
-              {importing ? "Memproses..." : "Mulai Import"}
-            </Button>
+            {(!importing && !importResult) && (
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" size="sm" disabled={!importFile}>
+                  Mulai Import
+                </Button>
+              </>
+            )}
+            {!importing && importResult && (
+              <Button type="button" size="sm" onClick={() => { setImportOpen(false); setImportResult(null); setImportFile(null); }}>
+                Tutup
+              </Button>
+            )}
           </div>
         </form>
       </Modal>

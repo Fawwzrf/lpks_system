@@ -35,118 +35,146 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
 
     if (modul === "siswa") {
-      let importedCount = 0;
-      const errors: { row: number; reason: string }[] = [];
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            let importedCount = 0;
+            const errors: { row: number; reason: string }[] = [];
 
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i];
-        const kodeProgram = String(row["Program"] || "").trim();
-        const manualNoInduk = String(row["No. Induk"] || "").trim();
-        const namaLengkap = String(row["Nama"] || "").trim();
-        const nik = String(row["NIK"] || "").trim();
-        const email = String(row["Email"] || "").trim();
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i];
+              const kodeProgram = String(row["Program"] || "").trim();
+              const manualNoInduk = String(row["No. Induk"] || "").trim();
+              const namaLengkap = String(row["Nama"] || "").trim();
+              const nik = String(row["NIK"] || "").trim();
+              const email = String(row["Email"] || "").trim();
 
-        if (!kodeProgram || !namaLengkap || !nik || !email) {
-          errors.push({ row: i + 2, reason: "Kolom Program, Nama, NIK, atau Email kosong." });
-          continue;
+              if (!kodeProgram || !namaLengkap || !nik || !email) {
+                errors.push({ row: i + 2, reason: "Kolom Program, Nama, NIK, atau Email kosong." });
+              } else {
+                const { data: program } = await supabase
+                  .from("master_program")
+                  .select("id")
+                  .eq("kode_program", kodeProgram)
+                  .single();
+
+                if (!program) {
+                  errors.push({ row: i + 2, reason: `Kode program '${kodeProgram}' tidak ditemukan.` });
+                } else {
+                  let noInduk = manualNoInduk;
+                  if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
+                    const { data: generatedNoInduk } = await supabase.rpc("generate_nomor_induk", {
+                      p_program_id: program.id,
+                    });
+                    noInduk = generatedNoInduk;
+                  }
+
+                  const urutan = String(noInduk).split(".")[1] || "0001";
+                  const username = generateStudentUsername(namaLengkap, urutan);
+                  const generatedPassword = generateStudentPassword(username);
+                  const authEmail = `${username.replace("@", "")}@lpks.id`;
+
+                  const supabaseAdmin = createAdminClient();
+
+                  const { data: existingUser } = await supabase
+                    .from("siswa")
+                    .select("id")
+                    .or(`username.eq.${username},nik.eq.${nik}`)
+                    .maybeSingle();
+
+                  if (existingUser) {
+                    errors.push({ row: i + 2, reason: `Akun duplikat (Username/NIK sudah dipakai).` });
+                  } else {
+                    const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
+                      email: authEmail,
+                      password: generatedPassword,
+                      email_confirm: true,
+                      user_metadata: { role: "siswa", nama: namaLengkap.trim() },
+                    });
+
+                    if (authCreateError || !authData.user) {
+                      errors.push({ row: i + 2, reason: `Gagal membuat akun login: ${authCreateError?.message}` });
+                    } else {
+                      const { error: insertError } = await supabase.from("siswa").insert({
+                        auth_id: authData.user.id,
+                        program_id: program.id,
+                        nomor_induk: noInduk,
+                        username,
+                        nama_lengkap: namaLengkap,
+                        nik,
+                        email,
+                        no_hp: String(row["No. HP"] || "").trim() || null,
+                        tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
+                        tgl_lahir: row["Tanggal Lahir"] || null,
+                        alamat_lengkap: String(row["Alamat"] || "").trim() || null,
+                        nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
+                        nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
+                        pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
+                        nisn: String(row["NISN"] || "").trim() || null,
+                        tgl_masuk: row["Tgl. Masuk"] || new Date().toISOString().split("T")[0],
+                        tgl_keluar: row["Tgl. Keluar"] || null,
+                        checklist_berkas: {
+                          ijazah: true,
+                          ktp: true,
+                          kk: true,
+                          foto: true,
+                          suket_sehat: true,
+                        },
+                        is_password_default: true,
+                      });
+
+                      if (insertError) {
+                        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+                        errors.push({ row: i + 2, reason: insertError.message });
+                      } else {
+                        importedCount++;
+                      }
+                    }
+                  }
+                }
+              }
+
+              // Send progress
+              const progress = Math.round(((i + 1) / rows.length) * 100);
+              const progressMsg = JSON.stringify({
+                type: "progress",
+                progress,
+                status: `Memproses baris ${i + 1} dari ${rows.length}...`
+              });
+              controller.enqueue(encoder.encode(progressMsg + "\n"));
+            }
+
+            // Send done
+            const doneMsg = JSON.stringify({
+              type: "done",
+              result: {
+                total_rows: rows.length,
+                imported_count: importedCount,
+                failed_count: errors.length,
+                errors,
+                message: `Impor selesai: ${importedCount} data siswa baru disimpan (${errors.length} gagal/dilewati).`
+              }
+            });
+            controller.enqueue(encoder.encode(doneMsg + "\n"));
+            controller.close();
+          } catch (streamErr) {
+            const errMsg = JSON.stringify({
+              type: "error",
+              message: streamErr instanceof Error ? streamErr.message : String(streamErr)
+            });
+            controller.enqueue(encoder.encode(errMsg + "\n"));
+            controller.close();
+          }
         }
+      });
 
-        // Cari program_id berdasarkan kode_program
-        const { data: program } = await supabase
-          .from("master_program")
-          .select("id")
-          .eq("kode_program", kodeProgram)
-          .single();
-
-        if (!program) {
-          errors.push({ row: i + 2, reason: `Kode program '${kodeProgram}' tidak ditemukan.` });
-          continue;
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "application/x-ndjson",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive"
         }
-
-        // Gunakan nomor induk manual jika ada, jika tidak, auto-generate
-        let noInduk = manualNoInduk;
-        if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
-          const { data: generatedNoInduk } = await supabase.rpc("generate_nomor_induk", {
-            p_program_id: program.id,
-          });
-          noInduk = generatedNoInduk;
-        }
-
-        // 2. Generate username format "namadepan@urutan_no_induk"
-        const urutan = String(noInduk).split(".")[1] || "0001";
-        const username = generateStudentUsername(namaLengkap, urutan);
-        const generatedPassword = generateStudentPassword(username);
-        const authEmail = `${username.replace("@", "")}@lpks.id`;
-
-        const supabaseAdmin = createAdminClient();
-
-        // Validasi duplikat agar akun tidak crash
-        const { data: existingUser } = await supabase
-          .from("siswa")
-          .select("id")
-          .or(`username.eq.${username},nik.eq.${nik}`)
-          .maybeSingle();
-
-        if (existingUser) {
-          errors.push({ row: i + 2, reason: `Akun duplikat (Username/NIK sudah dipakai).` });
-          continue;
-        }
-
-        // 3. Create Auth user
-        const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
-          email: authEmail,
-          password: generatedPassword,
-          email_confirm: true,
-          user_metadata: { role: "siswa", nama: namaLengkap.trim() },
-        });
-
-        if (authCreateError || !authData.user) {
-          errors.push({ row: i + 2, reason: `Gagal membuat akun login: ${authCreateError?.message}` });
-          continue;
-        }
-
-        const { error: insertError } = await supabase.from("siswa").insert({
-          auth_id: authData.user.id,
-          program_id: program.id,
-          nomor_induk: noInduk,
-          username,
-          nama_lengkap: namaLengkap,
-          nik,
-          email,
-          no_hp: String(row["No. HP"] || "").trim() || null,
-          tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
-          tgl_lahir: row["Tanggal Lahir"] || null,
-          alamat_lengkap: String(row["Alamat"] || "").trim() || null,
-          nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
-          nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
-          pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
-          nisn: String(row["NISN"] || "").trim() || null,
-          tgl_masuk: row["Tgl. Masuk"] || new Date().toISOString().split("T")[0],
-          tgl_keluar: row["Tgl. Keluar"] || null,
-          checklist_berkas: {
-            ijazah: true,
-            ktp: true,
-            kk: true,
-            foto: true,
-            suket_sehat: true,
-          },
-          is_password_default: true,
-        });
-
-        if (insertError) {
-          await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-          errors.push({ row: i + 2, reason: insertError.message });
-        } else {
-          importedCount++;
-        }
-      }
-
-      return successResponse({
-        total_rows: rows.length,
-        imported_count: importedCount,
-        failed_count: errors.length,
-        errors,
-        message: `Impor berhasil: ${importedCount} data siswa baru disimpan (${errors.length} dilewati).`,
       });
     }
 
