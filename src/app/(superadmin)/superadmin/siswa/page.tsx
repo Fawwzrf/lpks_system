@@ -681,11 +681,17 @@ export default function SiswaPage() {
               </div>
               {importResult.errors && importResult.errors.length > 0 && (
                 <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-40 overflow-y-auto">
-                  <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">Rincian Baris Gagal:</span>
+                  <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">Rincian Kegagalan:</span>
                   <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#F43F5E]/90">
-                    {importResult.errors.map((err, idx) => (
+                    {Object.entries(
+                      importResult.errors.reduce((acc, err) => {
+                        if (!acc[err.reason]) acc[err.reason] = [];
+                        acc[err.reason].push(err.row);
+                        return acc;
+                      }, {} as Record<string, number[]>)
+                    ).map(([reason, rows], idx) => (
                       <li key={idx}>
-                        <b>Baris {err.row}:</b> {err.reason}
+                        <b>Baris {rows.join(", ")}:</b> {reason}
                       </li>
                     ))}
                   </ul>

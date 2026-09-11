@@ -51,16 +51,16 @@ export async function POST(request: NextRequest) {
               const email = String(row["Email"] || "").trim();
 
               if (!kodeProgram || !namaLengkap || !nik || !email) {
-                errors.push({ row: i + 2, reason: "Kolom Program, Nama, NIK, atau Email kosong." });
+                errors.push({ row: i + 2, reason: "Data wajib (Program, Nama, NIK, atau Email Excel) belum diisi." });
               } else {
                 const { data: program } = await supabase
                   .from("master_program")
                   .select("id")
-                  .eq("kode_program", kodeProgram)
-                  .single();
+                  .or(`kode_program.ilike.${kodeProgram},nama.ilike.${kodeProgram}`)
+                  .maybeSingle();
 
                 if (!program) {
-                  errors.push({ row: i + 2, reason: `Kode program '${kodeProgram}' tidak ditemukan.` });
+                  errors.push({ row: i + 2, reason: `Program '${kodeProgram}' tidak dikenali (pastikan nama/kode program sesuai template).` });
                 } else {
                   let noInduk = manualNoInduk;
                   if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
                   const urutan = String(noInduk).split(".")[1] || "0001";
                   const username = generateStudentUsername(namaLengkap, urutan);
                   const generatedPassword = generateStudentPassword(username);
-                  const authEmail = `${username.replace("@", "")}@lpks.id`;
+                  // Ensure strictly valid email by removing anything that isn't a-z or 0-9 from the username part
+                  const authEmail = `${username.replace(/[^a-zA-Z0-9]/g, "")}@lpks.id`.toLowerCase();
 
                   const supabaseAdmin = createAdminClient();
 
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
                     .maybeSingle();
 
                   if (existingUser) {
-                    errors.push({ row: i + 2, reason: `Akun duplikat (Username/NIK sudah dipakai).` });
+                    errors.push({ row: i + 2, reason: `Siswa dengan NIK atau Username ini sudah terdaftar sebelumnya.` });
                   } else {
                     const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
                       email: authEmail,
@@ -94,7 +95,7 @@ export async function POST(request: NextRequest) {
                     });
 
                     if (authCreateError || !authData.user) {
-                      errors.push({ row: i + 2, reason: `Gagal membuat akun login: ${authCreateError?.message}` });
+                      errors.push({ row: i + 2, reason: `Gagal mendaftarkan akun sistem: ${authCreateError?.message === 'Unable to validate email address: invalid format' ? 'Format email/nama memuat karakter tidak valid' : authCreateError?.message}` });
                     } else {
                       const { error: insertError } = await supabase.from("siswa").insert({
                         auth_id: authData.user.id,
