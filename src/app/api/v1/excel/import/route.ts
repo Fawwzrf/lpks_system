@@ -50,8 +50,13 @@ export async function POST(request: NextRequest) {
               const nik = String(row["NIK"] || "").trim();
               const email = String(row["Email"] || "").trim();
 
+              if (!kodeProgram && !namaLengkap && !nik && !email) {
+                // Abaikan baris yang benar-benar kosong (biasanya sisa baris excel)
+                continue;
+              }
+
               if (!kodeProgram || !namaLengkap || !nik || !email) {
-                errors.push({ row: i + 2, reason: "Data wajib (Program, Nama, NIK, atau Email Excel) belum diisi." });
+                errors.push({ row: i + 2, reason: "Data wajib (Program, Nama, NIK, atau Email Excel) belum terisi lengkap." });
               } else {
                 const { data: program } = await supabase
                   .from("master_program")
