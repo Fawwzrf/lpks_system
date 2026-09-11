@@ -5,6 +5,36 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateStudentUsername, generateStudentPassword } from "@/lib/gate-checks";
 import * as XLSX from "xlsx";
 
+function parseExcelDate(val: unknown): string | null {
+  if (!val) return null;
+  if (typeof val === "number") {
+    // Excel serial date to JS Date
+    const d = new Date(Math.round((val - 25569) * 86400 * 1000));
+    return d.toISOString().split("T")[0];
+  }
+  if (typeof val === "string") {
+    const s = val.trim();
+    // try to parse DD/MM/YYYY or DD-MM-YYYY
+    const parts = s.split(/[\/\-]/);
+    if (parts.length === 3) {
+      // Assuming DD/MM/YYYY or D/M/YYYY
+      let day = parts[0];
+      let month = parts[1];
+      let year = parts[2];
+      
+      // If the first part is 4 digits, it's already YYYY-MM-DD
+      if (day.length === 4) return s;
+      
+      day = day.padStart(2, "0");
+      month = month.padStart(2, "0");
+      year = year.length === 2 ? `20${year}` : year;
+      return `${year}-${month}-${day}`;
+    }
+    return s;
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();
@@ -112,14 +142,14 @@ export async function POST(request: NextRequest) {
                         email,
                         no_hp: String(row["No. HP"] || "").trim() || null,
                         tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
-                        tgl_lahir: row["Tanggal Lahir"] || null,
+                        tgl_lahir: parseExcelDate(row["Tanggal Lahir"]),
                         alamat_lengkap: String(row["Alamat"] || "").trim() || null,
                         nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
                         nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
                         pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
                         nisn: String(row["NISN"] || "").trim() || null,
-                        tgl_masuk: row["Tgl. Masuk"] || new Date().toISOString().split("T")[0],
-                        tgl_keluar: row["Tgl. Keluar"] || null,
+                        tgl_masuk: parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
+                        tgl_keluar: parseExcelDate(row["Tgl. Keluar"]),
                         checklist_berkas: {
                           ijazah: true,
                           ktp: true,
