@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    query = query.order("tgl_masuk", { ascending: false }).range(offset, offset + limit - 1);
+    query = query.order("nomor_induk", { ascending: true }).range(offset, offset + limit - 1);
 
     const { data, count, error } = await query;
 

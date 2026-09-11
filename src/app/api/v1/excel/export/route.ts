@@ -21,19 +21,24 @@ export async function GET(request: NextRequest) {
         .order("nomor_induk", { ascending: true });
 
       exportRows =
-        siswaList?.map((s) => ({
-          "Nomor Induk": s.nomor_induk,
-          "Nama Lengkap": s.nama_lengkap,
-          "Program Pelatihan": ((s.program as unknown) as { nama: string })?.nama || "-",
-          NIK: s.nik,
-          Email: s.email,
-          "No HP": s.no_hp || "-",
+        siswaList?.map((s, idx) => ({
+          "No": idx + 1,
+          "No. Induk": s.nomor_induk,
+          "Nama": s.nama_lengkap,
+          "NIK": s.nik,
           "Tempat Lahir": s.tempat_lahir || "-",
           "Tanggal Lahir": s.tgl_lahir || "-",
-          "Pendidikan Terakhir": s.pendidikan_terakhir || "-",
-          "Tanggal Masuk": s.tgl_masuk,
-          "Tanggal Keluar": s.tgl_keluar || "Aktif",
-          Status: s.tgl_keluar ? "Alumni / Lulus" : "Siswa Aktif",
+          "Alamat": s.alamat_lengkap || "-",
+          "Nama Orang Tua (Ayah/Ibu)": [s.nama_ayah, s.nama_ibu].filter(Boolean).join(" / ") || "-",
+          "No. HP": s.no_hp || "-",
+          "Email": s.email,
+          "Pend. Terakhir": s.pendidikan_terakhir || "-",
+          "NISN": s.nisn || "-",
+          "Program": ((s.program as unknown) as { nama: string })?.nama || "-",
+          "Tgl. Masuk": s.tgl_masuk,
+          "Tgl. Keluar": s.tgl_keluar || "-",
+          "Username": s.username || "-",
+          "Password": s.is_password_default ? (s.username || "-") : "(Telah Diubah Mandiri)"
         })) || [];
     } else if (modul === "keuangan") {
       const { data: txList } = await supabase

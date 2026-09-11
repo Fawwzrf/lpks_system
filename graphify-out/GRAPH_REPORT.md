@@ -1,24 +1,24 @@
-# Graph Report - LPKS System  (2026-09-07)
+# Graph Report - LPKS System  (2026-09-11)
 
 ## Corpus Check
-- 91 files · ~79,836 words
+- 95 files · ~84,119 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 458 nodes · 912 edges · 36 communities (23 shown, 13 thin omitted)
+- 491 nodes · 966 edges · 39 communities (25 shown, 14 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `a01476ca`
+- Built from commit: `d8e597e4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - errorResponse
-- button.tsx
+- master/page.tsx
 - compilerOptions
-- utils.ts
+- superadmin/keuangan/page.tsx
 - dependencies
 - devDependencies
 - cn
@@ -26,13 +26,13 @@
 - pendaftaran/page.tsx
 - siswa/presensi/page.tsx
 - database.ts
+- Buku Panduan Pengguna (User Manual) — LPKS Sumbu Hidup
 - penilaian/page.tsx
-- superadmin/keuangan/page.tsx
-- superadmin/presensi/page.tsx
+- badge.tsx
 - transkrip/page.tsx
 - ai/page.tsx
 - app/layout.tsx
-- PendaftaranPage
+- button.tsx
 - src/middleware.ts
 - MasterPage
 - SiswaPage
@@ -49,30 +49,33 @@
 - Modul Penerbitan Sertifikat Kelulusan
 - UI Design System & Tokens
 - Memulai Instalasi Lokal
+- EditSiswaPage
+- AkunForm
+- NilaiPage
 
 ## God Nodes (most connected - your core abstractions)
-1. `errorResponse()` - 76 edges
-2. `createClient()` - 73 edges
-3. `successResponse()` - 67 edges
-4. `requireSuperadmin()` - 43 edges
+1. `errorResponse()` - 78 edges
+2. `createClient()` - 75 edges
+3. `successResponse()` - 69 edges
+4. `requireSuperadmin()` - 45 edges
 5. `cn()` - 28 edges
 6. `requireAuth()` - 23 edges
 7. `compilerOptions` - 17 edges
-8. `requireStudentOwnerOrAdmin()` - 14 edges
-9. `Button` - 13 edges
-10. `handleEnterToNextField()` - 11 edges
+8. `Button` - 14 edges
+9. `requireStudentOwnerOrAdmin()` - 14 edges
+10. `handleEnterToNextField()` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `validatePresensiSubmission()` --calls--> `isWithinGeofence()`  [EXTRACTED]
   tests/integration/flow-presensi.test.ts → src/lib/geo.ts
+- `BerandaPage()` --calls--> `formatRupiah()`  [EXTRACTED]
+  src/app/(siswa)/siswa/beranda/page.tsx → src/lib/utils.ts
 - `NavItem()` --calls--> `cn()`  [EXTRACTED]
   src/app/(superadmin)/layout.tsx → src/lib/utils.ts
 - `SuperadminLayout()` --calls--> `cn()`  [EXTRACTED]
   src/app/(superadmin)/layout.tsx → src/lib/utils.ts
 - `DashboardPage()` --calls--> `formatRupiah()`  [EXTRACTED]
   src/app/(superadmin)/superadmin/dashboard/page.tsx → src/lib/utils.ts
-- `PenilaianPage()` --calls--> `formatDateIndo()`  [EXTRACTED]
-  src/app/(superadmin)/superadmin/penilaian/page.tsx → src/lib/utils.ts
 
 ## Import Cycles
 - None detected.
@@ -80,23 +83,23 @@
 ## Hyperedges (group relationships)
 - **LPKS System Core Operational Modules** — docs_analysis_prd_modul_pendaftaran, docs_analysis_prd_modul_siswa, docs_analysis_prd_modul_presensi, docs_analysis_prd_modul_keuangan, docs_analysis_prd_modul_penilaian, docs_analysis_prd_modul_ujian, docs_analysis_prd_modul_sertifikat [EXTRACTED 1.00]
 
-## Communities (36 total, 13 thin omitted)
+## Communities (39 total, 14 thin omitted)
 
 ### Community 0 - "errorResponse"
-Cohesion: 0.10
-Nodes (60): POST(), POST(), GET(), Params, POST(), POST(), POST(), GET() (+52 more)
+Cohesion: 0.09
+Nodes (61): POST(), POST(), GET(), Params, POST(), POST(), POST(), GET() (+53 more)
 
-### Community 1 - "button.tsx"
-Cohesion: 0.10
-Nodes (12): Modul Ujian Internal & Kelulusan, SiswaLoginPage(), AdminLoginPage(), AkunForm(), KriteriaItem, NilaiPage(), RiwayatGrouped, KRITERIA_LIST (+4 more)
+### Community 1 - "master/page.tsx"
+Cohesion: 0.11
+Nodes (18): Modul Ujian Internal & Kelulusan, SiswaLoginPage(), AdminLoginPage(), BerkasItem, KriteriaItem, LokasiItem, ProgramItem, Tab (+10 more)
 
 ### Community 2 - "compilerOptions"
 Cohesion: 0.07
 Nodes (29): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+21 more)
 
-### Community 3 - "utils.ts"
-Cohesion: 0.15
-Nodes (11): Portal Mandiri Siswa Mobile-Responsive, BerandaPage(), StudentDashboardData, KeuanganData, KeuanganSiswaPage(), TransaksiItem, KeuanganPage(), Badge() (+3 more)
+### Community 3 - "superadmin/keuangan/page.tsx"
+Cohesion: 0.16
+Nodes (10): Modul Catatan Keuangan & Pembayaran, KeuanganData, KeuanganSiswaPage(), TransaksiItem, KeuanganPage(), SiswaOption, TransaksiRow, PenilaianPage() (+2 more)
 
 ### Community 4 - "dependencies"
 Cohesion: 0.07
@@ -115,8 +118,8 @@ Cohesion: 0.18
 Nodes (15): PUT(), GET(), POST(), generateStudentPassword(), generateStudentUsername(), isKeuanganLunas(), isSertifikatEligible(), isSiapUjian() (+7 more)
 
 ### Community 8 - "pendaftaran/page.tsx"
-Cohesion: 0.29
-Nodes (6): Modul Pendaftaran Siswa & Verifikasi Berkas, BERKAS_LIST, ProgramItem, RegistrationSuccessData, Select, SelectProps
+Cohesion: 0.13
+Nodes (10): Modul Pendaftaran Siswa & Verifikasi Berkas, BERKAS_LIST, FieldErrors, PendaftaranPage(), handleFieldBlur(), handleSubmit(), ProgramItem, RegistrationSuccessData (+2 more)
 
 ### Community 9 - "siswa/presensi/page.tsx"
 Cohesion: 0.22
@@ -126,17 +129,17 @@ Nodes (10): Modul Presensi Geofencing GPS, Geofencing Verification Engine (Haver
 Cohesion: 0.14
 Nodes (13): AiRingkasan, AuditLog, MasterKriteria, MasterLokasi, MasterProgram, MasterSyaratBerkas, PenilaianHarian, Presensi (+5 more)
 
-### Community 11 - "penilaian/page.tsx"
-Cohesion: 0.12
-Nodes (14): Modul Penilaian 5 Kriteria Fluktuasi, BerkasItem, KriteriaItem, LokasiItem, ProgramItem, Tab, TABS, KriteriaItem (+6 more)
-
-### Community 12 - "superadmin/keuangan/page.tsx"
+### Community 11 - "Buku Panduan Pengguna (User Manual) — LPKS Sumbu Hidup"
 Cohesion: 0.18
-Nodes (11): Modul Catatan Keuangan & Pembayaran, Modul Direktori Data Siswa, SiswaOption, TransaksiRow, FilterStatus, SiswaItem, Modal(), ModalProps (+3 more)
+Nodes (10): 1. Pendaftaran Siswa (Superadmin), 2. Presensi Harian Mandiri (Siswa), 3. Penilaian Kriteria Las (Superadmin), 4. Konsultan SOP Las & RAG (Superadmin), Buku Panduan Pengguna (User Manual) — LPKS Sumbu Hidup, Kontak Dukungan, Memulai (Getting Started), Panduan Fitur Utama (+2 more)
 
-### Community 13 - "superadmin/presensi/page.tsx"
-Cohesion: 0.29
-Nodes (5): PresensiAdminPage(), PresensiRow, STATUS_CONFIG, STATUS_OPTIONS, StatusPresensi
+### Community 12 - "penilaian/page.tsx"
+Cohesion: 0.14
+Nodes (14): Modul Penilaian 5 Kriteria Fluktuasi, Modul Direktori Data Siswa, KriteriaItem, PenilaianRow, SiswaOption, WARNA_PALETTE, FilterStatus, ProgramItem (+6 more)
+
+### Community 13 - "badge.tsx"
+Cohesion: 0.15
+Nodes (10): Portal Mandiri Siswa Mobile-Responsive, BerandaPage(), StudentDashboardData, PresensiAdminPage(), PresensiRow, STATUS_CONFIG, STATUS_OPTIONS, StatusPresensi (+2 more)
 
 ### Community 14 - "transkrip/page.tsx"
 Cohesion: 0.33
@@ -149,6 +152,10 @@ Nodes (3): AiPage(), Message, STARTER_PROMPTS
 ### Community 16 - "app/layout.tsx"
 Cohesion: 0.40
 Nodes (3): geistMono, geistSans, metadata
+
+### Community 17 - "button.tsx"
+Cohesion: 0.27
+Nodes (4): KriteriaItem, RiwayatGrouped, Button, ButtonProps
 
 ### Community 18 - "src/middleware.ts"
 Cohesion: 0.60
@@ -166,25 +173,29 @@ Nodes (6): Portal Superadmin Web Dashboard, DashboardPage(), DashboardStats, QUI
 Cohesion: 0.22
 Nodes (8): 1. Prasyarat, 2. Setup Environment, 3. Setup Database, 4. Menjalankan Server Development, LPKS System — Sistem Manajemen Pelatihan Pengelasan "Sumbu Hidup", Memulai Instalasi Lokal, Modul Utama, Tech Stack
 
+### Community 36 - "EditSiswaPage"
+Cohesion: 0.40
+Nodes (5): EditSiswaPage(), handleFieldBlur(), handleSubmit(), validateField(), validateForm()
+
 ## Knowledge Gaps
-- **177 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+172 more)
+- **189 isolated node(s):** `eslintConfig`, `nextConfig`, `name`, `version`, `private` (+184 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **13 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **14 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `cn()` connect `cn` to `button.tsx`, `utils.ts`, `pendaftaran/page.tsx`, `penilaian/page.tsx`, `superadmin/keuangan/page.tsx`, `dashboard/page.tsx`?**
+- **Why does `cn()` connect `cn` to `master/page.tsx`, `superadmin/keuangan/page.tsx`, `penilaian/page.tsx`, `badge.tsx`, `button.tsx`, `dashboard/page.tsx`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
 - **Why does `errorResponse()` connect `errorResponse` to `gate-checks.ts`?**
-  _High betweenness centrality (0.016) - this node is a cross-community bridge._
-- **Why does `createClient()` connect `errorResponse` to `gate-checks.ts`?**
   _High betweenness centrality (0.014) - this node is a cross-community bridge._
+- **Why does `createClient()` connect `errorResponse` to `gate-checks.ts`?**
+  _High betweenness centrality (0.013) - this node is a cross-community bridge._
 - **What connects `eslintConfig`, `nextConfig`, `name` to the rest of the system?**
-  _177 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _189 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `errorResponse` be split into smaller, more focused modules?**
-  _Cohesion score 0.09563046192259675 - nodes in this community are weakly interconnected._
-- **Should `button.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.10256410256410256 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.09412326803631152 - nodes in this community are weakly interconnected._
+- **Should `master/page.tsx` be split into smaller, more focused modules?**
+  _Cohesion score 0.10591133004926108 - nodes in this community are weakly interconnected._
 - **Should `compilerOptions` be split into smaller, more focused modules?**
   _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._

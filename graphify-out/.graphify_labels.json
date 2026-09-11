@@ -1,8 +1,8 @@
 {
   "0": "errorResponse",
-  "1": "button.tsx",
+  "1": "master/page.tsx",
   "2": "compilerOptions",
-  "3": "utils.ts",
+  "3": "superadmin/keuangan/page.tsx",
   "4": "dependencies",
   "5": "devDependencies",
   "6": "cn",
@@ -10,13 +10,13 @@
   "8": "pendaftaran/page.tsx",
   "9": "siswa/presensi/page.tsx",
   "10": "database.ts",
-  "11": "penilaian/page.tsx",
-  "12": "superadmin/keuangan/page.tsx",
-  "13": "superadmin/presensi/page.tsx",
+  "11": "Buku Panduan Pengguna (User Manual) — LPKS Sumbu Hidup",
+  "12": "penilaian/page.tsx",
+  "13": "badge.tsx",
   "14": "transkrip/page.tsx",
   "15": "ai/page.tsx",
   "16": "app/layout.tsx",
-  "17": "PendaftaranPage",
+  "17": "button.tsx",
   "18": "src/middleware.ts",
   "19": "MasterPage",
   "20": "SiswaPage",
@@ -34,5 +34,8 @@
   "32": "(auth)/layout.tsx",
   "33": "Modul Penerbitan Sertifikat Kelulusan",
   "34": "UI Design System & Tokens",
-  "35": "Memulai Instalasi Lokal"
+  "35": "Memulai Instalasi Lokal",
+  "36": "EditSiswaPage",
+  "37": "AkunForm",
+  "38": "NilaiPage"
 }

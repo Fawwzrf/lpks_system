@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { generateStudentUsername, generateStudentPassword } from "@/lib/gate-checks";
 import * as XLSX from "xlsx";
 
 export async function POST(request: NextRequest) {
@@ -38,13 +40,14 @@ export async function POST(request: NextRequest) {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const kodeProgram = String(row["kode_program"] || "").trim();
-        const namaLengkap = String(row["nama_lengkap"] || "").trim();
-        const nik = String(row["nik"] || "").trim();
-        const email = String(row["email"] || "").trim();
+        const kodeProgram = String(row["Program"] || "").trim();
+        const manualNoInduk = String(row["No. Induk"] || "").trim();
+        const namaLengkap = String(row["Nama"] || "").trim();
+        const nik = String(row["NIK"] || "").trim();
+        const email = String(row["Email"] || "").trim();
 
         if (!kodeProgram || !namaLengkap || !nik || !email) {
-          errors.push({ row: i + 2, reason: "Kolom kode_program, nama_lengkap, nik, atau email kosong." });
+          errors.push({ row: i + 2, reason: "Kolom Program, Nama, NIK, atau Email kosong." });
           continue;
         }
 
@@ -60,26 +63,66 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        // Generate nomor induk
-        const { data: noInduk } = await supabase.rpc("generate_nomor_induk", {
-          p_program_id: program.id,
+        // Gunakan nomor induk manual jika ada, jika tidak, auto-generate
+        let noInduk = manualNoInduk;
+        if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
+          const { data: generatedNoInduk } = await supabase.rpc("generate_nomor_induk", {
+            p_program_id: program.id,
+          });
+          noInduk = generatedNoInduk;
+        }
+
+        // 2. Generate username format "namadepan@urutan_no_induk"
+        const urutan = String(noInduk).split(".")[1] || "0001";
+        const username = generateStudentUsername(namaLengkap, urutan);
+        const generatedPassword = generateStudentPassword(username);
+        const authEmail = `${username.replace("@", "")}@lpks.id`;
+
+        const supabaseAdmin = createAdminClient();
+
+        // Validasi duplikat agar akun tidak crash
+        const { data: existingUser } = await supabase
+          .from("siswa")
+          .select("id")
+          .or(`username.eq.${username},nik.eq.${nik}`)
+          .maybeSingle();
+
+        if (existingUser) {
+          errors.push({ row: i + 2, reason: `Akun duplikat (Username/NIK sudah dipakai).` });
+          continue;
+        }
+
+        // 3. Create Auth user
+        const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
+          email: authEmail,
+          password: generatedPassword,
+          email_confirm: true,
+          user_metadata: { role: "siswa", nama: namaLengkap.trim() },
         });
 
+        if (authCreateError || !authData.user) {
+          errors.push({ row: i + 2, reason: `Gagal membuat akun login: ${authCreateError?.message}` });
+          continue;
+        }
+
         const { error: insertError } = await supabase.from("siswa").insert({
+          auth_id: authData.user.id,
           program_id: program.id,
           nomor_induk: noInduk,
+          username,
           nama_lengkap: namaLengkap,
           nik,
           email,
-          no_hp: String(row["no_hp"] || "").trim() || null,
-          tempat_lahir: String(row["tempat_lahir"] || "").trim() || null,
-          tgl_lahir: row["tgl_lahir"] || null,
-          alamat_lengkap: String(row["alamat_lengkap"] || "").trim() || null,
-          nama_ayah: String(row["nama_ayah"] || "").trim() || null,
-          nama_ibu: String(row["nama_ibu"] || "").trim() || null,
-          pendidikan_terakhir: String(row["pendidikan_terakhir"] || "").trim() || null,
-          nisn: String(row["nisn"] || "").trim() || null,
-          tgl_masuk: row["tgl_masuk"] || new Date().toISOString().split("T")[0],
+          no_hp: String(row["No. HP"] || "").trim() || null,
+          tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
+          tgl_lahir: row["Tanggal Lahir"] || null,
+          alamat_lengkap: String(row["Alamat"] || "").trim() || null,
+          nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
+          nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
+          pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
+          nisn: String(row["NISN"] || "").trim() || null,
+          tgl_masuk: row["Tgl. Masuk"] || new Date().toISOString().split("T")[0],
+          tgl_keluar: row["Tgl. Keluar"] || null,
           checklist_berkas: {
             ijazah: true,
             ktp: true,
@@ -87,9 +130,11 @@ export async function POST(request: NextRequest) {
             foto: true,
             suket_sehat: true,
           },
+          is_password_default: true,
         });
 
         if (insertError) {
+          await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
           errors.push({ row: i + 2, reason: insertError.message });
         } else {
           importedCount++;

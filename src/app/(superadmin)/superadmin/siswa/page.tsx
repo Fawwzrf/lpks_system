@@ -47,6 +47,9 @@ export default function SiswaPage() {
   const [filter, setFilter] = useState<FilterStatus>("semua");
   const [programFilter, setProgramFilter] = useState<string>("semua");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [total, setTotal] = useState(0);
 
   // Modal Kelola Akun
   const [selectedSiswa, setSelectedSiswa] = useState<SiswaItem | null>(null);
@@ -64,7 +67,29 @@ export default function SiswaPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState("");
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Import Status Animation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (importing) {
+      const statuses = [
+        "Membaca file Excel...",
+        "Validasi format dan data...",
+        "Meng-generate Nomor Induk...",
+        "Membuat Akun & Kata Sandi...",
+        "Menyimpan ke Database...",
+      ];
+      let i = 0;
+      setImportStatus(statuses[0]);
+      interval = setInterval(() => {
+        i = (i + 1) % statuses.length;
+        setImportStatus(statuses[i]);
+      }, 1500);
+    }
+    return () => clearInterval(interval);
+  }, [importing]);
 
   useEffect(() => {
     async function loadPrograms() {
@@ -84,7 +109,7 @@ export default function SiswaPage() {
   const loadSiswa = useCallback(async () => {
     setLoading(true);
     try {
-      let url = "/api/v1/siswa?limit=100";
+      let url = `/api/v1/siswa?limit=${limit}&page=${page}`;
       if (filter !== "semua") {
         url += `&status=${filter}`;
       }
@@ -98,13 +123,19 @@ export default function SiswaPage() {
       if (res.ok) {
         const json = await res.json();
         setSiswaList(json.data || []);
+        setTotal(json.meta?.total || 0);
       }
     } catch (err) {
       console.error("Gagal memuat data siswa:", err);
     } finally {
       setLoading(false);
     }
-  }, [filter, programFilter, search]);
+  }, [filter, programFilter, search, page, limit]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filter, programFilter, search, limit]);
 
   useEffect(() => {
     loadSiswa();
@@ -221,7 +252,7 @@ export default function SiswaPage() {
     {
       key: "no",
       header: "No",
-      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{siswaList.indexOf(row) + 1}</span>
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{(page - 1) * limit + siswaList.indexOf(row) + 1}</span>
     },
     {
       key: "nomor_induk",
@@ -234,23 +265,7 @@ export default function SiswaPage() {
       key: "nama_lengkap",
       header: "Nama",
       render: (row: SiswaItem) => (
-        <div className="space-y-1 min-w-[140px]">
-          <p className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</p>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] font-mono text-[#9CA3AF] bg-[#1F2937]/60 px-1.5 py-0.5 rounded border border-[#374151]/40">
-              User: {row.username || "—"}
-            </span>
-            {row.is_password_default !== false ? (
-              <span className="text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Password default">
-                Pass Default
-              </span>
-            ) : (
-              <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded" title="Password diubah mandiri">
-                Pass Diubah
-              </span>
-            )}
-          </div>
-        </div>
+        <span className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</span>
       ),
     },
     {
@@ -421,7 +436,44 @@ export default function SiswaPage() {
           <span>Memuat data direktori siswa...</span>
         </div>
       ) : (
-        <Table columns={columns} data={siswaList} emptyMessage="Tidak ada siswa yang cocok dengan kriteria pencarian." />
+        <div className="flex flex-col gap-4">
+          <Table columns={columns} data={siswaList} emptyMessage="Tidak ada siswa yang cocok dengan kriteria pencarian." />
+          <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
+            <div className="flex items-center gap-2">
+              <span>Menampilkan</span>
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="bg-[#111827] border border-[#1F2937] rounded px-2 py-1 focus:outline-none focus:border-[#DC2626]"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>data per halaman</span>
+            </div>
+            
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors"
+              >
+                Sebelumnya
+              </button>
+              <span className="px-3 py-1.5 font-medium">Halaman {page} dari {Math.max(1, Math.ceil(total / limit))}</span>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page >= Math.ceil(total / limit) || siswaList.length === 0}
+                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors"
+              >
+                Selanjutnya
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal Kelola Akun */}
@@ -571,7 +623,24 @@ export default function SiswaPage() {
             className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
           />
 
-          {importResult && (
+          {importing && (
+            <div className="flex flex-col justify-center items-center py-6 gap-3">
+              <div className="relative">
+                <Loader2 className="h-10 w-10 animate-spin text-[#DC2626]" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <KeyRound className="h-4 w-4 animate-pulse text-[#F9FAFB]" />
+                </div>
+              </div>
+              <div className="text-xs font-medium text-[#F9FAFB] animate-pulse">
+                {importStatus}
+              </div>
+              <p className="text-[10px] text-[#9CA3AF] text-center px-4">
+                Sistem sedang memproses data dan secara otomatis membuatkan username serta kata sandi untuk setiap siswa. Mohon tunggu...
+              </p>
+            </div>
+          )}
+
+          {!importing && importResult && (
             <div
               className={`rounded-lg p-3 text-xs flex items-center gap-2 ${
                 importResult.success
@@ -585,11 +654,11 @@ export default function SiswaPage() {
           )}
 
           <div className="flex items-center gap-2 justify-end pt-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
+            <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)} disabled={importing}>
               Tutup
             </Button>
             <Button type="submit" size="sm" disabled={!importFile || importing}>
-              {importing ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Mengimpor...</> : "Mulai Import"}
+              {importing ? "Memproses..." : "Mulai Import"}
             </Button>
           </div>
         </form>

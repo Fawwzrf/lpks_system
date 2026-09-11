@@ -37,6 +37,8 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
 
 ### 2. Modul Manajemen Data Siswa (Student Directory & Lifecycle)
 - Sistem HARUS menyediakan manajemen direktori seluruh siswa (CRUD Data Siswa lengkap).
+  - **Edit Data:** Sesuai prinsip integritas `Nomor Induk` (yang juga menjadi `Username`), pengubahan **Program Pelatihan** untuk siswa yang sudah terdaftar DILARANG (di-*disable* pada UI Edit).
+  - **Penghapusan (Soft Delete & Anonimisasi):** Menghapus siswa akan memicu anonimisasi data pribadi (NIK, No. HP, Alamat) dan mengubah status siswa menjadi Keluar/Alumni (`Tanggal Keluar` terisi), namun data statistik akademik (nilai, presensi) dipertahankan sesuai UU PDP.
 - Sistem HARUS memiliki kolom **Tanggal Keluar** untuk menandai status siswa:
   - **Siswa Aktif:** `Tanggal Keluar` masih kosong / `null`.
   - **Alumni / Selesai / Keluar:** `Tanggal Keluar` terisi (lengkap dengan tanggal kelulusan/selesai).
