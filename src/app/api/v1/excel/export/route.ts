@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     if (modul === "siswa") {
       const { data: siswaList } = await supabase
         .from("siswa")
-        .select("*, program:master_program(nama, biaya)")
+        .select("*, program:master_program(id, kode_program, nama, biaya)")
         .order("nomor_induk", { ascending: true });
 
       exportRows =
@@ -29,12 +29,13 @@ export async function GET(request: NextRequest) {
           "Tempat Lahir": s.tempat_lahir || "-",
           "Tanggal Lahir": s.tgl_lahir || "-",
           "Alamat": s.alamat_lengkap || "-",
-          "Nama Orang Tua (Ayah/Ibu)": [s.nama_ayah, s.nama_ibu].filter(Boolean).join(" / ") || "-",
+          "Nama Ayah": s.nama_ayah || "-",
+          "Nama Ibu": s.nama_ibu || "-",
           "No. HP": s.no_hp || "-",
           "Email": s.email,
           "Pend. Terakhir": s.pendidikan_terakhir || "-",
           "NISN": s.nisn || "-",
-          "Program": ((s.program as unknown) as { nama: string })?.nama || "-",
+          "Program": ((s.program as any)?.nama) || "-",
           "Tgl. Masuk": s.tgl_masuk,
           "Tgl. Keluar": s.tgl_keluar || "-",
           "Username": s.username || "-",
