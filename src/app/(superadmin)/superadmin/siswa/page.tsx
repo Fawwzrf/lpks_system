@@ -68,28 +68,7 @@ export default function SiswaPage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState("");
-  const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  // Import Status Animation
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (importing) {
-      const statuses = [
-        "Membaca file Excel...",
-        "Validasi format dan data...",
-        "Meng-generate Nomor Induk...",
-        "Membuat Akun & Kata Sandi...",
-        "Menyimpan ke Database...",
-      ];
-      let i = 0;
-      setImportStatus(statuses[0]);
-      interval = setInterval(() => {
-        i = (i + 1) % statuses.length;
-        setImportStatus(statuses[i]);
-      }, 1500);
-    }
-    return () => clearInterval(interval);
-  }, [importing]);
+  const [importResult, setImportResult] = useState<{ success: boolean; message: string; errors?: { row: number; reason: string }[] } | null>(null);
 
   useEffect(() => {
     async function loadPrograms() {
@@ -214,6 +193,7 @@ export default function SiswaPage() {
     e.preventDefault();
     if (!importFile) return;
     setImporting(true);
+    setImportStatus("Mengunggah dan memproses data di server...");
     setImportResult(null);
 
     const formData = new FormData();
@@ -233,7 +213,8 @@ export default function SiswaPage() {
 
       setImportResult({
         success: true,
-        message: `Berhasil mengimpor ${json.data?.imported_count || 0} siswa baru!`,
+        message: `Selesai: ${json.data?.imported_count || 0} berhasil, ${json.data?.failed_count || 0} gagal.`,
+        errors: json.data?.errors
       });
       await loadSiswa();
       setTimeout(() => {
@@ -641,15 +622,33 @@ export default function SiswaPage() {
           )}
 
           {!importing && importResult && (
-            <div
-              className={`rounded-lg p-3 text-xs flex items-center gap-2 ${
-                importResult.success
-                  ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
-                  : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
-              }`}
-            >
-              {importResult.success ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <AlertCircle className="h-4 w-4 shrink-0" />}
-              <span>{importResult.message}</span>
+            <div className="flex flex-col gap-2">
+              <div
+                className={`rounded-lg p-3 text-xs flex items-center gap-2 ${
+                  importResult.success && (!importResult.errors || importResult.errors.length === 0)
+                    ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
+                    : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
+                }`}
+              >
+                {importResult.success && (!importResult.errors || importResult.errors.length === 0) ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                )}
+                <span>{importResult.message}</span>
+              </div>
+              {importResult.errors && importResult.errors.length > 0 && (
+                <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-32 overflow-y-auto">
+                  <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">Rincian Baris Gagal:</span>
+                  <ul className="list-disc pl-4 space-y-1 text-[10px] text-[#F43F5E]/90">
+                    {importResult.errors.map((err, idx) => (
+                      <li key={idx}>
+                        <b>Baris {err.row}:</b> {err.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
 
