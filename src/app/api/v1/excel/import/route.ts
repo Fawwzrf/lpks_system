@@ -1,33 +1,28 @@
 import { NextRequest } from "next/server";
-import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
+import { errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateStudentUsername, generateStudentPassword } from "@/lib/gate-checks";
 import * as XLSX from "xlsx";
 
+/** Normalise Excel date values (serial number or DD/MM/YYYY string) to YYYY-MM-DD. */
 function parseExcelDate(val: unknown): string | null {
   if (!val) return null;
   if (typeof val === "number") {
-    // Excel serial date to JS Date
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
     return d.toISOString().split("T")[0];
   }
   if (typeof val === "string") {
     const s = val.trim();
-    // try to parse DD/MM/YYYY or DD-MM-YYYY
     const parts = s.split(/[\/\-]/);
     if (parts.length === 3) {
-      // Assuming DD/MM/YYYY or D/M/YYYY
-      let day = parts[0];
-      let month = parts[1];
-      let year = parts[2];
-      
-      // If the first part is 4 digits, it's already YYYY-MM-DD
-      if (day.length === 4) return s;
-      
-      day = day.padStart(2, "0");
-      month = month.padStart(2, "0");
-      year = year.length === 2 ? `20${year}` : year;
+      let [d1, d2, d3] = parts;
+      // Already YYYY-MM-DD or YYYY/MM/DD
+      if (d1.length === 4) return `${d1}-${d2.padStart(2, "0")}-${d3.padStart(2, "0")}`;
+      // DD/MM/YYYY or D/M/YYYY
+      const day   = d1.padStart(2, "0");
+      const month = d2.padStart(2, "0");
+      const year  = d3.length === 2 ? `20${d3}` : d3;
       return `${year}-${month}-${day}`;
     }
     return s;
@@ -74,143 +69,168 @@ export async function POST(request: NextRequest) {
 
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
-              const kodeProgram = String(row["Program"] || "").trim();
-              const manualNoInduk = String(row["No. Induk"] || "").trim();
-              const namaLengkap = String(row["Nama"] || "").trim();
-              const nik = String(row["NIK"] || "").trim();
-              const email = String(row["Email"] || "").trim();
 
-              if (!kodeProgram && !namaLengkap && !nik && !email) {
-                // Abaikan baris yang benar-benar kosong (biasanya sisa baris excel)
+              const namaProgram   = String(row["Program"]       || "").trim();
+              const manualNoInduk = String(row["No. Induk"]     || "").trim();
+              const namaLengkap   = String(row["Nama"]          || "").trim();
+              const nik           = String(row["NIK"]           || "").trim();
+              const email         = String(row["Email"]         || "").trim();
+
+              // Skip completely empty rows (trailing blank rows in Excel)
+              if (!namaProgram && !namaLengkap && !nik) continue;
+
+              // Nama, NIK, dan Program wajib ada
+              if (!namaProgram || !namaLengkap || !nik) {
+                errors.push({ row: i + 2, reason: "Kolom wajib (Program, Nama, atau NIK) belum diisi." });
+                // send progress & continue
+                controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
                 continue;
               }
 
-              if (!kodeProgram || !namaLengkap || !nik || !email) {
-                errors.push({ row: i + 2, reason: "Data wajib (Program, Nama, NIK, atau Email Excel) belum terisi lengkap." });
+              // ── Cari program ────────────────────────────────────────────
+              // Jika kolom Program berisi angka (misal "01"), pakai prefix No. Induk sebagai kode
+              // karena kode yang sama bisa punya >1 program (mis. SMAW 4G & SMAW 6G).
+              // Jika berisi teks (mis. "SMAW 4G"), cari berdasarkan nama.
+              let programId: string | null = null;
+              const isNumericCode = /^\d+$/.test(namaProgram);
+
+              if (isNumericCode) {
+                const kodePrefix = manualNoInduk.split(".")[0].trim().padStart(2, "0");
+                const { data: programs } = await supabase
+                  .from("master_program")
+                  .select("id, kode_program")
+                  .eq("kode_program", kodePrefix);
+
+                if (!programs || programs.length === 0) {
+                  errors.push({ row: i + 2, reason: `Program dengan kode '${kodePrefix}' tidak ditemukan di database.` });
+                  controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
+                  continue;
+                }
+                programId = programs[0].id;
               } else {
-                const { data: program } = await supabase
+                const { data: prog } = await supabase
                   .from("master_program")
                   .select("id")
-                  .or(`kode_program.ilike.${kodeProgram},nama.ilike.${kodeProgram}`)
+                  .ilike("nama", `%${namaProgram}%`)
+                  .limit(1)
                   .maybeSingle();
 
-                if (!program) {
-                  errors.push({ row: i + 2, reason: `Program '${kodeProgram}' tidak dikenali (pastikan nama/kode program sesuai template).` });
+                if (!prog) {
+                  errors.push({ row: i + 2, reason: `Program '${namaProgram}' tidak ditemukan. Pastikan nama program sesuai daftar (contoh: SMAW 4G).` });
+                  controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
+                  continue;
+                }
+                programId = prog.id;
+              }
+
+              // ── Nomor Induk ─────────────────────────────────────────────
+              let noInduk = manualNoInduk;
+              if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
+                const { data: generated } = await supabase.rpc("generate_nomor_induk");
+                noInduk = generated;
+              }
+
+              // ── Username & auth email ────────────────────────────────────
+              const urutanRaw = String(noInduk).includes(".")
+                ? String(noInduk).split(".")[1].trim()
+                : String(noInduk);
+              const username = generateStudentUsername(namaLengkap, urutanRaw);
+              const generatedPassword = generateStudentPassword(username);
+              // Jika user tidak mengisi email, buat email unik dari username + angka acak
+              const authEmail = email
+                ? email
+                : `${username.replace(/[^a-zA-Z0-9]/g, "")}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`.toLowerCase();
+
+              const supabaseAdmin = createAdminClient();
+
+              // Cek duplikat
+              const { data: existingUser } = await supabase
+                .from("siswa")
+                .select("id")
+                .or(`username.eq.${username},nik.eq.${nik}`)
+                .maybeSingle();
+
+              if (existingUser) {
+                errors.push({ row: i + 2, reason: "Siswa dengan NIK atau Username ini sudah terdaftar sebelumnya." });
+              } else {
+                const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
+                  email: authEmail,
+                  password: generatedPassword,
+                  email_confirm: true,
+                  user_metadata: { role: "siswa", nama: namaLengkap.trim() },
+                });
+
+                if (authCreateError || !authData?.user) {
+                  errors.push({ row: i + 2, reason: `Gagal mendaftarkan akun: ${authCreateError?.message ?? "unknown"}` });
                 } else {
-                  let noInduk = manualNoInduk;
-                  if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
-                    const { data: generatedNoInduk } = await supabase.rpc("generate_nomor_induk", {
-                      p_program_id: program.id,
-                    });
-                    noInduk = generatedNoInduk;
-                  }
+                  const { error: insertError } = await supabase.from("siswa").insert({
+                    auth_id:              authData.user.id,
+                    program_id:           programId,
+                    nomor_induk:          noInduk,
+                    username,
+                    nama_lengkap:         namaLengkap,
+                    nik,
+                    email:                email || null,
+                    no_hp:                String(row["No. HP"]        || "").trim() || null,
+                    tempat_lahir:         String(row["Tempat Lahir"]  || "").trim() || null,
+                    tgl_lahir:            parseExcelDate(row["Tanggal Lahir"]),
+                    alamat_lengkap:       String(row["Alamat"]        || "").trim() || null,
+                    nama_ayah:            String(row["Nama Ayah"]     || "").trim() || null,
+                    nama_ibu:             String(row["Nama Ibu"]      || "").trim() || null,
+                    pendidikan_terakhir:  String(row["Pend. Terakhir"]|| "").trim() || null,
+                    nisn:                 String(row["NISN"]          || "").trim() || null,
+                    tgl_masuk:            parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
+                    tgl_keluar:           parseExcelDate(row["Tgl. Keluar"]),
+                    checklist_berkas: { ijazah: true, ktp: true, kk: true, foto: true, suket_sehat: true },
+                    is_password_default:  true,
+                  });
 
-                  const urutan = String(noInduk).split(".")[1] || "0001";
-                  const username = generateStudentUsername(namaLengkap, urutan);
-                  const generatedPassword = generateStudentPassword(username);
-                  // Ensure strictly valid email by removing anything that isn't a-z or 0-9 from the username part
-                  const authEmail = `${username.replace(/[^a-zA-Z0-9]/g, "")}@lpks.id`.toLowerCase();
-
-                  const supabaseAdmin = createAdminClient();
-
-                  const { data: existingUser } = await supabase
-                    .from("siswa")
-                    .select("id")
-                    .or(`username.eq.${username},nik.eq.${nik}`)
-                    .maybeSingle();
-
-                  if (existingUser) {
-                    errors.push({ row: i + 2, reason: `Siswa dengan NIK atau Username ini sudah terdaftar sebelumnya.` });
+                  if (insertError) {
+                    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+                    errors.push({ row: i + 2, reason: insertError.message });
                   } else {
-                    const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
-                      email: authEmail,
-                      password: generatedPassword,
-                      email_confirm: true,
-                      user_metadata: { role: "siswa", nama: namaLengkap.trim() },
-                    });
-
-                    if (authCreateError || !authData.user) {
-                      errors.push({ row: i + 2, reason: `Gagal mendaftarkan akun sistem: ${authCreateError?.message === 'Unable to validate email address: invalid format' ? 'Format email/nama memuat karakter tidak valid' : authCreateError?.message}` });
-                    } else {
-                      const { error: insertError } = await supabase.from("siswa").insert({
-                        auth_id: authData.user.id,
-                        program_id: program.id,
-                        nomor_induk: noInduk,
-                        username,
-                        nama_lengkap: namaLengkap,
-                        nik,
-                        email,
-                        no_hp: String(row["No. HP"] || "").trim() || null,
-                        tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
-                        tgl_lahir: parseExcelDate(row["Tanggal Lahir"]),
-                        alamat_lengkap: String(row["Alamat"] || "").trim() || null,
-                        nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
-                        nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
-                        pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
-                        nisn: String(row["NISN"] || "").trim() || null,
-                        tgl_masuk: parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
-                        tgl_keluar: parseExcelDate(row["Tgl. Keluar"]),
-                        checklist_berkas: {
-                          ijazah: true,
-                          ktp: true,
-                          kk: true,
-                          foto: true,
-                          suket_sehat: true,
-                        },
-                        is_password_default: true,
-                      });
-
-                      if (insertError) {
-                        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-                        errors.push({ row: i + 2, reason: insertError.message });
-                      } else {
-                        importedCount++;
-                      }
-                    }
+                    importedCount++;
                   }
                 }
               }
 
-              // Send progress
+              // Send progress update after each row
               const progress = Math.round(((i + 1) / rows.length) * 100);
-              const progressMsg = JSON.stringify({
+              controller.enqueue(encoder.encode(JSON.stringify({
                 type: "progress",
                 progress,
-                status: `Memproses baris ${i + 1} dari ${rows.length}...`
-              });
-              controller.enqueue(encoder.encode(progressMsg + "\n"));
+                status: `Memproses baris ${i + 1} dari ${rows.length}...`,
+              }) + "\n"));
             }
 
             // Send done
-            const doneMsg = JSON.stringify({
+            controller.enqueue(encoder.encode(JSON.stringify({
               type: "done",
               result: {
-                total_rows: rows.length,
+                total_rows:     rows.length,
                 imported_count: importedCount,
-                failed_count: errors.length,
+                failed_count:   errors.length,
                 errors,
-                message: `Impor selesai: ${importedCount} data siswa baru disimpan (${errors.length} gagal/dilewati).`
-              }
-            });
-            controller.enqueue(encoder.encode(doneMsg + "\n"));
+                message: `Impor selesai: ${importedCount} data siswa baru disimpan (${errors.length} gagal/dilewati).`,
+              },
+            }) + "\n"));
             controller.close();
           } catch (streamErr) {
-            const errMsg = JSON.stringify({
+            controller.enqueue(encoder.encode(JSON.stringify({
               type: "error",
-              message: streamErr instanceof Error ? streamErr.message : String(streamErr)
-            });
-            controller.enqueue(encoder.encode(errMsg + "\n"));
+              message: streamErr instanceof Error ? streamErr.message : String(streamErr),
+            }) + "\n"));
             controller.close();
           }
-        }
+        },
       });
 
       return new Response(stream, {
         headers: {
           "Content-Type": "application/x-ndjson",
           "Cache-Control": "no-cache",
-          "Connection": "keep-alive"
-        }
+          "Connection": "keep-alive",
+        },
       });
     }
 
