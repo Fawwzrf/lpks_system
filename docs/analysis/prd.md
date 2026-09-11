@@ -22,7 +22,12 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
     - [ ] Surat keterangan sehat dokter (1 lembar)
 - **Form Input Data Siswa Lengkap (Terbuka setelah checklist terpenuhi):**
   - **Nomor Induk Otomatis:** `kode_program.No_siswa` (kode program otomatis sesuai pilihan kursus, `No_siswa` 4 digit otomatis *auto-increment* melanjutkan nomor terakhir, contoh: `01.0001`, `01.0002`).
-  - **Pilihan Program Pelatihan:** SMAW 4G (01), SMAW 6G (01), GTAW 6G (02), GTAW+SMAW 6G (03), FCAW+GMAW 3G (04) — *data master dinamis*.
+  - **Pilihan Program Pelatihan:** 
+    - SMAW 4G 5jt 30hari (kode 01)
+    - SMAW 6G 7,5jt 51 hari (kode 01)
+    - GTAW 6G 8,5jt 51 hari (kode 02)
+    - GTAW + SMAW 6G 13jt 98 hari (kode 03)
+    - FCAW + GMAW 3G 8jt 25hari (kode 04)
   - **Data Pribadi:** Nama Lengkap, NIK (16 digit), Tempat Lahir, Tanggal Lahir.
   - **Alamat Lengkap:** Jalan/Dusun/Daerah (termasuk No. Rumah), RT, RW, Kelurahan/Desa, Kecamatan, Kabupaten/Kota, Provinsi.
   - **Data Orang Tua:** Nama Ayah, Nama Ibu.

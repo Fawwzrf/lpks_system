@@ -46,8 +46,7 @@ CLAUDE.md
 .impeccable/
 .gemini/
 .playwright-mcp/
-.graphify-out/
-.graphify/
+graphify-out/
 
 # Sensitive architecture, API, & security documents (Hidden from public portfolio)
 docs/design/api.md
@@ -55,3 +54,6 @@ docs/design/keamanan.md
 docs/design/infrastruktur.md
 docs/design/basis-data.md
 docs/planning/
+
+.vercel
+.env*

@@ -1,14 +1,17 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Search, Download, Upload, FileText, Users, KeyRound,
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
+  Edit, Trash2, AlertTriangle
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
 
 interface SiswaItem {
   id: string;
@@ -18,17 +21,31 @@ interface SiswaItem {
   nik: string;
   email: string;
   no_hp?: string;
+  tempat_lahir?: string;
+  tgl_lahir?: string;
+  alamat_lengkap?: string;
+  pendidikan_terakhir?: string;
+  tgl_masuk?: string;
   tgl_keluar?: string | null;
   program?: { nama: string };
   is_password_default?: boolean;
 }
 
+interface ProgramItem {
+  id: string;
+  kode_program: string;
+  nama: string;
+}
+
 type FilterStatus = "semua" | "aktif" | "alumni";
 
 export default function SiswaPage() {
+  const router = useRouter();
   const [siswaList, setSiswaList] = useState<SiswaItem[]>([]);
+  const [programs, setPrograms] = useState<ProgramItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterStatus>("semua");
+  const [programFilter, setProgramFilter] = useState<string>("semua");
   const [search, setSearch] = useState("");
 
   // Modal Kelola Akun
@@ -39,11 +56,30 @@ export default function SiswaPage() {
   const [credSaving, setCredSaving] = useState(false);
   const [credMsg, setCredMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Modal Hapus Siswa
+  const [deleteSiswa, setDeleteSiswa] = useState<SiswaItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   // Import Modal
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  useEffect(() => {
+    async function loadPrograms() {
+      try {
+        const res = await fetch("/api/v1/master/program");
+        if (res.ok) {
+          const json = await res.json();
+          setPrograms(json.data || []);
+        }
+      } catch (e) {
+        console.error("Gagal memuat program:", e);
+      }
+    }
+    loadPrograms();
+  }, []);
 
   const loadSiswa = useCallback(async () => {
     setLoading(true);
@@ -51,6 +87,9 @@ export default function SiswaPage() {
       let url = "/api/v1/siswa?limit=100";
       if (filter !== "semua") {
         url += `&status=${filter}`;
+      }
+      if (programFilter !== "semua") {
+        url += `&program_id=${programFilter}`;
       }
       if (search.trim()) {
         url += `&search=${encodeURIComponent(search.trim())}`;
@@ -65,7 +104,7 @@ export default function SiswaPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, search]);
+  }, [filter, programFilter, search]);
 
   useEffect(() => {
     loadSiswa();
@@ -122,6 +161,24 @@ export default function SiswaPage() {
     }
   }
 
+  async function handleDeleteConfirm() {
+    if (!deleteSiswa) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/siswa/${deleteSiswa.id}`, { method: "DELETE" });
+      if (res.ok) {
+        await loadSiswa();
+        setDeleteSiswa(null);
+      } else {
+        alert("Gagal menghapus siswa.");
+      }
+    } catch (e) {
+      alert("Kesalahan jaringan saat menghapus siswa.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
     if (!importFile) return;
@@ -162,6 +219,11 @@ export default function SiswaPage() {
 
   const columns = [
     {
+      key: "no",
+      header: "No",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{siswaList.indexOf(row) + 1}</span>
+    },
+    {
       key: "nomor_induk",
       header: "No. Induk",
       render: (row: SiswaItem) => (
@@ -170,26 +232,20 @@ export default function SiswaPage() {
     },
     {
       key: "nama_lengkap",
-      header: "Nama Siswa",
+      header: "Nama",
       render: (row: SiswaItem) => (
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-[140px]">
           <p className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</p>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[11px] font-mono text-[#9CA3AF] bg-[#1F2937]/60 px-1.5 py-0.5 rounded border border-[#374151]/40">
+            <span className="text-[10px] font-mono text-[#9CA3AF] bg-[#1F2937]/60 px-1.5 py-0.5 rounded border border-[#374151]/40">
               User: {row.username || "—"}
             </span>
             {row.is_password_default !== false ? (
-              <span
-                className="text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium"
-                title="Password default sama dengan username"
-              >
+              <span className="text-[9px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded" title="Password default">
                 Pass Default
               </span>
             ) : (
-              <span
-                className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium"
-                title="Siswa telah mengganti kata sandi secara mandiri"
-              >
+              <span className="text-[9px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded" title="Password diubah mandiri">
                 Pass Diubah
               </span>
             )}
@@ -198,45 +254,84 @@ export default function SiswaPage() {
       ),
     },
     {
+      key: "nik",
+      header: "NIK",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#D1D5DB] font-mono">{row.nik || "—"}</span>
+    },
+    {
+      key: "lahir",
+      header: "Lahir",
+      render: (row: SiswaItem) => (
+        <div className="text-[11px] text-[#9CA3AF] min-w-[100px]">
+          <p>{row.tempat_lahir || "—"}</p>
+          <p className="text-[#6B7280]">{row.tgl_lahir || "—"}</p>
+        </div>
+      )
+    },
+    {
+      key: "alamat",
+      header: "Alamat",
+      render: (row: SiswaItem) => (
+        <span className="text-[11px] text-[#9CA3AF] block max-w-[150px] truncate" title={row.alamat_lengkap}>
+          {row.alamat_lengkap || "—"}
+        </span>
+      )
+    },
+    {
       key: "program",
       header: "Program",
       render: (row: SiswaItem) => (
-        <span className="text-xs text-[#D1D5DB]">{row.program?.nama || "Pelatihan"}</span>
+        <span className="text-[11px] text-[#D1D5DB]">{row.program?.nama || "—"}</span>
       ),
     },
     {
-      key: "status",
-      header: "Status",
-      render: (row: SiswaItem) => {
-        const isAlumni = !!row.tgl_keluar;
-        return (
-          <Badge variant={isAlumni ? "neutral" : "success"}>
-            {isAlumni ? "Alumni" : "Aktif"}
-          </Badge>
-        );
-      },
+      key: "no_hp",
+      header: "No. HP",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.no_hp || "—"}</span>
     },
     {
-      key: "kontak",
-      header: "Kontak",
-      render: (row: SiswaItem) => (
-        <div className="text-[11px] text-[#9CA3AF]">
-          <p>{row.email}</p>
-          <p className="text-[#6B7280]">{row.no_hp || "—"}</p>
-        </div>
-      ),
+      key: "pendidikan",
+      header: "Pend.",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.pendidikan_terakhir || "—"}</span>
+    },
+    {
+      key: "masuk",
+      header: "Masuk",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_masuk || "—"}</span>
+    },
+    {
+      key: "keluar",
+      header: "Keluar",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_keluar || "—"}</span>
     },
     {
       key: "aksi",
       header: "Aksi",
-      className: "w-28 text-right",
+      className: "w-36 text-right",
       render: (row: SiswaItem) => (
-        <button
-          onClick={() => openKelolaAkun(row)}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#1F2937] hover:border-[#DC2626]/40 bg-[#0B0F17] hover:bg-[#DC2626]/10 text-[11px] text-[#D1D5DB] hover:text-white transition-all"
-        >
-          <KeyRound className="h-3 w-3 text-[#DC2626]" /> Kelola Akun
-        </button>
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          <button
+            onClick={() => router.push(`/superadmin/siswa/edit/${row.id}`)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all"
+            title="Edit Siswa"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => setDeleteSiswa(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#F43F5E]/40 bg-[#0B0F17] hover:bg-[#F43F5E]/10 text-[#9CA3AF] hover:text-[#F43F5E] transition-all"
+            title="Hapus Siswa (Anonimisasi)"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={() => openKelolaAkun(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#3B82F6]/40 bg-[#0B0F17] hover:bg-[#3B82F6]/10 text-[#9CA3AF] hover:text-[#3B82F6] transition-all"
+            title="Kelola Akun Login"
+          >
+            <KeyRound className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ),
     },
   ];
@@ -282,6 +377,18 @@ export default function SiswaPage() {
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
           ))}
+        </div>
+
+        <div className="w-[200px]">
+          <Select
+            value={programFilter}
+            onChange={(e) => setProgramFilter(e.target.value)}
+          >
+            <option value="semua">Semua Program</option>
+            {programs.map(p => (
+              <option key={p.id} value={p.id}>{p.kode_program} - {p.nama}</option>
+            ))}
+          </Select>
         </div>
 
         <div className="relative flex-1 max-w-xs">
@@ -409,6 +516,39 @@ export default function SiswaPage() {
               </Button>
             </div>
           </form>
+        )}
+      </Modal>
+
+      {/* Modal Hapus Siswa */}
+      <Modal
+        open={!!deleteSiswa}
+        onClose={() => setDeleteSiswa(null)}
+        title="Hapus Data Siswa"
+        size="sm"
+      >
+        {deleteSiswa && (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 text-xs text-[#F43F5E] flex items-start gap-2.5">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-1 text-[11px]">
+                <strong className="text-xs">Peringatan Penghapusan</strong>
+                <p className="leading-relaxed opacity-90">
+                  Data akademik (nilai, presensi) akan tetap dipertahankan untuk kebutuhan riwayat statistik. Namun data pribadi <b>(NIK, No. HP, Alamat)</b> akan dihapus secara permanen (anonimisasi) sesuai dengan kebijakan privasi.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#9CA3AF] mt-1">
+              Apakah Anda yakin ingin menghapus/menonaktifkan siswa <b>{deleteSiswa.nama_lengkap}</b> ({deleteSiswa.nomor_induk})?
+            </div>
+
+            <div className="flex items-center gap-2 justify-end mt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setDeleteSiswa(null)}>Batal</Button>
+              <Button type="button" size="sm" onClick={handleDeleteConfirm} disabled={deleting} className="bg-[#DC2626] text-white hover:bg-[#B91C1C]">
+                {deleting ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Menghapus...</> : "Ya, Hapus Data"}
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 

@@ -19,10 +19,10 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Link href="/mockup">
+          <Link href="/superadmin/login">
             <Button size="sm" variant="spark">
               <Monitor className="h-3.5 w-3.5 mr-1.5" />
-              Buka Mockup Visual (Tahap 3)
+              Portal Superadmin
             </Button>
           </Link>
         </div>
@@ -31,7 +31,7 @@ export default function Home() {
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-16 text-center max-w-4xl mx-auto space-y-6">
         <Badge variant="spark" className="text-xs px-3 py-1">
-          Tahap 3 SDLC: Desain UI/UX &amp; Mockup Visual
+          Aplikasi Manajemen LPKS Sumbu Hidup
         </Badge>
 
         <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#F9FAFB] leading-tight">
@@ -47,20 +47,13 @@ export default function Home() {
 
         {/* Action Button */}
         <div className="pt-2 flex flex-wrap items-center justify-center gap-4">
-          <Link href="/mockup">
+          <Link href="/login">
             <Button size="lg" variant="spark" className="font-bold shadow-xl shadow-[#DC2626]/20">
-              Jelajahi Mockup Interaktif 6 Layar
+              Masuk sebagai Siswa
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </Link>
-          <a
-            href="https://github.com/Fawwzrf/lpks_system"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center font-medium rounded-lg transition-colors border border-[#374151] bg-transparent text-[#F9FAFB] hover:bg-[#1F2937] px-6 h-12 text-sm"
-          >
-            Lihat di GitHub
-          </a>
+
         </div>
 
         {/* Feature Grid Highlights */}

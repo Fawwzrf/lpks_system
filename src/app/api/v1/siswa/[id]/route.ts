@@ -46,6 +46,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // Field yang diizinkan untuk di-update
     const allowedFields = [
       "nama_lengkap",
+      "nik",
       "tempat_lahir",
       "tgl_lahir",
       "alamat_lengkap",
@@ -55,6 +56,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       "email",
       "pendidikan_terakhir",
       "nisn",
+      "tgl_masuk",
       "tgl_keluar",
       "checklist_berkas",
     ];
