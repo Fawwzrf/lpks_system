@@ -56,22 +56,66 @@ export async function GET(request: NextRequest) {
           };
         }) || [];
     } else if (modul === "keuangan") {
-      const { data: txList } = await supabase
-        .from("transaksi_keuangan")
-        .select("*, siswa:siswa(nomor_induk, nama_lengkap, program:master_program(nama))")
-        .order("tgl_bayar", { ascending: false });
+      const type = request.nextUrl.searchParams.get("type");
+      if (type === "transaksi") {
+        const { data: txList } = await supabase
+          .from("transaksi_keuangan")
+          .select("*, siswa:siswa(nomor_induk, nama_lengkap, program:master_program(nama))")
+          .order("tgl_bayar", { ascending: false });
 
-      exportRows =
-        txList?.map((tx) => ({
-          "Tanggal Bayar": tx.tgl_bayar,
-          "Nomor Induk": ((tx.siswa as unknown) as { nomor_induk: string })?.nomor_induk || "-",
-          "Nama Siswa": ((tx.siswa as unknown) as { nama_lengkap: string })?.nama_lengkap || "-",
-          Program: ((((tx.siswa as unknown) as { program: { nama: string } })?.program)?.nama) || "-",
-          "Nominal (Rp)": Number(tx.nominal),
-          Metode: tx.metode,
-          Keterangan: tx.keterangan || "-",
-          Penerima: tx.penerima,
-        })) || [];
+        exportRows =
+          txList?.map((tx) => ({
+            "Tanggal Bayar": tx.tgl_bayar,
+            "Nomor Induk": ((tx.siswa as unknown) as { nomor_induk: string })?.nomor_induk || "-",
+            "Nama Siswa": ((tx.siswa as unknown) as { nama_lengkap: string })?.nama_lengkap || "-",
+            Program: ((((tx.siswa as unknown) as { program: { nama: string } })?.program)?.nama) || "-",
+            "Nominal (Rp)": Number(tx.nominal),
+            Metode: tx.metode,
+            Keterangan: tx.keterangan || "-",
+            Penerima: tx.penerima,
+          })) || [];
+      } else {
+        // Default: Rekap Pembayaran Siswa Aktif
+        const today = new Date().toISOString().split("T")[0];
+        const { data: siswaList } = await supabase
+          .from("siswa")
+          .select("id, nomor_induk, nama_lengkap, program:master_program(nama, biaya)")
+          .not("nik", "like", "ANON-%")
+          .neq("alamat_lengkap", "[DATA DIHAPUS]")
+          .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+          .order("urutan_nomor", { ascending: true, nullsFirst: false })
+          .order("nomor_induk", { ascending: true });
+
+        const siswaIds = (siswaList || []).map((s) => s.id);
+        const { data: txList } = await supabase
+          .from("transaksi_keuangan")
+          .select("siswa_id, nominal")
+          .in("siswa_id", siswaIds.length > 0 ? siswaIds : ["00000000-0000-0000-0000-000000000000"]);
+
+        const txTotalMap = new Map<string, number>();
+        txList?.forEach((tx) => {
+          txTotalMap.set(tx.siswa_id, (txTotalMap.get(tx.siswa_id) || 0) + Number(tx.nominal || 0));
+        });
+
+        exportRows = (siswaList || []).map((s) => {
+          const prog = (s.program as unknown) as { nama: string; biaya: number } | null;
+          const biaya = Number(prog?.biaya || 0);
+          const terbayar = txTotalMap.get(s.id) || 0;
+          const sisa = Math.max(0, biaya - terbayar);
+          const isLunas = biaya > 0 && terbayar >= biaya;
+
+          return {
+            "Nomor Induk": s.nomor_induk,
+            "Nama Siswa": s.nama_lengkap,
+            Program: prog?.nama || "-",
+            "Biaya Pelatihan (Rp)": biaya,
+            "Total Terbayar (Rp)": terbayar,
+            "Sisa Tagihan (Rp)": sisa,
+            "Persentase": biaya > 0 ? `${Math.min(100, Math.round((terbayar / biaya) * 100))}%` : "0%",
+            Status: isLunas ? "Lunas" : (terbayar > 0 ? "Cicilan" : "Belum Bayar"),
+          };
+        });
+      }
     } else if (modul === "presensi") {
       const searchParams = request.nextUrl.searchParams;
       const paramBulan = searchParams.get("bulan"); // 1-12
