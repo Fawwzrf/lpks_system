@@ -136,15 +136,16 @@ export async function POST(request: NextRequest) {
                 : String(noInduk);
               const username = generateStudentUsername(namaLengkap, urutanRaw);
               const generatedPassword = generateStudentPassword(username);
-              // Jika user tidak mengisi email, buat email unik dari nama depan (hanya a-z) + angka acak
               const namaDepanClean = namaLengkap.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "") || "siswa";
-              const authEmail = email
-                ? email
-                : `${namaDepanClean}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`;
+              const generatedEmail = `${namaDepanClean}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`;
+              // Validasi email Excel: harus berformat x@y.z dan hanya satu @
+              const emailValid = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.split("@").length === 2;
+              // Pakai email Excel jika valid, fallback ke generated
+              let authEmail = emailValid ? email : generatedEmail;
 
               const supabaseAdmin = createAdminClient();
 
-              // Cek duplikat
+              // Cek duplikat siswa (bukan auth — siswa bisa punya orphan auth dari import sebelumnya)
               const { data: existingUser } = await supabase
                 .from("siswa")
                 .select("id")
@@ -154,12 +155,32 @@ export async function POST(request: NextRequest) {
               if (existingUser) {
                 errors.push({ row: i + 2, reason: "Siswa dengan NIK atau Username ini sudah terdaftar sebelumnya." });
               } else {
-                const { data: authData, error: authCreateError } = await supabaseAdmin.auth.admin.createUser({
+                let authData = null;
+                let authCreateError = null;
+
+                // Coba dengan authEmail; jika email sudah terdaftar di Auth, retry dengan generated email
+                const attempt1 = await supabaseAdmin.auth.admin.createUser({
                   email: authEmail,
                   password: generatedPassword,
                   email_confirm: true,
                   user_metadata: { role: "siswa", nama: namaLengkap.trim() },
                 });
+
+                if (attempt1.error && attempt1.error.message.includes("already been registered") && authEmail !== generatedEmail) {
+                  // Retry dengan generated email karena email Excel sudah dipakai
+                  authEmail = generatedEmail;
+                  const attempt2 = await supabaseAdmin.auth.admin.createUser({
+                    email: authEmail,
+                    password: generatedPassword,
+                    email_confirm: true,
+                    user_metadata: { role: "siswa", nama: namaLengkap.trim() },
+                  });
+                  authData = attempt2.data;
+                  authCreateError = attempt2.error;
+                } else {
+                  authData = attempt1.data;
+                  authCreateError = attempt1.error;
+                }
 
                 if (authCreateError || !authData?.user) {
                   errors.push({ row: i + 2, reason: `Gagal mendaftarkan akun: ${authCreateError?.message ?? "unknown"}` });
