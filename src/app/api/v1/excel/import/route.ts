@@ -327,6 +327,143 @@ export async function POST(request: NextRequest) {
           "Connection": "keep-alive",
         },
       });
+    } else if (modul === "presensi") {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            let importedCount = 0;
+            let updatedCount = 0;
+            const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
+
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i];
+              const rawNoInduk = String(row["nomor_induk"] || row["Nomor Induk"] || row["No. Induk"] || "").trim();
+              const noInduk = rawNoInduk.replace(/\.\s+/g, ".");
+              const rawTanggal = row["tanggal"] || row["Tanggal"];
+              const tanggal = parseExcelDate(rawTanggal);
+              const rawStatus = String(row["status"] || row["Status"] || "Hadir").trim();
+              const keterangan = String(row["keterangan"] || row["Keterangan"] || "").trim() || null;
+
+              if (!noInduk && !rawTanggal) continue;
+
+              if (!noInduk) {
+                errors.push({ row: i + 2, reason: "Nomor Induk siswa wajib diisi.", type: "error" });
+                continue;
+              }
+
+              if (!tanggal) {
+                errors.push({ row: i + 2, reason: "Format tanggal tidak valid. Gunakan YYYY-MM-DD atau DD/MM/YYYY.", type: "error" });
+                continue;
+              }
+
+              // Normalisasi status (Hadir, Izin, Sakit, Alpa)
+              let statusFormatted = "Hadir";
+              const sLower = rawStatus.toLowerCase();
+              if (sLower === "izin" || sLower === "i") statusFormatted = "Izin";
+              else if (sLower === "sakit" || sLower === "s") statusFormatted = "Sakit";
+              else if (sLower === "alpa" || sLower === "a" || sLower === "alpha") statusFormatted = "Alpa";
+              else if (sLower === "hadir" || sLower === "h") statusFormatted = "Hadir";
+              else {
+                errors.push({ row: i + 2, reason: `Status '${rawStatus}' tidak dikenal. Pilihan: Hadir, Izin, Sakit, Alpa.`, type: "error" });
+                continue;
+              }
+
+              // Cari siswa
+              const { data: siswa } = await supabase
+                .from("siswa")
+                .select("id")
+                .eq("nomor_induk", noInduk)
+                .maybeSingle();
+
+              if (!siswa) {
+                errors.push({ row: i + 2, reason: `Siswa dengan No. Induk '${noInduk}' tidak ditemukan di sistem.`, type: "warning" });
+                continue;
+              }
+
+              // Cek apakah sudah ada presensi pada tanggal tersebut
+              const { data: existing } = await supabase
+                .from("presensi")
+                .select("id")
+                .eq("siswa_id", siswa.id)
+                .eq("tanggal", tanggal)
+                .maybeSingle();
+
+              if (existing) {
+                const { error: updErr } = await supabase
+                  .from("presensi")
+                  .update({
+                    status: statusFormatted,
+                    keterangan,
+                    created_by: "superadmin",
+                  })
+                  .eq("id", existing.id);
+
+                if (updErr) {
+                  errors.push({ row: i + 2, reason: `Gagal memperbarui presensi: ${updErr.message}`, type: "error" });
+                } else {
+                  updatedCount++;
+                }
+              } else {
+                const { error: insErr } = await supabase.from("presensi").insert({
+                  siswa_id: siswa.id,
+                  tanggal,
+                  jam: "07:30:00",
+                  status: statusFormatted,
+                  keterangan,
+                  created_by: "superadmin",
+                });
+
+                if (insErr) {
+                  errors.push({ row: i + 2, reason: `Gagal menyimpan presensi: ${insErr.message}`, type: "error" });
+                } else {
+                  importedCount++;
+                }
+              }
+
+              const progress = Math.round(((i + 1) / rows.length) * 100);
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: "progress",
+                progress,
+                status: `Memproses baris ${i + 1} dari ${rows.length}...`,
+              }) + "\n"));
+            }
+
+            const statusParts: string[] = [];
+            if (importedCount > 0) statusParts.push(`${importedCount} riwayat presensi baru disimpan`);
+            if (updatedCount > 0) statusParts.push(`${updatedCount} riwayat presensi diperbarui`);
+            if (errors.length > 0) statusParts.push(`${errors.length} gagal/dilewati`);
+            const summaryMsg = `Impor selesai: ${statusParts.join(", ") || "0 data diproses"}.`;
+
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: "done",
+              result: {
+                total_rows: rows.length,
+                imported_count: importedCount,
+                updated_count: updatedCount,
+                failed_count: errors.length,
+                errors,
+                message: summaryMsg,
+              },
+            }) + "\n"));
+            controller.close();
+          } catch (streamErr) {
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: "error",
+              message: streamErr instanceof Error ? streamErr.message : String(streamErr),
+            }) + "\n"));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "application/x-ndjson",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
     }
 
     return errorResponse("NOT_IMPLEMENTED", `Impor untuk modul '${modul}' belum didukung.`, 400);

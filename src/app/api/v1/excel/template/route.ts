@@ -75,8 +75,18 @@ export async function GET(request: NextRequest) {
         };
         break;
 
+      case "presensi":
+        headers = ["nomor_induk", "tanggal", "status", "keterangan"];
+        sampleRow = {
+          nomor_induk: "01.1033",
+          tanggal: "2026-09-01",
+          status: "Hadir",
+          keterangan: "Presensi reguler (Pilihan status: Hadir, Izin, Sakit, Alpa)",
+        };
+        break;
+
       default:
-        return errorResponse("INVALID_MODUL", "Modul template tidak didukung. Pilihan: siswa, penilaian, keuangan.", 400);
+        return errorResponse("INVALID_MODUL", "Modul template tidak didukung. Pilihan: siswa, penilaian, keuangan, presensi.", 400);
     }
 
     const worksheet = XLSX.utils.json_to_sheet([sampleRow], { header: headers });

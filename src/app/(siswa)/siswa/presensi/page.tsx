@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { MapPin, Loader2, CheckCircle2, XCircle, AlertTriangle, Clock, Navigation, ExternalLink, RefreshCw } from "lucide-react";
+import { MapPin, Loader2, CheckCircle2, XCircle, AlertTriangle, Clock, Navigation, ExternalLink, RefreshCw, FileText } from "lucide-react";
 import { haversineDistance } from "@/lib/geo";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Modal } from "@/components/ui/modal";
 
 // Default koordinat LPKS Sumbu Hidup (Cilacap) jika belum termuat dari master
 const BENGKEL_LAT = -7.69897507696962;
@@ -16,6 +17,7 @@ interface PresensiItem {
   jam: string;
   status: "Hadir" | "Izin" | "Sakit" | "Alpa";
   jarak_meter?: number;
+  keterangan?: string;
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -52,6 +54,7 @@ export default function PresensiSiswaPage() {
   );
   const [distance, setDistance] = useState<number | null>(null);
   const [absenDone, setAbsenDone] = useState(false);
+  const [todayRecord, setTodayRecord] = useState<PresensiItem | null>(null);
   const [absenLoading, setAbsenLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
@@ -59,6 +62,12 @@ export default function PresensiSiswaPage() {
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [remainingAttempts, setRemainingAttempts] = useState<number>(3);
   const [mapType, setMapType] = useState<"m" | "k">("m"); // m=normal map, k=satellite
+
+  // Modal Pengajuan Izin / Sakit
+  const [izinModalOpen, setIzinModalOpen] = useState(false);
+  const [izinType, setIzinType] = useState<"Izin" | "Sakit">("Izin");
+  const [izinKeterangan, setIzinKeterangan] = useState("");
+  const [izinSubmitting, setIzinSubmitting] = useState(false);
 
   // Load initial data: master lokasi, status hari ini, dan riwayat presensi
   const loadData = useCallback(async () => {
@@ -87,6 +96,10 @@ export default function PresensiSiswaPage() {
         const json = await resToday.json();
         if (json.data?.sudah_absen) {
           setAbsenDone(true);
+          setTodayRecord(json.data.presensi || null);
+        } else {
+          setAbsenDone(false);
+          setTodayRecord(null);
         }
         if (typeof json.data?.sisa_percobaan_hari_ini === "number") {
           setRemainingAttempts(json.data.sisa_percobaan_hari_ini);
@@ -174,6 +187,44 @@ export default function PresensiSiswaPage() {
       setSubmitError("Tidak dapat terhubung ke server presensi.");
     } finally {
       setAbsenLoading(false);
+    }
+  }
+
+  async function handleAjukanIzin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!izinKeterangan.trim()) {
+      setSubmitError("Alasan / keterangan izin atau sakit wajib diisi.");
+      return;
+    }
+    setIzinSubmitting(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    try {
+      const res = await fetch("/api/v1/presensi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: izinType,
+          keterangan: izinKeterangan.trim(),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSubmitError(data.error?.message || "Gagal mengajukan izin/sakit.");
+        return;
+      }
+
+      setSubmitSuccess(data.data?.message || `Pengajuan ${izinType} Anda berhasil disimpan!`);
+      setAbsenDone(true);
+      setIzinModalOpen(false);
+      setIzinKeterangan("");
+      await loadData();
+    } catch {
+      setSubmitError("Tidak dapat terhubung ke server presensi.");
+    } finally {
+      setIzinSubmitting(false);
     }
   }
 
@@ -338,29 +389,57 @@ export default function PresensiSiswaPage() {
         </div>
       )}
 
-      {/* Absen Button */}
+      {/* Absen & Izin Buttons */}
       {alreadyAbsen ? (
-        <div className="flex items-center justify-center gap-2 h-12 rounded-xl bg-[#10B981]/15 border border-[#10B981]/30 text-[#10B981] text-sm font-semibold">
-          <CheckCircle2 className="h-5 w-5" aria-hidden="true" /> Absen Hari Ini Tercatat!
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#1F2937]">
+              {STATUS_ICON[todayRecord?.status || "Hadir"]}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white">
+                Presensi Hari Ini: <span className={STATUS_COLOR[todayRecord?.status || "Hadir"]}>{todayRecord?.status || "Tercatat"}</span>
+              </p>
+              {todayRecord?.keterangan ? (
+                <p className="text-[11px] text-[#9CA3AF] mt-0.5">Keterangan: {todayRecord.keterangan}</p>
+              ) : (
+                <p className="text-[11px] text-[#6B7280] mt-0.5">Kehadiran telah berhasil tercatat di sistem.</p>
+              )}
+            </div>
+          </div>
+          <div className="text-[11px] font-mono text-[#9CA3AF] bg-[#1F2937] px-2.5 py-1 rounded-md shrink-0">
+            {todayRecord?.jam ? `Pukul ${todayRecord.jam}` : "Hari ini"}
+          </div>
         </div>
       ) : (
-        <button
-          onClick={doAbsen}
-          disabled={!inZone || absenLoading || !isHariAktif || remainingAttempts <= 0}
-          className="h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
-          aria-disabled={!inZone || !isHariAktif || remainingAttempts <= 0}
-        >
-          {absenLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...
-            </>
-          ) : (
-            <>
-              <MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang{" "}
-              {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}
-            </>
-          )}
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <button
+            onClick={doAbsen}
+            disabled={!inZone || absenLoading || !isHariAktif || remainingAttempts <= 0}
+            className="flex-1 w-full h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#DC2626]/20"
+            aria-disabled={!inZone || !isHariAktif || remainingAttempts <= 0}
+          >
+            {absenLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...
+              </>
+            ) : (
+              <>
+                <MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang{" "}
+                {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => setIzinModalOpen(true)}
+            type="button"
+            className="w-full sm:w-auto h-12 px-5 rounded-xl border border-[#374151] hover:border-[#F59E0B] bg-[#111827] hover:bg-[#F59E0B]/10 text-[#F59E0B] text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Ajukan Izin / Sakit
+          </button>
+        </div>
       )}
 
       {/* Riwayat Log (Bone Page Skeleton saat Loading) */}
@@ -411,6 +490,9 @@ export default function PresensiSiswaPage() {
                 {STATUS_ICON[entry.status] || STATUS_ICON["Hadir"]}
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-[#D1D5DB] truncate">{entry.tanggal}</p>
+                  {entry.keterangan && (
+                    <p className="text-[11px] text-[#9CA3AF] truncate italic">&quot;{entry.keterangan}&quot;</p>
+                  )}
                   {typeof entry.jarak_meter === "number" && (
                     <p className="text-[11px] text-[#6B7280]">
                       {Math.round(entry.jarak_meter)} m dari bengkel
@@ -428,6 +510,81 @@ export default function PresensiSiswaPage() {
           </ul>
         )}
       </section>
+
+      {/* Modal Pengajuan Izin / Sakit */}
+      <Modal
+        open={izinModalOpen}
+        onClose={() => setIzinModalOpen(false)}
+        title="Form Pengajuan Izin / Sakit"
+        description="Pengajuan izin tidak memerlukan verifikasi GPS geofence bengkel."
+        size="sm"
+      >
+        <form onSubmit={handleAjukanIzin} className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Jenis Keterangan
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setIzinType("Izin")}
+                className={`h-9 rounded-lg border text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                  izinType === "Izin"
+                    ? "border-[#F59E0B] bg-[#F59E0B]/20 text-[#F59E0B]"
+                    : "border-[#374151] bg-[#111827] text-[#9CA3AF] hover:text-white"
+                }`}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Izin
+              </button>
+              <button
+                type="button"
+                onClick={() => setIzinType("Sakit")}
+                className={`h-9 rounded-lg border text-xs font-semibold transition-all flex items-center justify-center gap-2 ${
+                  izinType === "Sakit"
+                    ? "border-[#38BDF8] bg-[#38BDF8]/20 text-[#38BDF8]"
+                    : "border-[#374151] bg-[#111827] text-[#9CA3AF] hover:text-white"
+                }`}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Sakit
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Alasan / Keterangan <span className="text-[#DC2626]">*</span>
+            </label>
+            <textarea
+              rows={3}
+              value={izinKeterangan}
+              onChange={(e) => setIzinKeterangan(e.target.value)}
+              placeholder="Contoh: Demam tinggi sejak tadi malam, sedang istirahat di rumah."
+              className="w-full rounded-lg border border-[#374151] bg-[#0B0F17] p-2.5 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626]"
+              required
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <button
+              type="button"
+              onClick={() => setIzinModalOpen(false)}
+              className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white hover:bg-[#1F2937]"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={izinSubmitting}
+              className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {izinSubmitting && <Loader2 className="h-3 w-3 animate-spin" />}
+              Kirim Pengajuan
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

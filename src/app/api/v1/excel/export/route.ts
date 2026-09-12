@@ -72,8 +72,198 @@ export async function GET(request: NextRequest) {
           Keterangan: tx.keterangan || "-",
           Penerima: tx.penerima,
         })) || [];
+    } else if (modul === "presensi") {
+      const searchParams = request.nextUrl.searchParams;
+      const paramBulan = searchParams.get("bulan"); // 1-12
+      const paramTahun = searchParams.get("tahun"); // e.g. 2026
+      const paramStartDate = searchParams.get("start_date");
+      const paramEndDate = searchParams.get("end_date");
+      const paramProgramId = searchParams.get("program_id");
+
+      const now = new Date();
+      let dates: string[] = [];
+      let periodeLabel = "";
+      let monthName = "";
+
+      const NAMA_BULAN = [
+        "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
+        "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
+      ];
+
+      if (paramStartDate && paramEndDate) {
+        const start = new Date(paramStartDate);
+        const end = new Date(paramEndDate);
+        const cur = new Date(start);
+        while (cur <= end) {
+          dates.push(cur.toISOString().split("T")[0]);
+          cur.setDate(cur.getDate() + 1);
+        }
+        periodeLabel = `${paramStartDate} s/d ${paramEndDate}`;
+        monthName = NAMA_BULAN[start.getMonth()] + " " + start.getFullYear();
+      } else {
+        const bulan = paramBulan ? parseInt(paramBulan, 10) : now.getMonth() + 1;
+        const tahun = paramTahun ? parseInt(paramTahun, 10) : now.getFullYear();
+        const daysInMonth = new Date(tahun, bulan, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = String(d).padStart(2, "0");
+          const mStr = String(bulan).padStart(2, "0");
+          dates.push(`${tahun}-${mStr}-${dStr}`);
+        }
+        monthName = `${NAMA_BULAN[bulan - 1]} ${tahun}`;
+        periodeLabel = monthName;
+      }
+
+      // Ambil daftar siswa aktif
+      let siswaQuery = supabase
+        .from("siswa")
+        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, kode_program, nama)")
+        .not("nik", "like", "ANON-%")
+        .neq("alamat_lengkap", "[DATA DIHAPUS]")
+        .order("urutan_nomor", { ascending: true, nullsFirst: false })
+        .order("nomor_induk", { ascending: true });
+
+      if (paramProgramId) {
+        siswaQuery = siswaQuery.eq("program_id", paramProgramId);
+      }
+
+      const { data: siswaList } = await siswaQuery;
+
+      // Ambil semua presensi dalam rentang tanggal
+      const startDate = dates[0];
+      const endDate = dates[dates.length - 1];
+
+      const { data: presensiList } = await supabase
+        .from("presensi")
+        .select("siswa_id, tanggal, status")
+        .gte("tanggal", startDate)
+        .lte("tanggal", endDate);
+
+      // Petakan presensi: `${siswa_id}_${tanggal}` => status
+      const presensiMap = new Map<string, string>();
+      presensiList?.forEach((p) => {
+        presensiMap.set(`${p.siswa_id}_${p.tanggal}`, p.status);
+      });
+
+      // Susun AOA (Array of Arrays) untuk format resmi LPKS Sumbu Hidup
+      const totalCols = 3 + dates.length + 5; // No. Induk, Nama, Program + Tanggal + H, I, S, A, %
+      const aoa: (string | number)[][] = [];
+
+      // Baris Kop Surat (Kanan Atas)
+      const headerRow1 = new Array(totalCols).fill("");
+      headerRow1[totalCols - 1] = "DAFTAR HADIR SISWA";
+      aoa.push(headerRow1);
+
+      const headerRow2 = new Array(totalCols).fill("");
+      headerRow2[totalCols - 1] = `PERIODE: ${periodeLabel}`;
+      aoa.push(headerRow2);
+
+      const headerRow3 = new Array(totalCols).fill("");
+      headerRow3[totalCols - 1] = "LKP PENGELASAN SUMBU HIDUP CILACAP";
+      aoa.push(headerRow3);
+
+      aoa.push(new Array(totalCols).fill("")); // Baris kosong pemisah
+
+      // Baris Header Tabel Bagian 1
+      const tableHeader1: (string | number)[] = ["NO. INDUK", "NAMA SISWA", "PROGRAM"];
+      for (let i = 0; i < dates.length; i++) {
+        tableHeader1.push(i === 0 ? monthName : "");
+      }
+      tableHeader1.push("REKAPITULASI", "", "", "", "");
+      aoa.push(tableHeader1);
+
+      // Baris Header Tabel Bagian 2 (Nomor Tanggal & Kode Rekap)
+      const tableHeader2: (string | number)[] = ["", "", ""];
+      dates.forEach((d) => {
+        const dayNum = parseInt(d.split("-")[2], 10);
+        tableHeader2.push(dayNum);
+      });
+      tableHeader2.push("H", "I", "S", "A", "%");
+      aoa.push(tableHeader2);
+
+      // Baris Data Siswa
+      siswaList?.forEach((s) => {
+        let hCount = 0;
+        let iCount = 0;
+        let sCount = 0;
+        let aCount = 0;
+
+        const row: (string | number)[] = [
+          s.nomor_induk || "-",
+          s.nama_lengkap || "-",
+          ((s.program as any)?.nama) || "-",
+        ];
+
+        dates.forEach((d) => {
+          const status = presensiMap.get(`${s.id}_${d}`);
+          if (status === "Hadir") {
+            row.push("H");
+            hCount++;
+          } else if (status === "Izin") {
+            row.push("I");
+            iCount++;
+          } else if (status === "Sakit") {
+            row.push("S");
+            sCount++;
+          } else if (status === "Alpa") {
+            row.push("A");
+            aCount++;
+          } else {
+            row.push("");
+          }
+        });
+
+        const totalMeetings = hCount + iCount + sCount + aCount;
+        const pct = totalMeetings > 0 ? `${Math.round((hCount / totalMeetings) * 100)}%` : "-";
+
+        row.push(hCount, iCount, sCount, aCount, pct);
+        aoa.push(row);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Pengaturan Cell Merges
+      worksheet["!merges"] = [
+        // Header Kop kanan atas
+        { s: { r: 0, c: totalCols - 6 }, e: { r: 0, c: totalCols - 1 } },
+        { s: { r: 1, c: totalCols - 6 }, e: { r: 1, c: totalCols - 1 } },
+        { s: { r: 2, c: totalCols - 6 }, e: { r: 2, c: totalCols - 1 } },
+        // Kolom tetap NO. INDUK, NAMA SISWA, PROGRAM (merge vertikal baris 4 dan 5)
+        { s: { r: 4, c: 0 }, e: { r: 5, c: 0 } },
+        { s: { r: 4, c: 1 }, e: { r: 5, c: 1 } },
+        { s: { r: 4, c: 2 }, e: { r: 5, c: 2 } },
+        // Periode Bulan (merge horizontal seluruh kolom tanggal)
+        { s: { r: 4, c: 3 }, e: { r: 4, c: 3 + dates.length - 1 } },
+        // Rekapitulasi (merge horizontal kolom rekap)
+        { s: { r: 4, c: 3 + dates.length }, e: { r: 4, c: 3 + dates.length + 4 } },
+      ];
+
+      // Pengaturan Lebar Kolom
+      const colWidths: { wch: number }[] = [
+        { wch: 12 }, // No. Induk
+        { wch: 28 }, // Nama Siswa
+        { wch: 22 }, // Program
+      ];
+      for (let i = 0; i < dates.length; i++) {
+        colWidths.push({ wch: 4 }); // Tanggal
+      }
+      colWidths.push({ wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 7 }); // H, I, S, A, %
+      worksheet["!cols"] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Daftar Hadir");
+
+      const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const filenamePresensi = `Daftar_Hadir_${periodeLabel.replace(/[\s\/:]+/g, "_")}.xlsx`;
+
+      return new NextResponse(excelBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filenamePresensi}"`,
+        },
+      });
     } else {
-      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan.", 400);
+      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan, presensi.", 400);
     }
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
