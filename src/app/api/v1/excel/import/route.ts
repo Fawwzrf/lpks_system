@@ -136,10 +136,11 @@ export async function POST(request: NextRequest) {
                 : String(noInduk);
               const username = generateStudentUsername(namaLengkap, urutanRaw);
               const generatedPassword = generateStudentPassword(username);
-              // Jika user tidak mengisi email, buat email unik dari username + angka acak
+              // Jika user tidak mengisi email, buat email unik dari nama depan (hanya a-z) + angka acak
+              const namaDepanClean = namaLengkap.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "") || "siswa";
               const authEmail = email
                 ? email
-                : `${username.replace(/[^a-zA-Z0-9]/g, "")}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`.toLowerCase();
+                : `${namaDepanClean}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`;
 
               const supabaseAdmin = createAdminClient();
 
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
                     username,
                     nama_lengkap:         namaLengkap,
                     nik,
-                    email:                email || null,
+                    email:                authEmail,
                     no_hp:                String(row["No. HP"]        || "").trim() || null,
                     tempat_lahir:         String(row["Tempat Lahir"]  || "").trim() || null,
                     tgl_lahir:            parseExcelDate(row["Tanggal Lahir"]),
