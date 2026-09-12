@@ -18,29 +18,43 @@ export async function GET(request: NextRequest) {
       const { data: siswaList } = await supabase
         .from("siswa")
         .select("*, program:master_program(id, kode_program, nama, biaya)")
+        .not("nik", "like", "ANON-%")
+        .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 
+      // Pastikan data yang dihapus (alamat [DATA DIHAPUS] atau NIK anonim) tidak diekspor
+      const activeSiswaList = siswaList?.filter(
+        (s) => !s.nik?.startsWith("ANON-") && s.alamat_lengkap !== "[DATA DIHAPUS]"
+      ) || [];
+
       exportRows =
-        siswaList?.map((s, idx) => ({
-          "No": idx + 1,
-          "No. Induk": s.nomor_induk,
-          "Nama": s.nama_lengkap,
-          "NIK": s.nik,
-          "Tempat Lahir": s.tempat_lahir || "-",
-          "Tanggal Lahir": s.tgl_lahir || "-",
-          "Alamat": s.alamat_lengkap || "-",
-          "Nama Ayah": s.nama_ayah || "-",
-          "Nama Ibu": s.nama_ibu || "-",
-          "No. HP": s.no_hp || "-",
-          "Email": s.email,
-          "Pend. Terakhir": s.pendidikan_terakhir || "-",
-          "NISN": s.nisn || "-",
-          "Program": ((s.program as any)?.nama) || "-",
-          "Tgl. Masuk": s.tgl_masuk,
-          "Tgl. Keluar": s.tgl_keluar || "-",
-          "Username": s.username || "-",
-          "Password": s.is_password_default ? (s.username || "-") : "(Telah Diubah Mandiri)"
-        })) || [];
+        activeSiswaList.map((s, idx) => {
+          const emailRaw = String(s.email || "").trim();
+          // Kosongkan email yang dibuat otomatis oleh sistem (@lpks.id), hanya ekspor email riil
+          const isAutoEmail = !emailRaw || emailRaw.toLowerCase().includes("@lpks.id");
+          const displayEmail = isAutoEmail ? "" : emailRaw;
+
+          return {
+            "No": idx + 1,
+            "No. Induk": s.nomor_induk || "-",
+            "Nama": s.nama_lengkap || "-",
+            "NIK": s.nik || "-",
+            "Tempat Lahir": s.tempat_lahir || "-",
+            "Tanggal Lahir": s.tgl_lahir || "-",
+            "Alamat": s.alamat_lengkap || "-",
+            "Nama Ayah": s.nama_ayah || "-",
+            "Nama Ibu": s.nama_ibu || "-",
+            "No. HP": s.no_hp || "-",
+            "Email": displayEmail,
+            "Pend. Terakhir": s.pendidikan_terakhir || "-",
+            "NISN": s.nisn || "-",
+            "Program": ((s.program as any)?.nama) || "-",
+            "Tgl. Masuk": s.tgl_masuk || "-",
+            "Tgl. Keluar": s.tgl_keluar || "-",
+            "Username": s.username || "-",
+            "Password": s.is_password_default ? (s.username || "-") : "(Telah Diubah Mandiri)"
+          };
+        }) || [];
     } else if (modul === "keuangan") {
       const { data: txList } = await supabase
         .from("transaksi_keuangan")

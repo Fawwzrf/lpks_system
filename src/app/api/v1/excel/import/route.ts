@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             let importedCount = 0;
+            let updatedCount = 0;
             const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
 
             for (let i = 0; i < rows.length; i++) {
@@ -158,10 +159,56 @@ export async function POST(request: NextRequest) {
                 supabase.from("siswa").select("id").eq("username", username).maybeSingle(),
                 programId ? supabase.from("siswa").select("id").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
               ]);
-              const existingUser = byNoInduk || byUsername || byNikSameProgram;
+
+              const existingUser = byNoInduk || byNikSameProgram || byUsername;
 
               if (existingUser) {
-                errors.push({ row: i + 2, reason: "Data siswa ini sudah ada di sistem (Nomor Induk, username, atau NIK di program ini sudah terdaftar).", type: "warning" });
+                // Perbarui biodata siswa yang sudah ada (misal perbaikan Nama Ibu, Alamat, dsb)
+                const updatePayload: Record<string, unknown> = {
+                  nama_lengkap: namaLengkap,
+                  nik,
+                  tempat_lahir: String(row["Tempat Lahir"] || "").trim() || null,
+                  tgl_lahir: parseExcelDate(row["Tanggal Lahir"]),
+                  alamat_lengkap: String(row["Alamat"] || "").trim() || null,
+                  nama_ayah: String(row["Nama Ayah"] || "").trim() || null,
+                  nama_ibu: String(row["Nama Ibu"] || "").trim() || null,
+                  no_hp: String(row["No. HP"] || "").trim() || null,
+                  pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
+                  nisn: String(row["NISN"] || "").trim() || null,
+                  tgl_masuk: parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
+                  tgl_keluar: parseExcelDate(row["Tgl. Keluar"]),
+                  updated_at: new Date().toISOString(),
+                };
+
+                if (programId) {
+                  updatePayload.program_id = programId;
+                }
+                if (noInduk) {
+                  updatePayload.nomor_induk = noInduk;
+                }
+
+                // Jika di Excel ada email valid dan email di DB saat ini masih dummy @lpks.id, perbarui
+                if (emailValid) {
+                  const { data: currentSiswa } = await supabase
+                    .from("siswa")
+                    .select("email")
+                    .eq("id", existingUser.id)
+                    .single();
+                  if (currentSiswa?.email?.toLowerCase().includes("@lpks.id")) {
+                    updatePayload.email = email;
+                  }
+                }
+
+                const { error: updateError } = await supabase
+                  .from("siswa")
+                  .update(updatePayload)
+                  .eq("id", existingUser.id);
+
+                if (updateError) {
+                  errors.push({ row: i + 2, reason: `Gagal memperbarui data siswa: ${updateError.message}`, type: "error" });
+                } else {
+                  updatedCount++;
+                }
               } else {
                 // Jika authEmail sudah terpakai di tabel siswa (misal siswa mendaftar program ke-2 dengan email sama), fallback ke generatedEmail
                 const { data: existingEmailInSiswa } = await supabase
@@ -245,14 +292,21 @@ export async function POST(request: NextRequest) {
             }
 
             // Send done
+            const statusParts: string[] = [];
+            if (importedCount > 0) statusParts.push(`${importedCount} data siswa baru disimpan`);
+            if (updatedCount > 0) statusParts.push(`${updatedCount} data siswa diperbarui`);
+            if (errors.length > 0) statusParts.push(`${errors.length} gagal/dilewati`);
+            const summaryMsg = `Impor selesai: ${statusParts.join(", ") || "0 data diproses"}.`;
+
             controller.enqueue(encoder.encode(JSON.stringify({
               type: "done",
               result: {
                 total_rows:     rows.length,
                 imported_count: importedCount,
+                updated_count:  updatedCount,
                 failed_count:   errors.length,
                 errors,
-                message: `Impor selesai: ${importedCount} data siswa baru disimpan (${errors.length} gagal/dilewati).`,
+                message: summaryMsg,
               },
             }) + "\n"));
             controller.close();
