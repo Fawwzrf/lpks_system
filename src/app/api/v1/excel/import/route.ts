@@ -137,8 +137,9 @@ export async function POST(request: NextRequest) {
                 : String(noInduk);
               const username = generateStudentUsername(namaLengkap, urutanRaw);
               const generatedPassword = generateStudentPassword(username);
-              const namaDepanClean = namaLengkap.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, "") || "siswa";
-              const generatedEmail = `${namaDepanClean}${Math.floor(1000 + Math.random() * 9000)}@lpks.id`;
+              const namaDepanClean = namaLengkap.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "siswa";
+              const cleanNoInduk = urutanRaw.replace(/\D/g, "") || String(Math.floor(1000 + Math.random() * 9000));
+              const generatedEmail = `${namaDepanClean}.${cleanNoInduk}@lpks.id`;
               // Validasi email Excel: harus berformat x@y.z dan hanya satu @
               const emailValid = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.split("@").length === 2;
               // Pakai email Excel jika valid, fallback ke generated
@@ -146,17 +147,33 @@ export async function POST(request: NextRequest) {
 
               const supabaseAdmin = createAdminClient();
 
-              // Cek duplikat siswa — pakai dua query terpisah karena @ dalam username
-              // dapat merusak filter .or() di PostgREST
-              const [{ data: byNik }, { data: byUsername }] = await Promise.all([
-                supabase.from("siswa").select("id").eq("nik", nik).maybeSingle(),
+              // Cek duplikat siswa:
+              // Siswa boleh terdaftar lebih dari 1 kali jika mengambil program berbeda (misal 2 pelatihan berbeda).
+              // Duplikat dicegah jika:
+              // 1. Nomor Induk sudah terdaftar
+              // 2. Username sudah terdaftar
+              // 3. NIK yang sama di program yang sama sudah terdaftar
+              const [{ data: byNoInduk }, { data: byUsername }, { data: byNikSameProgram }] = await Promise.all([
+                supabase.from("siswa").select("id").eq("nomor_induk", noInduk).maybeSingle(),
                 supabase.from("siswa").select("id").eq("username", username).maybeSingle(),
+                programId ? supabase.from("siswa").select("id").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
               ]);
-              const existingUser = byNik || byUsername;
+              const existingUser = byNoInduk || byUsername || byNikSameProgram;
 
               if (existingUser) {
-                errors.push({ row: i + 2, reason: "Data siswa ini sudah ada di sistem (NIK atau username terdaftar).", type: "warning" });
+                errors.push({ row: i + 2, reason: "Data siswa ini sudah ada di sistem (Nomor Induk, username, atau NIK di program ini sudah terdaftar).", type: "warning" });
               } else {
+                // Jika authEmail sudah terpakai di tabel siswa (misal siswa mendaftar program ke-2 dengan email sama), fallback ke generatedEmail
+                const { data: existingEmailInSiswa } = await supabase
+                  .from("siswa")
+                  .select("id")
+                  .eq("email", authEmail)
+                  .maybeSingle();
+
+                if (existingEmailInSiswa) {
+                  authEmail = generatedEmail;
+                }
+
                 let authData = null;
                 let authCreateError = null;
 
