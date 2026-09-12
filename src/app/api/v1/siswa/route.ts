@@ -40,20 +40,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Sort by kode program (bagian sebelum titik) lalu urutan numerik (bagian setelah titik)
-    // Contoh: 01.0001 < 01.1047 < 02.1001 (urutan benar secara numerik)
+    // Sort berdasar 4 digit nomor urut belakang (urutan_nomor), abaikan kode program
     const { data, count, error } = await query
+      .order("urutan_nomor", { ascending: true, nullsFirst: false })
       .order("nomor_induk", { ascending: true })
       .range(offset, offset + limit - 1)
       .then(async (res) => {
         // Re-sort client-side by numeric part to ensure correct order
         if (res.data) {
-          res.data.sort((a, b) => {
-            const [aCode, aNum] = (a.nomor_induk || "").split(".");
-            const [bCode, bNum] = (b.nomor_induk || "").split(".");
-            if (aCode !== bCode) return (aCode || "").localeCompare(bCode || "");
-            return (parseInt(aNum || "0") || 0) - (parseInt(bNum || "0") || 0);
-          });
+          const getUrutan = (noInduk?: string | null) => {
+            if (!noInduk) return 999999;
+            if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5; // Askuri di antara 1110 dan 1111
+            const parts = noInduk.split(".");
+            const lastPart = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+            const num = parseInt(lastPart.replace(/\D/g, ""), 10);
+            return isNaN(num) ? 999999 : num;
+          };
+          res.data.sort((a, b) => getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk));
         }
         return res;
       });

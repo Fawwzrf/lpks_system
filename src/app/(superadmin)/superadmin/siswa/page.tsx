@@ -438,9 +438,9 @@ export default function SiswaPage() {
           <RefreshCw className="h-3.5 w-3.5" />
         </button>
 
-        <div className="ml-auto flex items-center gap-1.5 text-xs text-[#6B7280]">
-          <Users className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>{siswaList.length} siswa terdaftar</span>
+        <div className="ml-auto flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#111827] border border-[#1F2937] text-sm text-[#9CA3AF] shadow-sm">
+          <Users className="h-4 w-4 text-[#EF4444]" aria-hidden="true" />
+          <span>Total: <strong className="text-white font-semibold text-base">{total}</strong> siswa terdaftar</span>
         </div>
       </div>
 
