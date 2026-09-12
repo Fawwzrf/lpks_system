@@ -146,12 +146,13 @@ export async function POST(request: NextRequest) {
 
               const supabaseAdmin = createAdminClient();
 
-              // Cek duplikat siswa (bukan auth — siswa bisa punya orphan auth dari import sebelumnya)
-              const { data: existingUser } = await supabase
-                .from("siswa")
-                .select("id")
-                .or(`username.eq.${username},nik.eq.${nik}`)
-                .maybeSingle();
+              // Cek duplikat siswa — pakai dua query terpisah karena @ dalam username
+              // dapat merusak filter .or() di PostgREST
+              const [{ data: byNik }, { data: byUsername }] = await Promise.all([
+                supabase.from("siswa").select("id").eq("nik", nik).maybeSingle(),
+                supabase.from("siswa").select("id").eq("username", username).maybeSingle(),
+              ]);
+              const existingUser = byNik || byUsername;
 
               if (existingUser) {
                 errors.push({ row: i + 2, reason: "Data siswa ini sudah ada di sistem (NIK atau username terdaftar).", type: "warning" });
