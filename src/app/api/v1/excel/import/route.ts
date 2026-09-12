@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         async start(controller) {
           try {
             let importedCount = 0;
-            const errors: { row: number; reason: string }[] = [];
+            const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
 
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
               // Nama, NIK, dan Program wajib ada
               if (!namaProgram || !namaLengkap || !nik) {
-                errors.push({ row: i + 2, reason: "Kolom wajib (Program, Nama, atau NIK) belum diisi." });
+                errors.push({ row: i + 2, reason: "Kolom wajib belum diisi: pastikan Program, Nama, dan NIK terisi.", type: "warning" });
                 // send progress & continue
                 controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
                 continue;
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
                   .eq("kode_program", kodePrefix);
 
                 if (!programs || programs.length === 0) {
-                  errors.push({ row: i + 2, reason: `Program dengan kode '${kodePrefix}' tidak ditemukan di database.` });
+                  errors.push({ row: i + 2, reason: `Kode program '${kodePrefix}' tidak terdaftar di sistem.`, type: "error" });
                   controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
                   continue;
                 }
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
                   .maybeSingle();
 
                 if (!prog) {
-                  errors.push({ row: i + 2, reason: `Program '${namaProgram}' tidak ditemukan. Pastikan nama program sesuai daftar (contoh: SMAW 4G).` });
+                  errors.push({ row: i + 2, reason: `Program '${namaProgram}' tidak ditemukan. Pastikan nama program sesuai daftar (contoh: SMAW 4G).`, type: "error" });
                   controller.enqueue(encoder.encode(JSON.stringify({ type: "progress", progress: Math.round(((i + 1) / rows.length) * 100), status: `Memproses baris ${i + 1} dari ${rows.length}...` }) + "\n"));
                   continue;
                 }
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
                 .maybeSingle();
 
               if (existingUser) {
-                errors.push({ row: i + 2, reason: "Siswa dengan NIK atau Username ini sudah terdaftar sebelumnya." });
+                errors.push({ row: i + 2, reason: "Data siswa ini sudah ada di sistem (NIK atau username terdaftar).", type: "warning" });
               } else {
                 let authData = null;
                 let authCreateError = null;
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
                 }
 
                 if (authCreateError || !authData?.user) {
-                  errors.push({ row: i + 2, reason: `Gagal mendaftarkan akun: ${authCreateError?.message ?? "unknown"}` });
+                  errors.push({ row: i + 2, reason: `Gagal membuat akun untuk siswa ini. Coba import ulang baris ini.`, type: "error" });
                 } else {
                   const { error: insertError } = await supabase.from("siswa").insert({
                     auth_id:              authData.user.id,
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
 
                   if (insertError) {
                     await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-                    errors.push({ row: i + 2, reason: insertError.message });
+                    errors.push({ row: i + 2, reason: `Gagal menyimpan data siswa ke database. Silakan coba lagi.`, type: "error" });
                   } else {
                     importedCount++;
                   }

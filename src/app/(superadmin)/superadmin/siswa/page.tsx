@@ -679,24 +679,45 @@ export default function SiswaPage() {
                 )}
                 <span className="leading-relaxed font-medium">{importResult.message}</span>
               </div>
-              {importResult.errors && importResult.errors.length > 0 && (
-                <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-40 overflow-y-auto">
-                  <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">Rincian Kegagalan:</span>
-                  <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#F43F5E]/90">
-                    {Object.entries(
-                      importResult.errors.reduce((acc, err) => {
-                        if (!acc[err.reason]) acc[err.reason] = [];
-                        acc[err.reason].push(err.row);
-                        return acc;
-                      }, {} as Record<string, number[]>)
-                    ).map(([reason, rows], idx) => (
-                      <li key={idx}>
-                        <b>Baris {rows.join(", ")}:</b> {reason}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+              {importResult.errors && importResult.errors.length > 0 && (() => {
+                type ImportError = { row: number; reason: string; type?: "warning" | "error" };
+                const warnings = (importResult.errors as ImportError[]).filter(e => e.type === "warning");
+                const errs     = (importResult.errors as ImportError[]).filter(e => e.type !== "warning");
+
+                const groupBy = (items: ImportError[]) =>
+                  Object.entries(
+                    items.reduce((acc, e) => {
+                      if (!acc[e.reason]) acc[e.reason] = [];
+                      acc[e.reason].push(e.row);
+                      return acc;
+                    }, {} as Record<string, number[]>)
+                  );
+
+                return (
+                  <div className="flex flex-col gap-2">
+                    {warnings.length > 0 && (
+                      <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 max-h-36 overflow-y-auto">
+                        <span className="text-[11px] font-semibold text-amber-400 block mb-2">⚠ Dilewati (data sudah ada):</span>
+                        <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-amber-300/90">
+                          {groupBy(warnings).map(([reason, rows], idx) => (
+                            <li key={idx}><b>Baris {rows.join(", ")}:</b> {reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {errs.length > 0 && (
+                      <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-36 overflow-y-auto">
+                        <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">✕ Gagal diimpor:</span>
+                        <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#F43F5E]/90">
+                          {groupBy(errs).map(([reason, rows], idx) => (
+                            <li key={idx}><b>Baris {rows.join(", ")}:</b> {reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 
