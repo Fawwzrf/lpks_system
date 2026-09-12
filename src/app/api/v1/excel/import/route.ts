@@ -124,7 +124,8 @@ export async function POST(request: NextRequest) {
               }
 
               // ── Nomor Induk ─────────────────────────────────────────────
-              let noInduk = manualNoInduk;
+              // Normalisasi format dari Excel: "03. 1032" → "03.1032"
+              let noInduk = manualNoInduk.replace(/\.\s+/g, ".");
               if (!noInduk || noInduk.toLowerCase().includes("abaikan") || noInduk.toLowerCase().includes("auto")) {
                 const { data: generated } = await supabase.rpc("generate_nomor_induk");
                 noInduk = generated;

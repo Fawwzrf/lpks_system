@@ -40,9 +40,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    query = query.order("nomor_induk", { ascending: true }).range(offset, offset + limit - 1);
-
-    const { data, count, error } = await query;
+    // Sort by kode program (bagian sebelum titik) lalu urutan numerik (bagian setelah titik)
+    // Contoh: 01.0001 < 01.1047 < 02.1001 (urutan benar secara numerik)
+    const { data, count, error } = await query
+      .order("nomor_induk", { ascending: true })
+      .range(offset, offset + limit - 1)
+      .then(async (res) => {
+        // Re-sort client-side by numeric part to ensure correct order
+        if (res.data) {
+          res.data.sort((a, b) => {
+            const [aCode, aNum] = (a.nomor_induk || "").split(".");
+            const [bCode, bNum] = (b.nomor_induk || "").split(".");
+            if (aCode !== bCode) return (aCode || "").localeCompare(bCode || "");
+            return (parseInt(aNum || "0") || 0) - (parseInt(bNum || "0") || 0);
+          });
+        }
+        return res;
+      });
 
     if (error) {
       return errorResponse("DATABASE_ERROR", "Gagal mengambil daftar siswa.", 500, error.message);
