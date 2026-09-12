@@ -12,8 +12,9 @@ export async function GET() {
       .from("master_lokasi")
       .select("*")
       .eq("is_active", true)
+      .order("updated_at", { ascending: false, nullsFirst: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error && error.code !== "PGRST116") {
       return errorResponse("DATABASE_ERROR", "Gagal mengambil lokasi LPKS.", 500, error.message);

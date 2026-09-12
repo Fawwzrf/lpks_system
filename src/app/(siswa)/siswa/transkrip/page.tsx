@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -65,9 +66,23 @@ export default function TranskripPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-        <span>Memuat transkrip nilai...</span>
+      <div className="flex flex-col gap-5 animate-pulse">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-6 w-40 bg-[#1F2937]" />
+          <Skeleton className="h-3.5 w-60 bg-[#1F2937]/60" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="rounded-xl border border-[#1F2937] bg-[#111827] p-3.5 flex flex-col gap-2">
+              <Skeleton className="h-3 w-20 bg-[#1F2937]" />
+              <Skeleton className="h-6 w-12 bg-[#1F2937]" />
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 h-64 flex flex-col gap-3">
+          <Skeleton className="h-4 w-36 bg-[#1F2937]" />
+          <Skeleton className="h-full w-full rounded-lg bg-[#1F2937]/40" />
+        </div>
       </div>
     );
   }

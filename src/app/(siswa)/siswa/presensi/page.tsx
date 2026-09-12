@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, Loader2, CheckCircle2, XCircle, AlertTriangle, Clock } from "lucide-react";
-
-const BENGKEL_LAT = -6.2088;
-const BENGKEL_LON = 106.8456;
+import React, { useEffect, useState, useCallback } from "react";
+import { MapPin, Loader2, CheckCircle2, XCircle, AlertTriangle, Clock, Navigation, ExternalLink, RefreshCw } from "lucide-react";
 import { haversineDistance } from "@/lib/geo";
+import { Skeleton } from "@/components/ui/skeleton";
 
+// Default koordinat LPKS Sumbu Hidup (Cilacap) jika belum termuat dari master
+const BENGKEL_LAT = -7.69897507696962;
+const BENGKEL_LON = 109.010520861496;
 const RADIUS_M = 100;
 
 interface PresensiItem {
@@ -23,26 +24,30 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   Sakit: <AlertTriangle className="h-3.5 w-3.5 text-[#38BDF8]" aria-hidden="true" />,
   Alpa:  <XCircle className="h-3.5 w-3.5 text-[#F43F5E]" aria-hidden="true" />,
 };
+
 const STATUS_COLOR: Record<string, string> = {
   Hadir: "text-[#10B981]",
-  Izin: "text-[#F59E0B]",
+  Izin:  "text-[#F59E0B]",
   Sakit: "text-[#38BDF8]",
-  Alpa: "text-[#F43F5E]"
+  Alpa:  "text-[#F43F5E]",
 };
 
 export default function PresensiSiswaPage() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
   // Validasi hari: Senin(1)–Kamis(4) + Sabtu(6)
   const hariIni = new Date().getDay();
   const isHariAktif = [1, 2, 3, 4, 6].includes(hariIni);
-  const NAMA_HARI = ["Minggu","Senin","Selasa","Rabu","Kamis","Jumat","Sabtu"];
+  const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
-  const [bengkelLoc, setBengkelLoc] = useState({ lat: BENGKEL_LAT, lng: BENGKEL_LON, radius: RADIUS_M });
+  const [bengkelLoc, setBengkelLoc] = useState({
+    nama: "LPKS Sumbu Hidup",
+    lat: BENGKEL_LAT,
+    lng: BENGKEL_LON,
+    radius: RADIUS_M,
+  });
   const [position, setPosition] = useState<GeolocationPosition | null>(null);
   const [geoError, setGeoError] = useState<string | null>(
     typeof window !== "undefined" && !navigator.geolocation
-      ? "Browser tidak mendukung geolokasi."
+      ? "Browser tidak mendukung geolokasi GPS."
       : null
   );
   const [distance, setDistance] = useState<number | null>(null);
@@ -53,17 +58,22 @@ export default function PresensiSiswaPage() {
   const [riwayat, setRiwayat] = useState<PresensiItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [remainingAttempts, setRemainingAttempts] = useState<number>(3);
+  const [mapType, setMapType] = useState<"m" | "k">("m"); // m=normal map, k=satellite
 
   // Load initial data: master lokasi, status hari ini, dan riwayat presensi
   const loadData = useCallback(async () => {
     try {
-      // 1. Lokasi LPKS
+      // 1. Lokasi LPKS dari database (handle format object maupun array)
       const resLokasi = await fetch("/api/v1/master/lokasi");
       if (resLokasi.ok) {
         const json = await resLokasi.json();
-        const aktif = json.data?.find((l: { is_active: boolean }) => l.is_active) || json.data?.[0];
-        if (aktif) {
+        const aktif = Array.isArray(json.data)
+          ? json.data.find((l: { is_active?: boolean }) => l.is_active) || json.data[0]
+          : json.data;
+
+        if (aktif && typeof aktif.lat === "number" && typeof aktif.lng === "number") {
           setBengkelLoc({
+            nama: aktif.nama_titik || "LPKS Sumbu Hidup",
             lat: Number(aktif.lat),
             lng: Number(aktif.lng),
             radius: Number(aktif.radius_meter) || RADIUS_M,
@@ -90,7 +100,7 @@ export default function PresensiSiswaPage() {
         setRiwayat(json.data || []);
       }
     } catch (err) {
-      console.error("Gagal memuat status presensi:", err);
+      console.error("Gagal memuat data presensi:", err);
     } finally {
       setLoadingHistory(false);
     }
@@ -100,94 +110,34 @@ export default function PresensiSiswaPage() {
     loadData();
   }, [loadData]);
 
-  // Radar canvas draw
-  const drawRadar = useCallback((dist: number | null) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const { width: W, height: H } = canvas;
-    const cx = W / 2, cy = H / 2;
-    const maxR = W / 2 - 8;
-
-    ctx.clearRect(0, 0, W, H);
-
-    // Background
-    ctx.fillStyle = "#0B0F17";
-    ctx.fillRect(0, 0, W, H);
-
-    // Grid circles
-    [0.25, 0.5, 0.75, 1].forEach((f) => {
-      ctx.beginPath();
-      ctx.arc(cx, cy, maxR * f, 0, Math.PI * 2);
-      ctx.strokeStyle = "#1F2937";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    });
-
-    // Bengkel center dot
-    ctx.beginPath();
-    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#DC2626";
-    ctx.fill();
-
-    // Safe zone ring (radius toleransi)
-    ctx.beginPath();
-    ctx.arc(cx, cy, maxR * 0.5, 0, Math.PI * 2);
-    ctx.strokeStyle = "rgba(220,38,38,0.35)";
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([4, 4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Labels
-    ctx.fillStyle = "#6B7280";
-    ctx.font = "10px system-ui";
-    ctx.textAlign = "left";
-    ctx.fillText(`${bengkelLoc.radius}m`, cx + maxR * 0.5 + 4, cy + 4);
-    ctx.fillText(`${bengkelLoc.radius * 2}m`, cx + maxR * 1 + 4, cy + 4);
-
-    // User pin
-    if (dist !== null) {
-      const maxRange = bengkelLoc.radius * 2;
-      const clampedFraction = Math.min(dist / maxRange, 1);
-      const userR = maxR * clampedFraction;
-      const inZone = dist <= bengkelLoc.radius;
-
-      // Pulse ring
-      ctx.beginPath();
-      ctx.arc(cx + userR * 0.7, cy - userR * 0.3, 10, 0, Math.PI * 2);
-      ctx.strokeStyle = inZone ? "rgba(16,185,129,0.3)" : "rgba(245,158,11,0.3)";
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Pin
-      ctx.beginPath();
-      ctx.arc(cx + userR * 0.7, cy - userR * 0.3, 6, 0, Math.PI * 2);
-      ctx.fillStyle = inZone ? "#10B981" : "#F59E0B";
-      ctx.fill();
-    }
-  }, [bengkelLoc]);
-
+  // Pantau posisi GPS real-time pengguna
   useEffect(() => {
     if (!navigator.geolocation) return;
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
         setPosition(pos);
         setGeoError(null);
-        const d = haversineDistance(pos.coords.latitude, pos.coords.longitude, bengkelLoc.lat, bengkelLoc.lng);
+        const d = haversineDistance(
+          pos.coords.latitude,
+          pos.coords.longitude,
+          bengkelLoc.lat,
+          bengkelLoc.lng
+        );
         setDistance(Math.round(d));
-        drawRadar(d);
       },
-      () => setGeoError("Izin lokasi ditolak atau tidak tersedia. Pastikan GPS aktif."),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      (err) => {
+        if (err.code === 1) {
+          setGeoError("Akses lokasi ditolak. Silakan izinkan izin GPS di pengaturan browser.");
+        } else if (err.code === 2) {
+          setGeoError("Sinyal GPS tidak dapat ditemukan. Pastikan lokasi aktif.");
+        } else {
+          setGeoError("Waktu permintaan lokasi habis. Coba lagi.");
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [drawRadar, bengkelLoc]);
-
-  useEffect(() => {
-    drawRadar(distance);
-  }, [distance, drawRadar]);
+  }, [bengkelLoc]);
 
   const inZone = distance !== null && distance <= bengkelLoc.radius;
   const alreadyAbsen = absenDone;
@@ -251,35 +201,127 @@ export default function PresensiSiswaPage() {
         </div>
       )}
 
-      {/* Radar Map */}
-      <div className="rounded-xl border border-[#1F2937] bg-[#111827] overflow-hidden">
-        <canvas
-          ref={canvasRef}
-          width={320}
-          height={220}
-          className="w-full"
-          style={{ maxHeight: 220 }}
-          aria-label="Peta radar geofencing bengkel"
-        />
+      {/* Visualisasi Google Maps Resmi */}
+      <div className="relative rounded-2xl border border-[#1F2937] bg-[#111827] overflow-hidden shadow-xl">
+        {/* Kontrol Toggle Tampilan Google Maps */}
+        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5 bg-[#111827]/90 backdrop-blur-md border border-[#374151] p-1 rounded-xl shadow-lg">
+          <button
+            type="button"
+            onClick={() => setMapType("m")}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors ${
+              mapType === "m"
+                ? "bg-[#DC2626] text-white shadow-sm"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Peta
+          </button>
+          <button
+            type="button"
+            onClick={() => setMapType("k")}
+            className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors ${
+              mapType === "k"
+                ? "bg-[#DC2626] text-white shadow-sm"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Satelit
+          </button>
+        </div>
+
+        {/* Header Info Lokasi Google Maps */}
+        <div className="absolute top-3 left-3 z-10 max-w-[calc(100%-140px)]">
+          <div className="bg-[#111827]/90 backdrop-blur-md border border-[#374151] rounded-xl px-3 py-2 flex items-center gap-2.5 shadow-xl">
+            <div className="w-7 h-7 rounded-lg bg-[#DC2626] flex items-center justify-center text-white shrink-0 shadow-md">
+              <MapPin className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-white truncate">{bengkelLoc.nama}</p>
+              <p className="text-[10px] text-[#9CA3AF] truncate">Radius Geofence: {bengkelLoc.radius}m</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Google Maps Embed Frame */}
+        <div className="relative w-full h-[260px] sm:h-[300px] bg-[#0E131F]">
+          <iframe
+            title="Google Maps Lokasi LPKS Sumbu Hidup"
+            src={`https://maps.google.com/maps?q=${bengkelLoc.lat},${bengkelLoc.lng}&t=${mapType}&hl=id&z=18&output=embed`}
+            className="w-full h-full border-0"
+            loading="lazy"
+            allowFullScreen
+          />
+
+          {/* Floating Action di Bawah Map */}
+          <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+            <div
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold backdrop-blur-md border shadow-lg flex items-center gap-2 pointer-events-auto ${
+                inZone
+                  ? "bg-[#064E3B]/90 border-[#059669] text-[#34D399]"
+                  : "bg-[#78350F]/90 border-[#D97706] text-[#FCD34D]"
+              }`}
+            >
+              <span className="relative flex h-2.5 w-2.5">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    inZone ? "bg-[#10B981]" : "bg-[#F59E0B]"
+                  }`}
+                />
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    inZone ? "bg-[#10B981]" : "bg-[#F59E0B]"
+                  }`}
+                />
+              </span>
+              <span>{inZone ? "Dalam Radius Presensi" : "Di Luar Radius"}</span>
+            </div>
+
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${bengkelLoc.lat},${bengkelLoc.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white/95 hover:bg-white text-[#111827] text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg flex items-center gap-1.5 transition-all pointer-events-auto shrink-0"
+              title="Buka rute navigasi di Google Maps"
+            >
+              <Navigation className="h-3.5 w-3.5 text-[#2563EB]" />
+              <span>Petunjuk Arah</span>
+              <ExternalLink className="h-3 w-3 text-[#6B7280]" />
+            </a>
+          </div>
+        </div>
       </div>
 
       {/* Distance Indicator */}
-      <div className={`rounded-xl border p-4 flex items-center gap-3 ${inZone ? "border-[#10B981]/30 bg-[#10B981]/8" : "border-[#F59E0B]/30 bg-[#F59E0B]/8"}`}>
-        <MapPin className={`h-5 w-5 shrink-0 ${inZone ? "text-[#10B981]" : "text-[#F59E0B]"}`} aria-hidden="true" />
+      <div
+        className={`rounded-xl border p-4 flex items-center gap-3 transition-colors ${
+          inZone ? "border-[#10B981]/30 bg-[#10B981]/8" : "border-[#F59E0B]/30 bg-[#F59E0B]/8"
+        }`}
+      >
+        <MapPin
+          className={`h-5 w-5 shrink-0 ${inZone ? "text-[#10B981]" : "text-[#F59E0B]"}`}
+          aria-hidden="true"
+        />
         <div className="flex-1">
           <p className={`text-sm font-bold ${inZone ? "text-[#10B981]" : "text-[#F9FAFB]"}`}>
             {geoError
               ? "Lokasi tidak tersedia"
               : distance !== null
-                ? `${distance} m dari bengkel`
-                : "Mendeteksi lokasi..."}
+              ? `${distance} m dari bengkel`
+              : "Mendeteksi posisi GPS Anda..."}
           </p>
           <p className="text-[11px] text-[#6B7280]">
-            {inZone
-              ? `Anda berada dalam zona presensi (maks. ${bengkelLoc.radius}m) ✓`
-              : `Di luar zona presensi (> ${bengkelLoc.radius}m)`}
+            {geoError
+              ? geoError
+              : inZone
+              ? `Posisi terverifikasi di dalam area (toleransi maks. ${bengkelLoc.radius}m) ✓`
+              : `Anda berada di luar batas absensi. Silakan mendekat ke area LPKS.`}
           </p>
         </div>
+        {position && (
+          <div className="text-right shrink-0 text-[10px] text-[#6B7280] hidden sm:block">
+            Akurasi GPS: ±{Math.round(position.coords.accuracy)}m
+          </div>
+        )}
       </div>
 
       {/* Feedback Messages */}
@@ -308,20 +350,52 @@ export default function PresensiSiswaPage() {
           className="h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
           aria-disabled={!inZone || !isHariAktif || remainingAttempts <= 0}
         >
-          {absenLoading
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...</>
-            : <><MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}</>}
+          {absenLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...
+            </>
+          ) : (
+            <>
+              <MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang{" "}
+              {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}
+            </>
+          )}
         </button>
       )}
 
-      {/* Riwayat Log */}
+      {/* Riwayat Log (Bone Page Skeleton saat Loading) */}
       <section aria-label="Riwayat presensi siswa">
-        <h2 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest mb-3 flex items-center gap-2">
-          <Clock className="h-3.5 w-3.5" aria-hidden="true" /> Riwayat Presensi
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-semibold text-[#9CA3AF] uppercase tracking-widest flex items-center gap-2">
+            <Clock className="h-3.5 w-3.5" aria-hidden="true" /> Riwayat Presensi
+          </h2>
+          <button
+            onClick={loadData}
+            className="p-1 rounded-lg hover:bg-[#1F2937] text-[#6B7280] hover:text-white transition-colors"
+            title="Segarkan riwayat"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
         {loadingHistory ? (
-          <div className="flex items-center justify-center py-6 text-xs text-[#6B7280] gap-2">
-            <Loader2 className="h-4 w-4 animate-spin text-[#DC2626]" /> Memuat riwayat...
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div
+                key={idx}
+                className="flex items-center gap-3 bg-[#111827] rounded-xl border border-[#1F2937] px-4 py-3.5"
+              >
+                <Skeleton className="h-4 w-4 rounded-full bg-[#1F2937]" />
+                <div className="flex-1 flex flex-col gap-1.5">
+                  <Skeleton className="h-3.5 w-28 bg-[#1F2937]" />
+                  <Skeleton className="h-2.5 w-20 bg-[#1F2937]/60" />
+                </div>
+                <div className="flex flex-col items-end gap-1.5">
+                  <Skeleton className="h-3.5 w-12 bg-[#1F2937]" />
+                  <Skeleton className="h-2.5 w-16 bg-[#1F2937]/60" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : riwayat.length === 0 ? (
           <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-6 text-center text-xs text-[#6B7280]">
@@ -338,11 +412,15 @@ export default function PresensiSiswaPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-[#D1D5DB] truncate">{entry.tanggal}</p>
                   {typeof entry.jarak_meter === "number" && (
-                    <p className="text-[11px] text-[#6B7280]">{Math.round(entry.jarak_meter)} m dari bengkel</p>
+                    <p className="text-[11px] text-[#6B7280]">
+                      {Math.round(entry.jarak_meter)} m dari bengkel
+                    </p>
                   )}
                 </div>
                 <div className="text-right shrink-0">
-                  <p className={`text-xs font-semibold ${STATUS_COLOR[entry.status] || "text-[#10B981]"}`}>{entry.status}</p>
+                  <p className={`text-xs font-semibold ${STATUS_COLOR[entry.status] || "text-[#10B981]"}`}>
+                    {entry.status}
+                  </p>
                   <p className="text-[10px] font-mono text-[#6B7280]">{entry.jam || "—"}</p>
                 </div>
               </li>

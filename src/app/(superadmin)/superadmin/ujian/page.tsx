@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { handleEnterToNextField } from "@/lib/form-utils";
+import { CardSkeleton } from "@/components/ui/skeleton";
 
 interface SiswaUjianItem {
   id: string;
@@ -197,10 +198,7 @@ export default function UjianPage() {
 
       {/* Loading state */}
       {loading && data.length === 0 ? (
-        <div className="p-12 text-center text-xs text-[#6B7280] flex flex-col items-center justify-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-          <span>Memuat data siswa dan evaluasi gate check ujian...</span>
-        </div>
+        <CardSkeleton count={6} className="md:grid-cols-2 lg:grid-cols-3" />
       ) : data.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[#1F2937] p-8 text-center text-xs text-[#6B7280]">
           Belum ada data siswa terdaftar.

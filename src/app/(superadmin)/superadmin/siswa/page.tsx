@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Table } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 interface SiswaItem {
   id: string;
@@ -445,10 +446,7 @@ export default function SiswaPage() {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-          <span>Memuat data direktori siswa...</span>
-        </div>
+        <TableSkeleton rows={8} columns={6} />
       ) : (
         <div className="flex flex-col gap-4">
           <Table columns={columns} data={siswaList} emptyMessage="Tidak ada siswa yang cocok dengan kriteria pencarian." />

@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { handleEnterToNextField } from "@/lib/form-utils";
 import { formatDateIndo } from "@/lib/utils";
@@ -303,10 +304,7 @@ export default function PenilaianPage() {
 
       {/* Tabel Riwayat */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-          <span>Memuat data penilaian...</span>
-        </div>
+        <TableSkeleton rows={6} columns={6} />
       ) : (
         <Table columns={columns} data={riwayatList} emptyMessage="Belum ada riwayat penilaian untuk siswa ini." />
       )}

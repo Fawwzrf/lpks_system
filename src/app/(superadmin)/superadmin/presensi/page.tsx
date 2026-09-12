@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Search, MapPin, CheckCircle2, XCircle, AlertTriangle, Loader2, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 
 const STATUS_OPTIONS = ["Hadir", "Izin", "Sakit", "Alpa"] as const;
 type StatusPresensi = typeof STATUS_OPTIONS[number];
@@ -205,10 +206,7 @@ export default function PresensiAdminPage() {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-          <span>Memuat log presensi tanggal {selectedDate}...</span>
-        </div>
+        <TableSkeleton rows={7} columns={6} />
       ) : (
         <Table columns={columns} data={filtered} emptyMessage={`Tidak ada log presensi pada tanggal ${selectedDate}.`} />
       )}

@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { MapPin, CheckCircle2, AlertTriangle, Wallet, Sparkles, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { formatRupiah } from "@/lib/utils";
 
 interface StudentDashboardData {
@@ -125,9 +126,16 @@ export default function BerandaPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-        <span>Memuat data beranda...</span>
+      <div className="flex flex-col gap-4 animate-pulse">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-6 w-44 bg-[#1F2937]" />
+          <Skeleton className="h-3.5 w-64 bg-[#1F2937]/60" />
+        </div>
+        <CardSkeleton count={3} />
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-3">
+          <Skeleton className="h-4 w-32 bg-[#1F2937]" />
+          <Skeleton className="h-16 w-full rounded-lg bg-[#1F2937]/50" />
+        </div>
       </div>
     );
   }

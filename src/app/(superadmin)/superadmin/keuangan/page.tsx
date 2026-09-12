@@ -7,6 +7,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
+import { TableSkeleton } from "@/components/ui/skeleton";
 import { formatRupiah, formatDateIndo } from "@/lib/utils";
 import { handleEnterToNextField } from "@/lib/form-utils";
 
@@ -208,10 +209,7 @@ export default function KeuanganPage() {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-          <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-          <span>Memuat data transaksi keuangan...</span>
-        </div>
+        <TableSkeleton rows={7} columns={7} />
       ) : (
         <Table columns={columns} data={transaksiList} emptyMessage="Belum ada transaksi pembayaran yang tercatat." />
       )}

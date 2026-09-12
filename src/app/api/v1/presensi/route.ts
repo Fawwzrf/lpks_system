@@ -163,8 +163,9 @@ export async function POST(request: NextRequest) {
       .from("master_lokasi")
       .select("lat, lng, radius_meter")
       .eq("is_active", true)
+      .order("updated_at", { ascending: false, nullsFirst: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const targetLat = lokasiLpks?.lat ?? -6.917464;
     const targetLng = lokasiLpks?.lng ?? 107.619122;
