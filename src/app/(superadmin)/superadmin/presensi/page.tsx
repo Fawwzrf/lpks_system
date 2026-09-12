@@ -495,7 +495,7 @@ export default function PresensiAdminPage() {
         <div>
           <h1 className="text-base font-bold text-[#F9FAFB]">Presensi GPS & Rekapitulasi Absensi</h1>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Pemantauan absensi geofencing harian, entri izin/sakit/alpa manual, dan ekspor matriks kehadiran resmi.
+            Pemantauan absensi geofencing harian siswa aktif (belum lulus), entri izin/sakit/alpa manual, dan ekspor matriks kehadiran resmi.
           </p>
         </div>
 
@@ -585,7 +585,7 @@ export default function PresensiAdminPage() {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         {(
           [
-            { label: "Semua", count: countSemua, tab: "Semua" },
+            { label: "Semua Siswa Aktif", count: countSemua, tab: "Semua" },
             { label: "Hadir", count: countHadir, tab: "Hadir" },
             { label: "Izin", count: countIzin, tab: "Izin" },
             { label: "Sakit", count: countSakit, tab: "Sakit" },

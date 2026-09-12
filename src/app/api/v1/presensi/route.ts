@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
         .select("id, nomor_induk, nama_lengkap, program_id, program:master_program(id, kode_program, nama)")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
+        .is("tgl_keluar", null)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 
@@ -137,12 +138,13 @@ export async function POST(request: NextRequest) {
       if (body.action === "batch_alpa") {
         const targetDate = body.tanggal || todayStr;
 
-        // Ambil semua siswa aktif
+        // Ambil semua siswa aktif (belum lulus)
         const { data: activeStudents, error: studentError } = await supabase
           .from("siswa")
           .select("id")
           .not("nik", "like", "ANON-%")
-          .neq("alamat_lengkap", "[DATA DIHAPUS]");
+          .neq("alamat_lengkap", "[DATA DIHAPUS]")
+          .is("tgl_keluar", null);
 
         if (studentError || !activeStudents) {
           return errorResponse("DATABASE_ERROR", "Gagal memuat siswa aktif.", 500, studentError?.message);

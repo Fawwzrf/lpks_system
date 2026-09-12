@@ -113,12 +113,13 @@ export async function GET(request: NextRequest) {
         periodeLabel = monthName;
       }
 
-      // Ambil daftar siswa aktif
+      // Ambil daftar siswa aktif (belum lulus)
       let siswaQuery = supabase
         .from("siswa")
         .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, kode_program, nama)")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
+        .is("tgl_keluar", null)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 
