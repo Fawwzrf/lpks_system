@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { CheckCircle2, AlertTriangle, Download, Wallet, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { formatRupiah, formatDateIndo } from "@/lib/utils";
 
 interface TransaksiItem {
@@ -95,9 +96,27 @@ export default function KeuanganSiswaPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-        <span>Memuat informasi keuangan...</span>
+      <div className="flex flex-col gap-5 animate-pulse">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-6 w-48 bg-[#1F2937]" />
+          <Skeleton className="h-3.5 w-64 bg-[#1F2937]/60" />
+        </div>
+        <Skeleton className="h-20 w-full rounded-2xl bg-[#1F2937]/50" />
+        <CardSkeleton count={3} />
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-3">
+          <Skeleton className="h-4 w-36 bg-[#1F2937]" />
+          <div className="divide-y divide-[#1F2937]/60">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="py-3 flex items-center justify-between">
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton className="h-3.5 w-32 bg-[#1F2937]" />
+                  <Skeleton className="h-2.5 w-20 bg-[#1F2937]/60" />
+                </div>
+                <Skeleton className="h-4 w-24 bg-[#1F2937]" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }

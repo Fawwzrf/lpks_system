@@ -8,6 +8,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type FieldErrors = Record<string, string>;
 
@@ -216,9 +217,25 @@ export default function EditSiswaPage({ params }: PageProps) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-        <span>Memuat data siswa...</span>
+      <div className="flex flex-col gap-6 max-w-2xl pb-10 animate-pulse">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-24 rounded-lg bg-[#1F2937]" />
+          <div className="flex flex-col gap-1.5">
+            <Skeleton className="h-5 w-36 bg-[#1F2937]" />
+            <Skeleton className="h-3 w-48 bg-[#1F2937]/60" />
+          </div>
+        </div>
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-6 flex flex-col gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-2">
+                <Skeleton className="h-3.5 w-24 bg-[#1F2937]" />
+                <Skeleton className="h-10 w-full rounded-lg bg-[#1F2937]/60" />
+              </div>
+            ))}
+          </div>
+          <Skeleton className="h-11 w-full rounded-xl bg-[#DC2626]/20 mt-4" />
+        </div>
       </div>
     );
   }

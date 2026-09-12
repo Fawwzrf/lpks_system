@@ -6,6 +6,7 @@ import {
   UserPlus, MapPin, ClipboardList, Award, Loader2,
 } from "lucide-react";
 import { StatCard } from "@/components/ui/stat-card";
+import { CardSkeleton, Skeleton } from "@/components/ui/skeleton";
 import { formatRupiah } from "@/lib/utils";
 import Link from "next/link";
 
@@ -131,24 +132,35 @@ export default function DashboardPage() {
 
       {/* Stats grid */}
       <section aria-label="Statistik utama">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {statCards.map((s) => (
-            <StatCard key={s.title} {...s} />
-          ))}
-        </div>
+        {loading ? (
+          <CardSkeleton count={4} className="grid-cols-2 lg:grid-cols-4 gap-3" />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {statCards.map((s) => (
+              <StatCard key={s.title} {...s} />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* AI Quick Insight */}
       <section aria-label="AI Quick Insight">
         <div className="rounded-xl border border-[#DC2626]/25 bg-[#DC2626]/8 p-4 flex gap-3 items-start">
           <div className="h-8 w-8 rounded-xl bg-[#DC2626]/15 border border-[#DC2626]/30 flex items-center justify-center shrink-0">
-            {loading ? <Loader2 className="h-4 w-4 text-[#DC2626] animate-spin" /> : <Sparkles className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />}
+            <Sparkles className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-[#F9FAFB] mb-1">AI Quick Insight</p>
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              {loading ? "Menghubungkan ke asisten analitik AI..." : stats.aiInsight}
-            </p>
+            {loading ? (
+              <div className="flex flex-col gap-1.5 mt-1">
+                <Skeleton className="h-3.5 w-64 bg-[#DC2626]/20" />
+                <Skeleton className="h-3 w-48 bg-[#DC2626]/15" />
+              </div>
+            ) : (
+              <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                {stats.aiInsight}
+              </p>
+            )}
             <Link href="/superadmin/ai" className="text-[11px] text-[#DC2626] hover:underline font-medium mt-1 inline-block">
               Buka AI Showcase &amp; Tanya Data →
             </Link>

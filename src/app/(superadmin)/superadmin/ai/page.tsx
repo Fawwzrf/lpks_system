@@ -114,10 +114,12 @@ export default function AiPage() {
                 </div>
               ))}
               {loading && (
-                <div className="flex gap-2.5">
+                <div className="flex gap-2.5 items-center">
                   <div className="h-6 w-6 rounded-full bg-[#DC2626]/15 border border-[#DC2626]/30 flex items-center justify-center text-[10px] font-bold text-[#DC2626] shrink-0">AI</div>
-                  <div className="rounded-xl bg-[#1F2937] px-3 py-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#DC2626]" />
+                  <div className="rounded-xl bg-[#1F2937] px-3.5 py-2.5 flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DC2626] animate-pulse"></span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DC2626] animate-pulse [animation-delay:200ms]"></span>
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#DC2626] animate-pulse [animation-delay:400ms]"></span>
                   </div>
                 </div>
               )}

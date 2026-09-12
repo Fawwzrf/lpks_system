@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { handleEnterToNextField } from "@/lib/form-utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Tab = "program" | "kriteria" | "berkas" | "lokasi";
 
@@ -368,8 +369,19 @@ export default function MasterPage() {
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-xs text-[#6B7280] flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-[#DC2626]" /> Memuat master data...
+            <div className="divide-y divide-[#1F2937] animate-pulse">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 px-5 py-4">
+                  <div className="flex flex-col gap-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-4 w-10 bg-[#1F2937]" />
+                      <Skeleton className="h-4 w-44 bg-[#1F2937]" />
+                    </div>
+                    <Skeleton className="h-3 w-64 bg-[#1F2937]/60" />
+                  </div>
+                  <Skeleton className="h-8 w-8 rounded-lg bg-[#1F2937]" />
+                </div>
+              ))}
             </div>
           ) : (
             <ul className="divide-y divide-[#1F2937]">

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, Clock, Info, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface KriteriaItem {
   id: string;
@@ -130,9 +131,23 @@ export default function NilaiPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-3 text-xs text-[#6B7280]">
-        <Loader2 className="h-6 w-6 animate-spin text-[#DC2626]" />
-        <span>Memuat kriteria penilaian...</span>
+      <div className="flex flex-col gap-6 animate-pulse">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-6 w-44 bg-[#1F2937]" />
+          <Skeleton className="h-3.5 w-72 bg-[#1F2937]/60" />
+        </div>
+        <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-4">
+          <Skeleton className="h-4 w-36 bg-[#1F2937]" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex flex-col gap-2">
+                <Skeleton className="h-3.5 w-28 bg-[#1F2937]" />
+                <Skeleton className="h-10 w-full rounded-lg bg-[#1F2937]/60" />
+              </div>
+            ))}
+          </div>
+          <Skeleton className="h-11 w-full rounded-xl bg-[#DC2626]/20 mt-2" />
+        </div>
       </div>
     );
   }

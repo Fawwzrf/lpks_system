@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { KeyRound, CheckCircle2, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function AkunForm() {
   const router = useRouter();
@@ -208,9 +209,26 @@ function AkunForm() {
   );
 }
 
+function AkunSkeleton() {
+  return (
+    <div className="flex flex-col gap-6 max-w-md animate-pulse">
+      <div className="flex flex-col gap-2">
+        <Skeleton className="h-6 w-36 bg-[#1F2937]" />
+        <Skeleton className="h-3.5 w-56 bg-[#1F2937]/60" />
+      </div>
+      <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-4">
+        <Skeleton className="h-4 w-28 bg-[#1F2937]" />
+        <Skeleton className="h-10 w-full rounded-lg bg-[#1F2937]/60" />
+        <Skeleton className="h-10 w-full rounded-lg bg-[#1F2937]/60" />
+        <Skeleton className="h-10 w-full rounded-lg bg-[#1F2937]/60" />
+      </div>
+    </div>
+  );
+}
+
 export default function AkunPage() {
   return (
-    <Suspense fallback={<div className="p-4 text-center text-xs text-[#9CA3AF]">Memuat data...</div>}>
+    <Suspense fallback={<AkunSkeleton />}>
       <AkunForm />
     </Suspense>
   );
