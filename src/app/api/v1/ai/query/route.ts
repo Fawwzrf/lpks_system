@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
         nomor_induk: s.nomor_induk,
         nama: s.nama_lengkap,
         program: ((s.program as unknown) as { nama: string })?.nama,
-        status: s.tgl_keluar ? "Alumni" : "Aktif",
+        status: (s.tgl_keluar && new Date(s.tgl_keluar) < new Date()) ? "Alumni" : "Aktif",
       })),
       sampel_nilai_terbaru: nilaiTerbaru?.map((n) => ({
         siswa: ((n.siswa as unknown) as { nama_lengkap: string })?.nama_lengkap,

@@ -252,6 +252,7 @@ export default function PendaftaranPage() {
       pendidikan_terakhir: rawData.pendidikan_terakhir || null,
       nisn: rawData.nisn || null,
       tgl_masuk: tanggalMasuk || null,
+      tgl_keluar: tglKeluar || null,
       checklist_berkas: checklistMap,
     };
 

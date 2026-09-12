@@ -119,7 +119,7 @@ export async function GET(request: NextRequest) {
         .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, kode_program, nama)")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .is("tgl_keluar", null)
+        .or(`tgl_keluar.is.null,tgl_keluar.gte.${dates[0]}`)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 

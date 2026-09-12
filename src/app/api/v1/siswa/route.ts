@@ -24,10 +24,11 @@ export async function GET(request: NextRequest) {
       .select("*, program:master_program(id, kode_program, nama, biaya)", { count: "exact" });
 
     // Filter status aktif vs alumni
+    const today = new Date().toISOString().split("T")[0];
     if (status === "aktif") {
-      query = query.is("tgl_keluar", null);
+      query = query.not("nik", "like", "ANON-%").or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`);
     } else if (status === "alumni") {
-      query = query.not("tgl_keluar", "is", null);
+      query = query.or(`nik.like.ANON-%,tgl_keluar.lt.${today}`);
     }
 
     if (programId) {
@@ -183,6 +184,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Hitung tanggal keluar otomatis jika belum ditentukan
+    const finalTglMasuk = tgl_masuk || new Date().toISOString().split("T")[0];
+    let finalTglKeluar = body.tgl_keluar || null;
+    if (!finalTglKeluar && program_id) {
+      const { data: prog } = await supabase
+        .from("master_program")
+        .select("estimasi_durasi_hari")
+        .eq("id", program_id)
+        .maybeSingle();
+      if (prog?.estimasi_durasi_hari) {
+        const d = new Date(finalTglMasuk);
+        d.setDate(d.getDate() + Number(prog.estimasi_durasi_hari));
+        finalTglKeluar = d.toISOString().split("T")[0];
+      }
+    }
+
     // 4. Simpan record siswa baru
     const { data: newSiswa, error: insertError } = await supabase
       .from("siswa")
@@ -202,7 +219,8 @@ export async function POST(request: NextRequest) {
         email: email.trim().toLowerCase(),
         pendidikan_terakhir: pendidikan_terakhir?.trim() || null,
         nisn: nisn?.trim() || null,
-        tgl_masuk: tgl_masuk || new Date().toISOString().split("T")[0],
+        tgl_masuk: finalTglMasuk,
+        tgl_keluar: finalTglKeluar,
         checklist_berkas: checklist_berkas || {},
         is_password_default: true,
       })

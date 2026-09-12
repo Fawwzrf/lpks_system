@@ -93,13 +93,14 @@ export async function POST(request: NextRequest) {
               // karena kode yang sama bisa punya >1 program (mis. SMAW 4G & SMAW 6G).
               // Jika berisi teks (mis. "SMAW 4G"), cari berdasarkan nama.
               let programId: string | null = null;
+              let estimasiDurasiHari: number = 0;
               const isNumericCode = /^\d+$/.test(namaProgram);
 
               if (isNumericCode) {
                 const kodePrefix = manualNoInduk.split(".")[0].trim().padStart(2, "0");
                 const { data: programs } = await supabase
                   .from("master_program")
-                  .select("id, kode_program")
+                  .select("id, kode_program, estimasi_durasi_hari")
                   .eq("kode_program", kodePrefix);
 
                 if (!programs || programs.length === 0) {
@@ -108,10 +109,11 @@ export async function POST(request: NextRequest) {
                   continue;
                 }
                 programId = programs[0].id;
+                estimasiDurasiHari = Number(programs[0].estimasi_durasi_hari || 0);
               } else {
                 const { data: prog } = await supabase
                   .from("master_program")
-                  .select("id")
+                  .select("id, estimasi_durasi_hari")
                   .ilike("nama", `%${namaProgram}%`)
                   .limit(1)
                   .maybeSingle();
@@ -122,6 +124,7 @@ export async function POST(request: NextRequest) {
                   continue;
                 }
                 programId = prog.id;
+                estimasiDurasiHari = Number(prog.estimasi_durasi_hari || 0);
               }
 
               // ── Nomor Induk ─────────────────────────────────────────────
@@ -145,6 +148,15 @@ export async function POST(request: NextRequest) {
               const emailValid = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.split("@").length === 2;
               // Pakai email Excel jika valid, fallback ke generated
               let authEmail = emailValid ? email : generatedEmail;
+
+              // Hitung tanggal masuk & tanggal keluar
+              const tglMasukFinal = parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0];
+              let tglKeluarFinal = parseExcelDate(row["Tgl. Keluar"]);
+              if (!tglKeluarFinal && estimasiDurasiHari > 0 && tglMasukFinal) {
+                const d = new Date(tglMasukFinal);
+                d.setDate(d.getDate() + estimasiDurasiHari);
+                tglKeluarFinal = d.toISOString().split("T")[0];
+              }
 
               const supabaseAdmin = createAdminClient();
 
@@ -175,8 +187,8 @@ export async function POST(request: NextRequest) {
                   no_hp: String(row["No. HP"] || "").trim() || null,
                   pendidikan_terakhir: String(row["Pend. Terakhir"] || "").trim() || null,
                   nisn: String(row["NISN"] || "").trim() || null,
-                  tgl_masuk: parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
-                  tgl_keluar: parseExcelDate(row["Tgl. Keluar"]),
+                  tgl_masuk: tglMasukFinal,
+                  tgl_keluar: tglKeluarFinal,
                   updated_at: new Date().toISOString(),
                 };
 
@@ -267,8 +279,8 @@ export async function POST(request: NextRequest) {
                     nama_ibu:             String(row["Nama Ibu"]      || "").trim() || null,
                     pendidikan_terakhir:  String(row["Pend. Terakhir"]|| "").trim() || null,
                     nisn:                 String(row["NISN"]          || "").trim() || null,
-                    tgl_masuk:            parseExcelDate(row["Tgl. Masuk"]) || new Date().toISOString().split("T")[0],
-                    tgl_keluar:           parseExcelDate(row["Tgl. Keluar"]),
+                    tgl_masuk:            tglMasukFinal,
+                    tgl_keluar:           tglKeluarFinal,
                     checklist_berkas: { ijazah: true, ktp: true, kk: true, foto: true, suket_sehat: true },
                     is_password_default:  true,
                   });
