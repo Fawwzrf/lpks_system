@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin, requireStudentOwnerOrAdmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -71,6 +72,31 @@ export async function PUT(request: NextRequest, { params }: Params) {
       }
     }
 
+    // Validasi & update nomor_induk jika disertakan
+    if (body.nomor_induk && String(body.nomor_induk).trim()) {
+      const cleanNomorInduk = String(body.nomor_induk).trim();
+      const { data: duplicate } = await supabase
+        .from("siswa")
+        .select("id, nama_lengkap")
+        .eq("nomor_induk", cleanNomorInduk)
+        .neq("id", id)
+        .maybeSingle();
+
+      if (duplicate) {
+        return errorResponse(
+          "DUPLICATE_NOMOR_INDUK",
+          `Nomor induk ${cleanNomorInduk} sudah digunakan oleh ${duplicate.nama_lengkap}. Silakan pilih nomor urut lain.`,
+          409
+        );
+      }
+
+      updates.nomor_induk = cleanNomorInduk;
+      const parts = cleanNomorInduk.split(".");
+      const noUrutStr = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+      const num = parseInt(noUrutStr.replace(/\D/g, ""), 10);
+      updates.urutan_nomor = isNaN(num) ? null : num;
+    }
+
     const { data, error } = await supabase
       .from("siswa")
       .update(updates)
@@ -79,6 +105,13 @@ export async function PUT(request: NextRequest, { params }: Params) {
       .single();
 
     if (error) {
+      if (error.code === "23505" && error.message?.includes("nomor_induk")) {
+        return errorResponse(
+          "DUPLICATE_NOMOR_INDUK",
+          "Nomor induk tersebut sudah terdaftar dalam sistem. Silakan pilih nomor urut lain.",
+          409
+        );
+      }
       return errorResponse("DATABASE_ERROR", "Gagal memperbarui data siswa.", 500, error.message);
     }
 
@@ -100,29 +133,42 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (authError) return authError;
 
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
 
-    // Mekanisme Soft-delete & Anonimisasi Sesuai UU PDP No. 27/2022
-    // Data akademik tetap ada, tetapi identitas sensitif dianonimkan
-    const { data, error } = await supabase
+    // 1. Ambil data siswa untuk nomor_induk dan auth_id
+    const { data: siswa } = await supabase
       .from("siswa")
-      .update({
-        nik: `ANON-${id.substring(0, 8)}`,
-        no_hp: "0000000000",
-        alamat_lengkap: "[DATA DIHAPUS]",
-        tgl_keluar: new Date().toISOString().split("T")[0],
-        updated_at: new Date().toISOString(),
-      })
+      .select("id, nomor_induk, auth_id, nama_lengkap")
       .eq("id", id)
-      .select("id, nomor_induk, nama_lengkap, tgl_keluar")
-      .single();
+      .maybeSingle();
 
-    if (error) {
-      return errorResponse("DATABASE_ERROR", "Gagal melakukan anonimisasi data siswa.", 500, error.message);
+    if (!siswa) {
+      return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
+    }
+
+    // 2. Hapus relasi restrict jika ada (transaksi_keuangan dan presensi_attempts)
+    await supabase.from("transaksi_keuangan").delete().eq("siswa_id", id);
+    await supabase.from("presensi_attempts").delete().eq("siswa_id", id);
+
+    // 3. Hapus data siswa dari database (cascade akan menghapus presensi, penilaian_harian, ujian, ai_ringkasan)
+    const { error: deleteError } = await supabase
+      .from("siswa")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      return errorResponse("DATABASE_ERROR", "Gagal menghapus data siswa.", 500, deleteError.message);
+    }
+
+    // 4. Hapus akun auth jika terdaftar
+    if (siswa.auth_id) {
+      await supabaseAdmin.auth.admin.deleteUser(siswa.auth_id).catch(() => {});
     }
 
     return successResponse({
-      siswa: data,
-      message: "Data pribadi siswa berhasil dianonimisasi dan berstatus non-aktif (soft-delete).",
+      id,
+      nomor_induk: siswa.nomor_induk,
+      message: `Data siswa ${siswa.nama_lengkap} (${siswa.nomor_induk}) berhasil dihapus. Nomor induk kini dapat digunakan kembali.`,
     });
   } catch (err) {
     return errorResponse(

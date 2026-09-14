@@ -72,6 +72,8 @@ export default function EditSiswaPage({ params }: PageProps) {
   const [tanggalMasuk, setTanggalMasuk] = useState("");
   const [tanggalKeluar, setTanggalKeluar] = useState("");
   const [programInfo, setProgramInfo] = useState<{ id: string; nama: string; kode: string; } | null>(null);
+  const [noUrut, setNoUrut] = useState("");
+  const [kodeProgram, setKodeProgram] = useState("");
 
   const loadSiswa = useCallback(async () => {
     try {
@@ -79,6 +81,13 @@ export default function EditSiswaPage({ params }: PageProps) {
       if (!res.ok) throw new Error("Data siswa tidak ditemukan.");
       const json = await res.json();
       const siswa = json.data;
+
+      // Ekstrak kode program dan nomor urut dari nomor_induk
+      const parts = (siswa.nomor_induk || "").split(".");
+      const initialKode = parts[0] || siswa.program?.kode_program || "01";
+      const initialUrut = parts.length > 1 ? parts.slice(1).join(".") : parts[0] || "";
+      setKodeProgram(initialKode);
+      setNoUrut(initialUrut);
 
       // Pecah alamat
       const addr = siswa.alamat_lengkap || "";
@@ -168,12 +177,22 @@ export default function EditSiswaPage({ params }: PageProps) {
       return;
     }
 
+    if (!noUrut.trim()) {
+      setFieldErrors({ nomor_induk: "Nomor urut siswa wajib diisi." });
+      document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
+    const currentKode = kodeProgram || programInfo?.kode || "01";
+    const fullNomorInduk = `${currentKode}.${noUrut.trim()}`;
+
     setFieldErrors({});
     setSaving(true);
 
     const alamatStr = `${rawData.jalan}, RT ${rawData.rt}/RW ${rawData.rw}, ${rawData.kelurahan}, Kec. ${rawData.kecamatan}, ${rawData.kabupaten}, Prov. ${rawData.provinsi}`;
 
     const payload = {
+      nomor_induk: fullNomorInduk,
       nama_lengkap: rawData.nama,
       nik: rawData.nik,
       email: rawData.email,
@@ -200,8 +219,13 @@ export default function EditSiswaPage({ params }: PageProps) {
 
       if (!res.ok) {
         const msg = data?.error?.message || "Terjadi kesalahan.";
-        setFieldErrors({ _global: msg });
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        if (data?.error?.code === "DUPLICATE_NOMOR_INDUK") {
+          setFieldErrors({ nomor_induk: msg });
+          document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+        } else {
+          setFieldErrors({ _global: msg });
+          window.scrollTo({ top: 0, behavior: "smooth" });
+        }
         return;
       }
 
@@ -275,10 +299,43 @@ export default function EditSiswaPage({ params }: PageProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Nomor Induk" value={formValues.nomor_induk || ""} readOnly className="bg-[#1F2937]/30 text-[#9CA3AF]" />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#D1D5DB]">
+                Nomor Induk Siswa * (No. Urut Dapat Diedit)
+              </label>
+              <div className="flex items-center">
+                <span className="inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
+                  {kodeProgram || programInfo?.kode || "01"}.
+                </span>
+                <input
+                  type="text"
+                  name="no_urut"
+                  value={noUrut}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                    setNoUrut(val);
+                    if (fieldErrors.nomor_induk) {
+                      setFieldErrors((prev) => { const n = { ...prev }; delete n.nomor_induk; return n; });
+                    }
+                  }}
+                  placeholder="cth: 1053 atau 0001"
+                  className={`flex-1 h-10 rounded-r-lg border bg-[#111827] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
+                    fieldErrors.nomor_induk ? "border-[#F43F5E] focus:border-[#F43F5E]" : "border-[#374151] focus:border-[#10B981]"
+                  }`}
+                  required
+                />
+              </div>
+              {fieldErrors.nomor_induk ? (
+                <p className="text-[11px] text-[#F43F5E] mt-0.5">{fieldErrors.nomor_induk}</p>
+              ) : (
+                <p className="text-[10px] text-[#6B7280] mt-0.5">
+                  Nomor Induk aktif: <span className="font-mono text-[#10B981]">{kodeProgram || programInfo?.kode || "01"}.{noUrut || "____"}</span>
+                </p>
+              )}
+            </div>
             <Input label="Program Pelatihan" value={programInfo ? `${programInfo.kode} - ${programInfo.nama}` : ""} readOnly className="bg-[#1F2937]/30 text-[#9CA3AF]" />
           </div>
-          <p className="text-[10px] text-[#6B7280] mt-1.5">Program Pelatihan dan Nomor Induk terikat secara permanen dan tidak dapat diubah.</p>
+          <p className="text-[10px] text-[#6B7280] mt-1.5">Program Pelatihan terikat permanen. Nomor urut siswa dapat disesuaikan jika diperlukan.</p>
 
           {/* DATA PRIBADI */}
           <div className="flex items-center gap-4 mt-6 mb-4">

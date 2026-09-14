@@ -21,14 +21,16 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("siswa")
-      .select("*, program:master_program(id, kode_program, nama, biaya)", { count: "exact" });
+      .select("*, program:master_program(id, kode_program, nama, biaya)", { count: "exact" })
+      .not("nik", "like", "ANON-%")
+      .neq("alamat_lengkap", "[DATA DIHAPUS]");
 
     // Filter status aktif vs alumni
     const today = new Date().toISOString().split("T")[0];
     if (status === "aktif") {
-      query = query.not("nik", "like", "ANON-%").or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`);
+      query = query.or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`);
     } else if (status === "alumni") {
-      query = query.or(`nik.like.ANON-%,tgl_keluar.lt.${today}`);
+      query = query.not("tgl_keluar", "is", null).lt("tgl_keluar", today);
     }
 
     if (programId) {
@@ -127,24 +129,57 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const supabaseAdmin = createAdminClient();
 
-    // 1. Generate nomor induk berurutan secara atomik via RPC PostgreSQL
-    const { data: generatedNoInduk, error: rpcError } = await supabase.rpc(
-      "generate_nomor_induk",
-      { p_program_id: program_id }
-    );
+    // 1. Tentukan nomor induk: jika no_urut atau nomor_induk dikirim dari form, gunakan itu
+    let finalNomorInduk = "";
+    if (body.nomor_induk && String(body.nomor_induk).trim()) {
+      finalNomorInduk = String(body.nomor_induk).trim();
+    } else if (body.no_urut && String(body.no_urut).trim()) {
+      const { data: prog } = await supabase
+        .from("master_program")
+        .select("kode_program")
+        .eq("id", program_id)
+        .single();
+      finalNomorInduk = `${prog?.kode_program || "01"}.${String(body.no_urut).trim()}`;
+    } else {
+      // Generate nomor induk berurutan secara atomik via RPC PostgreSQL
+      const { data: generatedNoInduk, error: rpcError } = await supabase.rpc(
+        "generate_nomor_induk",
+        { p_program_id: program_id }
+      );
 
-    if (rpcError || !generatedNoInduk) {
+      if (rpcError || !generatedNoInduk) {
+        return errorResponse(
+          "NOMOR_INDUK_FAILED",
+          "Gagal membuat nomor induk otomatis untuk siswa.",
+          500,
+          rpcError?.message
+        );
+      }
+      finalNomorInduk = generatedNoInduk;
+    }
+
+    // Validasi duplikat nomor induk
+    const { data: existingNoInduk } = await supabase
+      .from("siswa")
+      .select("id, nama_lengkap, nomor_induk")
+      .eq("nomor_induk", finalNomorInduk)
+      .maybeSingle();
+
+    if (existingNoInduk) {
       return errorResponse(
-        "NOMOR_INDUK_FAILED",
-        "Gagal membuat nomor induk otomatis untuk siswa.",
-        500,
-        rpcError?.message
+        "DUPLICATE_NOMOR_INDUK",
+        `Nomor induk ${finalNomorInduk} sudah digunakan oleh ${existingNoInduk.nama_lengkap}. Silakan gunakan nomor urut yang berbeda.`,
+        409
       );
     }
 
     // 2. Generate username format "namadepan@urutan_no_induk" (contoh: "budi@0005")
-    const urutan = String(generatedNoInduk).split(".")[1] || "0001";
-    const username = generateStudentUsername(nama_lengkap, urutan);
+    const parts = finalNomorInduk.split(".");
+    const urutanStr = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+    const numUrutan = parseInt(urutanStr.replace(/\D/g, ""), 10);
+    const urutanNomor = isNaN(numUrutan) ? null : numUrutan;
+
+    const username = generateStudentUsername(nama_lengkap, urutanStr);
 
     // Validasi akun agar tidak duplikat (cek username dan NIK)
     const { data: existingUser } = await supabase
@@ -206,7 +241,8 @@ export async function POST(request: NextRequest) {
       .insert({
         auth_id: authData.user.id,
         program_id,
-        nomor_induk: generatedNoInduk,
+        nomor_induk: finalNomorInduk,
+        urutan_nomor: urutanNomor,
         username,
         nama_lengkap: nama_lengkap.trim(),
         nik: cleanNik,
@@ -254,7 +290,7 @@ export async function POST(request: NextRequest) {
           password: generatedPassword,
           note: "Catat dan berikan ke siswa. Password tidak dapat ditampilkan ulang.",
         },
-        message: `Siswa berhasil didaftarkan dengan Nomor Induk ${generatedNoInduk}.`,
+        message: `Siswa berhasil didaftarkan dengan Nomor Induk ${finalNomorInduk}.`,
       },
       undefined,
       201

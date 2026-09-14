@@ -99,6 +99,9 @@ export default function PendaftaranPage() {
   const [tanggalMasuk, setTanggalMasuk] = useState("");
   const [programId, setProgramId] = useState("");
   const [nextNomorInduk, setNextNomorInduk] = useState<string | null>(null);
+  const [noUrut, setNoUrut] = useState("");
+  const [kodeProgram, setKodeProgram] = useState("");
+  const [nomorIndukError, setNomorIndukError] = useState("");
 
   // Restore draft from sessionStorage on mount
   useEffect(() => {
@@ -112,6 +115,8 @@ export default function PendaftaranPage() {
         if (draft.tanggalMasuk) setTanggalMasuk(draft.tanggalMasuk);
         if (draft.programId) setProgramId(draft.programId);
         if (draft.nextNomorInduk) setNextNomorInduk(draft.nextNomorInduk);
+        if (draft.noUrut) setNoUrut(draft.noUrut);
+        if (draft.kodeProgram) setKodeProgram(draft.kodeProgram);
       }
     } catch { /* corrupted storage, ignore */ }
   }, []);
@@ -163,7 +168,10 @@ export default function PendaftaranPage() {
   useEffect(() => {
     if (!programId) {
       setNextNomorInduk(null);
-      persistDraft({ nextNomorInduk: null });
+      setKodeProgram("");
+      setNoUrut("");
+      setNomorIndukError("");
+      persistDraft({ nextNomorInduk: null, kodeProgram: "", noUrut: "" });
       return;
     }
     async function loadNextId() {
@@ -171,8 +179,18 @@ export default function PendaftaranPage() {
         const res = await fetch(`/api/v1/siswa/next-id?program_id=${programId}`);
         if (res.ok) {
           const json = await res.json();
-          setNextNomorInduk(json.data.next_nomor_induk);
-          persistDraft({ nextNomorInduk: json.data.next_nomor_induk });
+          const nextNomor = json.data?.next_nomor_induk || null;
+          const nextUrut = json.data?.next_no_urut || "";
+          const kodeProg = json.data?.kode_program || "";
+          setNextNomorInduk(nextNomor);
+          setKodeProgram(kodeProg);
+          setNoUrut(nextUrut);
+          setNomorIndukError("");
+          persistDraft({
+            nextNomorInduk: nextNomor,
+            kodeProgram: kodeProg,
+            noUrut: nextUrut,
+          });
         }
       } catch (e) {
         console.error("Gagal memuat next nomor induk:", e);
@@ -232,6 +250,15 @@ export default function PendaftaranPage() {
       return;
     }
 
+    if (!noUrut.trim()) {
+      setNomorIndukError("Nomor urut siswa wajib diisi.");
+      document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const currentKode = kodeProgram || selectedProgram?.kode_program || "01";
+    const fullNomorInduk = `${currentKode}.${noUrut.trim()}`;
+
+    setNomorIndukError("");
     setFieldErrors({});
     setSaving(true);
 
@@ -240,6 +267,8 @@ export default function PendaftaranPage() {
 
     const payload = {
       program_id: programId,
+      no_urut: noUrut.trim(),
+      nomor_induk: fullNomorInduk,
       nama_lengkap: rawData.nama,
       nik: rawData.nik,
       email: rawData.email,
@@ -272,6 +301,10 @@ export default function PendaftaranPage() {
 
         // Petakan error code dari API ke field yang tepat
         switch (code) {
+          case "DUPLICATE_NOMOR_INDUK":
+            setNomorIndukError(msg);
+            document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+            break;
           case "VALIDATION_ERROR":
             // Cek field mana yang kurang
             if (msg.includes("NIK")) setFieldErrors({ nik: msg });
@@ -404,6 +437,9 @@ export default function PendaftaranPage() {
             setTanggalMasuk("");
             setProgramId("");
             setNextNomorInduk(null);
+            setNoUrut("");
+            setKodeProgram("");
+            setNomorIndukError("");
             sessionStorage.removeItem(SESSION_KEY);
           }}
         >
@@ -683,16 +719,53 @@ export default function PendaftaranPage() {
                 ))}
               </Select>
 
-              {/* Nomor Induk Preview — large, clear */}
+              {/* Nomor Induk: Kode Program + Nomor Urut (Bisa Diedit Manual) */}
               {selectedProgram && (
-                <div className="flex items-center gap-3 rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 px-4 py-2.5">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-[#6B7280] uppercase tracking-wider font-medium">Nomor Induk Siswa Baru:</span>
-                    <span className="text-base font-mono font-bold text-[#10B981]">{nextNomorInduk || `${selectedProgram.kode_program}.XXXX`}</span>
+                <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-4 flex flex-col gap-3 mt-1">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-semibold text-[#F9FAFB] flex items-center gap-1.5">
+                      Nomor Induk:{" "}
+                      <span className="font-mono font-bold text-[#10B981] text-sm">
+                        {kodeProgram || selectedProgram.kode_program}.{noUrut || "____"}
+                      </span>
+                    </span>
+                    <span className="text-[11px] text-[#6B7280]">
+                      Biaya Program: <strong className="text-[#F9FAFB]">Rp {Number(selectedProgram.biaya).toLocaleString("id-ID")}</strong>
+                    </span>
                   </div>
-                  <div className="ml-auto text-right flex flex-col">
-                    <span className="text-[10px] text-[#6B7280] uppercase tracking-wider font-medium">Biaya Program</span>
-                    <span className="text-sm font-semibold text-[#F9FAFB]">Rp {Number(selectedProgram.biaya).toLocaleString("id-ID")}</span>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-[#D1D5DB]">
+                      Nomor Urut Siswa * (Terisi Otomatis, Dapat Diedit Manual)
+                    </label>
+                    <div className="flex items-center">
+                      <span className="inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
+                        {kodeProgram || selectedProgram.kode_program}.
+                      </span>
+                      <input
+                        type="text"
+                        name="no_urut"
+                        value={noUrut}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                          setNoUrut(val);
+                          setNomorIndukError("");
+                          persistDraft({ noUrut: val });
+                        }}
+                        placeholder="cth: 1053 atau 0001"
+                        className={`flex-1 h-10 rounded-r-lg border bg-[#111827] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
+                          nomorIndukError ? "border-[#F43F5E] focus:border-[#F43F5E]" : "border-[#374151] focus:border-[#10B981]"
+                        }`}
+                        required
+                      />
+                    </div>
+                    {nomorIndukError ? (
+                      <p className="text-[11px] text-[#F43F5E] mt-0.5">{nomorIndukError}</p>
+                    ) : (
+                      <p className="text-[10px] text-[#6B7280] mt-0.5">
+                        Nilai default dibuat otomatis dari urutan program. Anda dapat mengedit nomor urut jika ingin menggunakan slot nomor tertentu.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

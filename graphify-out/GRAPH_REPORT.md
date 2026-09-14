@@ -1,16 +1,16 @@
 # Graph Report - LPKS System  (2026-09-14)
 
 ## Corpus Check
-- 99 files · ~99,200 words
+- 99 files · ~100,973 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 524 nodes · 1042 edges · 36 communities (23 shown, 13 thin omitted)
+- 524 nodes · 1045 edges · 36 communities (23 shown, 13 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.95)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `abcc21e1`
+- Built from commit: `d2a79899`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

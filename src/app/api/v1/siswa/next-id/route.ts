@@ -27,33 +27,39 @@ export async function GET(request: NextRequest) {
       return errorResponse("NOT_FOUND", "Program pelatihan tidak ditemukan.", 404);
     }
 
-    // Dapatkan nomor induk terakhir
-    const { data: lastSiswa, error } = await supabase
+    // Dapatkan semua nomor induk yang menggunakan kode_program ini untuk mencari nomor urut tertinggi
+    const { data: allSiswa, error } = await supabase
       .from("siswa")
       .select("nomor_induk")
-      .eq("program_id", programId)
-      .order("nomor_induk", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .not("nik", "like", "ANON-%")
+      .ilike("nomor_induk", `${program.kode_program}.%`);
 
     if (error) {
-      return errorResponse("DATABASE_ERROR", "Gagal mengambil data siswa terakhir.", 500, error.message);
+      return errorResponse("DATABASE_ERROR", "Gagal mengambil data siswa.", 500, error.message);
     }
 
-    let nextUrutan = 1;
-    if (lastSiswa?.nomor_induk) {
-      const parts = lastSiswa.nomor_induk.split(".");
-      if (parts.length === 2) {
-        const lastUrutan = parseInt(parts[1].replace(/\D/g, ""), 10);
-        if (!isNaN(lastUrutan)) {
-          nextUrutan = lastUrutan + 1;
+    let maxUrutan = 0;
+    allSiswa?.forEach((s) => {
+      if (s.nomor_induk) {
+        const parts = s.nomor_induk.split(".");
+        if (parts.length >= 2) {
+          const num = parseInt(parts[1].replace(/\D/g, ""), 10);
+          if (!isNaN(num) && num > maxUrutan) {
+            maxUrutan = num;
+          }
         }
       }
-    }
+    });
 
-    const nextNomorInduk = `${program.kode_program}.${String(nextUrutan).padStart(4, "0")}`;
+    const nextUrutan = maxUrutan + 1;
+    const nextNoUrut = String(nextUrutan).padStart(4, "0");
+    const nextNomorInduk = `${program.kode_program}.${nextNoUrut}`;
 
-    return successResponse({ next_nomor_induk: nextNomorInduk });
+    return successResponse({
+      next_nomor_induk: nextNomorInduk,
+      next_no_urut: nextNoUrut,
+      kode_program: program.kode_program,
+    });
   } catch (err) {
     return errorResponse(
       "INTERNAL_ERROR",
