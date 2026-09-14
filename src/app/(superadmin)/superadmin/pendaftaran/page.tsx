@@ -54,8 +54,7 @@ function validateField(name: string, value: string): string {
     }
     case "email": {
       const v = value.trim();
-      if (!v) return "Email wajib diisi.";
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Format email tidak valid (cth: nama@gmail.com).";
+      if (v && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Format email tidak valid (cth: nama@gmail.com).";
       return "";
     }
     case "telepon": {
@@ -77,7 +76,7 @@ function validateField(name: string, value: string): string {
 /** Validasi semua field sebelum submit */
 function validateForm(data: Record<string, string>): FieldErrors {
   const errors: FieldErrors = {};
-  for (const name of ["nama", "nik", "email", "telepon", "program_id", "tgl_masuk"]) {
+  for (const name of ["nama", "nik", "telepon", "program_id", "tgl_masuk"]) {
     const msg = validateField(name, data[name] ?? "");
     if (msg) errors[name] = msg;
   }
@@ -304,6 +303,10 @@ export default function PendaftaranPage() {
           case "DUPLICATE_NOMOR_INDUK":
             setNomorIndukError(msg);
             document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+            break;
+          case "DUPLICATE_EMAIL":
+            setFieldErrors({ email: msg });
+            document.querySelector('[name="email"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
             break;
           case "VALIDATION_ERROR":
             // Cek field mana yang kurang
@@ -643,16 +646,16 @@ export default function PendaftaranPage() {
                 error={fieldErrors.telepon}
               />
               <Input
-                label="Email *"
+                label="Email (Opsional)"
                 name="email"
                 type="email"
-                required
-                placeholder="nama.siswa@gmail.com"
+                placeholder="nama.siswa@gmail.com (opsional)"
                 data-next="pendidikan_terakhir"
                 value={formValues.email ?? ""}
                 onChange={(e) => handleFieldChange("email", e.target.value)}
                 onBlur={(e) => handleFieldBlur("email", e.target.value)}
                 error={fieldErrors.email}
+                hint="Jika dikosongkan, email akun sistem akan dibuat otomatis (@lpks.id)"
               />
             </div>
 

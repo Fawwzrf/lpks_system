@@ -44,6 +44,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
     const body = await request.json();
     const supabase = await createClient();
 
+    // Ambil data siswa yang sedang diedit
+    const { data: siswa, error: findError } = await supabase
+      .from("siswa")
+      .select("id, nama_lengkap, nomor_induk, email")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (findError || !siswa) {
+      return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
+    }
+
     // Field yang diizinkan untuk di-update
     const allowedFields = [
       "nama_lengkap",
@@ -97,6 +108,37 @@ export async function PUT(request: NextRequest, { params }: Params) {
       updates.urutan_nomor = isNaN(num) ? null : num;
     }
 
+    // Validasi & format email: jika dikosongkan, generate email otomatis @lpks.id
+    if (body.email !== undefined) {
+      const rawEmail = String(body.email || "").trim();
+      if (!rawEmail) {
+        const targetNomorInduk = updates.nomor_induk || siswa.nomor_induk || "";
+        const cleanNoInduk = String(targetNomorInduk).replace(/\./g, "") || "0001";
+        const targetNama = body.nama_lengkap || siswa.nama_lengkap || "siswa";
+        const namaDepanClean = String(targetNama).trim().split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "siswa";
+        updates.email = `${namaDepanClean}.${cleanNoInduk}@lpks.id`;
+      } else {
+        const cleanEmail = rawEmail.toLowerCase();
+        if (cleanEmail !== siswa.email) {
+          const { data: duplicateEmail } = await supabase
+            .from("siswa")
+            .select("id, nama_lengkap")
+            .eq("email", cleanEmail)
+            .neq("id", id)
+            .maybeSingle();
+
+          if (duplicateEmail) {
+            return errorResponse(
+              "DUPLICATE_EMAIL",
+              `Email ${cleanEmail} sudah digunakan oleh ${duplicateEmail.nama_lengkap}. Silakan gunakan email lain.`,
+              409
+            );
+          }
+        }
+        updates.email = cleanEmail;
+      }
+    }
+
     const { data, error } = await supabase
       .from("siswa")
       .update(updates)
@@ -105,12 +147,21 @@ export async function PUT(request: NextRequest, { params }: Params) {
       .single();
 
     if (error) {
-      if (error.code === "23505" && error.message?.includes("nomor_induk")) {
-        return errorResponse(
-          "DUPLICATE_NOMOR_INDUK",
-          "Nomor induk tersebut sudah terdaftar dalam sistem. Silakan pilih nomor urut lain.",
-          409
-        );
+      if (error.code === "23505") {
+        if (error.message?.includes("nomor_induk")) {
+          return errorResponse(
+            "DUPLICATE_NOMOR_INDUK",
+            "Nomor induk tersebut sudah terdaftar dalam sistem. Silakan pilih nomor urut lain.",
+            409
+          );
+        }
+        if (error.message?.includes("email")) {
+          return errorResponse(
+            "DUPLICATE_EMAIL",
+            "Email tersebut sudah terdaftar dalam sistem. Silakan gunakan email lain.",
+            409
+          );
+        }
       }
       return errorResponse("DATABASE_ERROR", "Gagal memperbarui data siswa.", 500, error.message);
     }
