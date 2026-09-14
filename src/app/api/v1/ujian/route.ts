@@ -9,10 +9,16 @@ export async function GET() {
 
     const supabase = await createClient();
 
-    // 1. Ambil seluruh siswa aktif
+    const today = new Date().toISOString().split("T")[0];
+
+    // 1. Ambil seluruh siswa aktif (abaikan siswa yang dinonaktifkan / dihapus)
     const { data: siswaList, error: siswaErr } = await supabase
       .from("siswa")
       .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, nama, biaya)")
+      .not("nik", "like", "ANON-%")
+      .neq("alamat_lengkap", "[DATA DIHAPUS]")
+      .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+      .order("urutan_nomor", { ascending: true, nullsFirst: false })
       .order("nomor_induk", { ascending: true });
 
     if (siswaErr) {
@@ -78,6 +84,28 @@ export async function GET() {
         nilai_harian_ok: isNilaiHarianOk,
         ujian: u,
       };
+    });
+
+    // Pengurutan: Siswa yang siap menjalani ujian internal diletakkan paling atas
+    result.sort((a, b) => {
+      const getPriority = (item: typeof a) => {
+        if (item.nilai_harian_ok && !item.ujian?.is_lulus) return 0; // Siap & menunggu ujian internal
+        if (item.nilai_harian_ok && item.ujian?.is_lulus) return 1;  // Sudah lulus ujian internal
+        return 2; // Belum memenuhi syarat nilai harian
+      };
+
+      const pDiff = getPriority(a) - getPriority(b);
+      if (pDiff !== 0) return pDiff;
+
+      const getUrutan = (noInduk?: string | null) => {
+        if (!noInduk) return 999999;
+        if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5;
+        const parts = noInduk.split(".");
+        const lastPart = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+        const num = parseInt(lastPart.replace(/\D/g, ""), 10);
+        return isNaN(num) ? 999999 : num;
+      };
+      return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
     });
 
     return successResponse(result);

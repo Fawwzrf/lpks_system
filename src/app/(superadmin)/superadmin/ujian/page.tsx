@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Award, CheckCircle2, XCircle, AlertTriangle, Printer, Plus, Loader2, RefreshCw } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Award, CheckCircle2, XCircle, AlertTriangle, Printer, Plus, Loader2, RefreshCw, Search, X, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,8 @@ export default function UjianPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"semua" | "siap_ujian" | "lulus" | "dalam_bimbingan">("semua");
 
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [inputTarget, setInputTarget] = useState<SiswaUjianItem | null>(null);
@@ -94,6 +96,67 @@ export default function UjianPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Statistik Ringkasan
+  const stats = useMemo(() => {
+    const total = data.length;
+    const siapUjian = data.filter((s) => s.nilai_harian_ok && !s.ujian?.is_lulus).length;
+    const lulus = data.filter((s) => !!s.ujian?.is_lulus).length;
+    const dalamBimbingan = data.filter((s) => !s.nilai_harian_ok).length;
+    return { total, siapUjian, lulus, dalamBimbingan };
+  }, [data]);
+
+  // Priority sorting: Siswa yang siap menjalani ujian internal berada paling atas
+  const getUrutan = (noInduk?: string | null) => {
+    if (!noInduk) return 999999;
+    if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5;
+    const parts = noInduk.split(".");
+    const lastPart = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+    const num = parseInt(lastPart.replace(/\D/g, ""), 10);
+    return isNaN(num) ? 999999 : num;
+  };
+
+  const getPriority = (item: SiswaUjianItem) => {
+    // 0: Siap menjalani ujian internal (nilai harian ok, belum lulus ujian internal) -> Paling Atas
+    if (item.nilai_harian_ok && !item.ujian?.is_lulus) return 0;
+    // 1: Sudah lulus ujian internal
+    if (item.nilai_harian_ok && item.ujian?.is_lulus) return 1;
+    // 2: Belum siap ujian internal (masih dalam bimbingan harian)
+    return 2;
+  };
+
+  const filteredAndSortedData = useMemo(() => {
+    return data
+      .filter((s) => {
+        // 1. Filter Pencarian Nama / Nomor Induk / Program
+        if (search.trim()) {
+          const q = search.toLowerCase().trim();
+          const matchName = s.nama_lengkap.toLowerCase().includes(q);
+          const matchNo = s.nomor_induk.toLowerCase().includes(q);
+          const matchProg = s.program_nama.toLowerCase().includes(q);
+          if (!matchName && !matchNo && !matchProg) return false;
+        }
+
+        // 2. Filter Status Tab
+        if (statusFilter === "siap_ujian") {
+          return s.nilai_harian_ok && !s.ujian?.is_lulus;
+        }
+        if (statusFilter === "lulus") {
+          return !!s.ujian?.is_lulus;
+        }
+        if (statusFilter === "dalam_bimbingan") {
+          return !s.nilai_harian_ok;
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        const pA = getPriority(a);
+        const pB = getPriority(b);
+        if (pA !== pB) return pA - pB;
+        return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
+      });
+  }, [data, search, statusFilter]);
 
   function handleOpenInput(siswa: SiswaUjianItem) {
     setInputTarget(siswa);
@@ -153,7 +216,7 @@ export default function UjianPage() {
         throw new Error(json.error?.message ?? (typeof json.error === "string" ? json.error : "Gagal menyimpan nilai ujian."));
       }
 
-      setSuccessMsg(json.data?.message || "Nilai ujian berhasil disimpan!");
+      setSuccessMsg(json.data?.message || "Nilai ujian internal berhasil disimpan!");
       setInputModalOpen(false);
       await fetchData();
     } catch (err) {
@@ -182,6 +245,154 @@ export default function UjianPage() {
         </Button>
       </div>
 
+      {/* Metric Summary Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div
+          onClick={() => setStatusFilter("semua")}
+          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
+            statusFilter === "semua"
+              ? "border-[#DC2626] bg-[#DC2626]/5 shadow-sm"
+              : "border-[#1F2937] bg-[#111827] hover:border-[#374151]"
+          }`}
+        >
+          <div className="h-9 w-9 rounded-lg bg-[#374151]/30 border border-[#374151] flex items-center justify-center shrink-0">
+            <Users className="h-4 w-4 text-[#9CA3AF]" />
+          </div>
+          <div>
+            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Total Siswa</p>
+            <p className="text-sm font-bold text-[#F9FAFB]">
+              {loading ? "..." : `${stats.total} Siswa`}
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter("siap_ujian")}
+          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
+            statusFilter === "siap_ujian"
+              ? "border-[#10B981] bg-[#10B981]/10 shadow-sm"
+              : "border-[#1F2937] bg-[#111827] hover:border-[#10B981]/50"
+          }`}
+        >
+          <div className="h-9 w-9 rounded-lg bg-[#10B981]/15 border border-[#10B981]/30 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Siap Ujian Internal</p>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+            </div>
+            <p className="text-sm font-bold text-[#10B981]">
+              {loading ? "..." : `${stats.siapUjian} Siswa`}
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter("lulus")}
+          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
+            statusFilter === "lulus"
+              ? "border-[#38BDF8] bg-[#38BDF8]/10 shadow-sm"
+              : "border-[#1F2937] bg-[#111827] hover:border-[#38BDF8]/50"
+          }`}
+        >
+          <div className="h-9 w-9 rounded-lg bg-[#38BDF8]/15 border border-[#38BDF8]/30 flex items-center justify-center shrink-0">
+            <Award className="h-4 w-4 text-[#38BDF8]" />
+          </div>
+          <div>
+            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Lulus Ujian</p>
+            <p className="text-sm font-bold text-[#38BDF8]">
+              {loading ? "..." : `${stats.lulus} Siswa`}
+            </p>
+          </div>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter("dalam_bimbingan")}
+          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
+            statusFilter === "dalam_bimbingan"
+              ? "border-[#F59E0B] bg-[#F59E0B]/10 shadow-sm"
+              : "border-[#1F2937] bg-[#111827] hover:border-[#F59E0B]/50"
+          }`}
+        >
+          <div className="h-9 w-9 rounded-lg bg-[#F59E0B]/15 border border-[#F59E0B]/30 flex items-center justify-center shrink-0">
+            <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
+          </div>
+          <div>
+            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Dalam Bimbingan</p>
+            <p className="text-sm font-bold text-[#F59E0B]">
+              {loading ? "..." : `${stats.dalamBimbingan} Siswa`}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Search & Filter Tabs */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[260px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari siswa berdasarkan nama atau no. induk..."
+            className="h-9 w-full rounded-xl border border-[#1F2937] bg-[#111827] pl-8.5 pr-8 text-xs text-[#F9FAFB] placeholder-[#6B7280] focus:border-[#DC2626] focus:outline-none transition-colors"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#F9FAFB]"
+              title="Hapus pencarian"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#111827] border border-[#1F2937] text-xs">
+          <button
+            onClick={() => setStatusFilter("semua")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              statusFilter === "semua"
+                ? "bg-[#DC2626] text-white"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Semua ({stats.total})
+          </button>
+          <button
+            onClick={() => setStatusFilter("siap_ujian")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              statusFilter === "siap_ujian"
+                ? "bg-[#10B981] text-white"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Siap Ujian ({stats.siapUjian})
+          </button>
+          <button
+            onClick={() => setStatusFilter("lulus")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              statusFilter === "lulus"
+                ? "bg-[#38BDF8] text-white"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Lulus ({stats.lulus})
+          </button>
+          <button
+            onClick={() => setStatusFilter("dalam_bimbingan")}
+            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
+              statusFilter === "dalam_bimbingan"
+                ? "bg-[#F59E0B] text-black font-semibold"
+                : "text-[#9CA3AF] hover:text-white"
+            }`}
+          >
+            Bimbingan ({stats.dalamBimbingan})
+          </button>
+        </div>
+      </div>
+
       {/* Notifications */}
       {errorMsg && (
         <div className="p-3 bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] text-xs rounded-xl flex items-center gap-2">
@@ -199,15 +410,16 @@ export default function UjianPage() {
       {/* Loading state */}
       {loading && data.length === 0 ? (
         <CardSkeleton count={6} className="md:grid-cols-2 lg:grid-cols-3" />
-      ) : data.length === 0 ? (
+      ) : filteredAndSortedData.length === 0 ? (
         <div className="rounded-xl border border-dashed border-[#1F2937] p-8 text-center text-xs text-[#6B7280]">
-          Belum ada data siswa terdaftar.
+          {search ? `Tidak ada siswa yang cocok dengan pencarian "${search}".` : "Belum ada data siswa terdaftar."}
         </div>
       ) : (
         /* Siswa Cards Grid */
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {data.map((s) => {
+          {filteredAndSortedData.map((s) => {
             const hasUjian = !!s.ujian;
+            const isReadyForInternal = s.nilai_harian_ok && !s.ujian?.is_lulus;
             const avg = hasUjian
               ? Math.round(
                   (s.ujian!.teori +
@@ -226,13 +438,35 @@ export default function UjianPage() {
             return (
               <div
                 key={s.id}
-                className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-4 shadow-sm"
+                className={`rounded-xl border bg-[#111827] p-5 flex flex-col gap-4 shadow-sm transition-all ${
+                  isReadyForInternal
+                    ? "border-[#10B981]/50 ring-1 ring-[#10B981]/20"
+                    : "border-[#1F2937]"
+                }`}
               >
                 {/* Header Card */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#F9FAFB] truncate">{s.nama_lengkap}</p>
-                    <p className="text-[11px] text-[#6B7280] mt-0.5">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <p className="text-xs font-bold text-[#F9FAFB] truncate">{s.nama_lengkap}</p>
+                      {isReadyForInternal && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2 py-0.5 rounded-full">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                          Siap Ujian Internal
+                        </span>
+                      )}
+                      {isUjianLulus && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#38BDF8] bg-[#38BDF8]/15 border border-[#38BDF8]/30 px-2 py-0.5 rounded-full">
+                          Lulus Ujian
+                        </span>
+                      )}
+                      {!s.nilai_harian_ok && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2 py-0.5 rounded-full">
+                          Dalam Bimbingan
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-[#6B7280]">
                       {s.nomor_induk} &bull; {s.program_nama}
                     </p>
                     {avg !== null ? (
@@ -307,15 +541,19 @@ export default function UjianPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-1 gap-1"
+                    className={`flex-1 gap-1 text-xs whitespace-nowrap px-2 ${
+                      isReadyForInternal
+                        ? "border-[#10B981] bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/25 hover:text-white"
+                        : ""
+                    }`}
                     onClick={() => handleOpenInput(s)}
                   >
-                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                    {s.ujian ? "Ubah Nilai" : "Input Nilai"}
+                    <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>{s.ujian ? "Edit Nilai Internal" : "Input Nilai Internal"}</span>
                   </Button>
                   <Button
                     size="sm"
-                    className="flex-1 gap-1 bg-[#DC2626] hover:bg-[#B91C1C] text-white disabled:opacity-40"
+                    className="flex-1 gap-1 text-xs bg-[#DC2626] hover:bg-[#B91C1C] text-white disabled:opacity-40"
                     disabled={!gateSertifikat}
                     onClick={() => handlePrintSertifikat(s.id)}
                     title={
@@ -324,7 +562,7 @@ export default function UjianPage() {
                         : "Cetak Sertifikat Kelulusan PDF"
                     }
                   >
-                    <Printer className="h-3.5 w-3.5" aria-hidden="true" /> Sertifikat
+                    <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Sertifikat
                   </Button>
                 </div>
 
@@ -408,7 +646,7 @@ export default function UjianPage() {
                   <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
                 </>
               ) : (
-                "Simpan Nilai Ujian"
+                "Simpan Nilai Internal"
               )}
             </Button>
           </div>
