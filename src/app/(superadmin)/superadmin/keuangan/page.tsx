@@ -375,25 +375,37 @@ export default function KeuanganSuperadminPage() {
     {
       key: "status",
       header: "Status",
-      className: "w-32",
+      className: "w-36 whitespace-nowrap",
       render: (r: SiswaKeuanganItem) => {
         if (r.is_lunas) {
           return (
-            <Badge variant="outline" className="bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30 gap-1 text-[11px] font-medium">
-              <CheckCircle2 className="h-3 w-3" /> Lunas
+            <Badge
+              variant="outline"
+              className="bg-[#10B981]/15 text-[#10B981] border-[#10B981]/30 gap-1.5 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+              <span>Lunas</span>
             </Badge>
           );
         }
         if (r.total_terbayar > 0) {
           return (
-            <Badge variant="outline" className="bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30 gap-1 text-[11px] font-medium">
-              <Clock className="h-3 w-3" /> Cicilan ({r.persentase}%)
+            <Badge
+              variant="outline"
+              className="bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30 gap-1.5 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0"
+            >
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span>Cicilan ({r.persentase}%)</span>
             </Badge>
           );
         }
         return (
-          <Badge variant="outline" className="bg-[#F43F5E]/15 text-[#F43F5E] border-[#F43F5E]/30 gap-1 text-[11px] font-medium">
-            <AlertCircle className="h-3 w-3" /> Belum Bayar
+          <Badge
+            variant="outline"
+            className="bg-[#F43F5E]/15 text-[#F43F5E] border-[#F43F5E]/30 gap-1.5 px-2.5 py-1 text-[11px] font-medium whitespace-nowrap shrink-0"
+          >
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>Belum Bayar</span>
           </Badge>
         );
       },
