@@ -57,25 +57,9 @@ export async function GET(request: NextRequest) {
         }) || [];
     } else if (modul === "keuangan") {
       const type = request.nextUrl.searchParams.get("type");
-      if (type === "transaksi") {
-        const { data: txList } = await supabase
-          .from("transaksi_keuangan")
-          .select("*, siswa:siswa(nomor_induk, nama_lengkap, program:master_program(nama))")
-          .order("tgl_bayar", { ascending: false });
 
-        exportRows =
-          txList?.map((tx) => ({
-            "Tanggal Bayar": tx.tgl_bayar,
-            "Nomor Induk": ((tx.siswa as unknown) as { nomor_induk: string })?.nomor_induk || "-",
-            "Nama Siswa": ((tx.siswa as unknown) as { nama_lengkap: string })?.nama_lengkap || "-",
-            Program: ((((tx.siswa as unknown) as { program: { nama: string } })?.program)?.nama) || "-",
-            "Nominal (Rp)": Number(tx.nominal),
-            Metode: tx.metode,
-            Keterangan: tx.keterangan || "-",
-            Penerima: tx.penerima,
-          })) || [];
-      } else {
-        // Default: Rekap Pembayaran Siswa Aktif
+      if (type === "rekap_siswa") {
+        // Default Rekap Status Pembayaran Siswa Aktif
         const today = new Date().toISOString().split("T")[0];
         const { data: siswaList } = await supabase
           .from("siswa")
@@ -114,6 +98,141 @@ export async function GET(request: NextRequest) {
             "Persentase": biaya > 0 ? `${Math.min(100, Math.round((terbayar / biaya) * 100))}%` : "0%",
             Status: isLunas ? "Lunas" : (terbayar > 0 ? "Cicilan" : "Belum Bayar"),
           };
+        });
+      } else {
+        // Format Rekap Kas Bulanan (sesuai buku kas fisik: No, Nama Siswa, Tanggal Pembayaran, Pembayaran Bulan Ini, Akumulasi Saldo, Jumlah Saldo Bulan Ini)
+        const NAMA_BULAN = [
+          "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+          "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+        ];
+        const now = new Date();
+        const paramBulan = parseInt(request.nextUrl.searchParams.get("bulan") || String(now.getMonth() + 1), 10);
+        const paramTahun = parseInt(request.nextUrl.searchParams.get("tahun") || String(now.getFullYear()), 10);
+        const namaBulan = NAMA_BULAN[paramBulan - 1] || "Bulan";
+
+        const mStr = String(paramBulan).padStart(2, "0");
+        const startDate = `${paramTahun}-${mStr}-01`;
+        const lastDay = new Date(paramTahun, paramBulan, 0).getDate();
+        const endDate = `${paramTahun}-${mStr}-${String(lastDay).padStart(2, "0")}`;
+
+        const { data: txList } = await supabase
+          .from("transaksi_keuangan")
+          .select("id, tgl_bayar, nominal, metode, keterangan, penerima, siswa:siswa(id, nomor_induk, nama_lengkap, program:master_program(nama))")
+          .gte("tgl_bayar", startDate)
+          .lte("tgl_bayar", endDate)
+          .order("tgl_bayar", { ascending: true })
+          .order("created_at", { ascending: true });
+
+        const aoa: (string | number)[][] = [];
+
+        // Header Kop
+        aoa.push(["REKAPITULASI PENDAPATAN KEUANGAN BULANAN"]);
+        aoa.push(["LPKS PENGELASAN SUMBU HIDUP CILACAP"]);
+        aoa.push([`Bulan: ${namaBulan} ${paramTahun}`]);
+        aoa.push([]); // Baris kosong pemisah
+
+        // Baris Header Kolom Tabel
+        aoa.push([
+          "NO",
+          "NAMA SISWA",
+          "TANGGAL PEMBAYARAN",
+          "NO. INDUK",
+          "PROGRAM PELATIHAN",
+          "METODE",
+          "KETERANGAN",
+          "PEMBAYARAN BULAN INI (RP)",
+          "AKUMULASI SALDO (RP)"
+        ]);
+
+        let runningSaldo = 0;
+        let totalBulanIni = 0;
+
+        if (!txList || txList.length === 0) {
+          aoa.push(["-", "Tidak ada transaksi pembayaran pada bulan ini", "-", "-", "-", "-", "-", 0, 0]);
+        } else {
+          txList.forEach((tx, idx) => {
+            const nominal = Number(tx.nominal || 0);
+            runningSaldo += nominal;
+            totalBulanIni += nominal;
+
+            const s = (tx.siswa as unknown) as { nomor_induk?: string; nama_lengkap?: string; program?: { nama?: string } } | null;
+            const namaSiswa = s?.nama_lengkap || tx.keterangan || "-";
+            const noInduk = s?.nomor_induk || "-";
+            const program = s?.program?.nama || "-";
+
+            // Format tanggal Indonesia: DD Bulan YYYY
+            const parts = tx.tgl_bayar ? tx.tgl_bayar.split("-") : [];
+            let tglFormatted = tx.tgl_bayar || "-";
+            if (parts.length === 3) {
+              const day = parseInt(parts[2], 10);
+              const mon = NAMA_BULAN[parseInt(parts[1], 10) - 1] || parts[1];
+              tglFormatted = `${day} ${mon} ${parts[0]}`;
+            }
+
+            aoa.push([
+              idx + 1,
+              namaSiswa,
+              tglFormatted,
+              noInduk,
+              program,
+              tx.metode || "Tunai",
+              tx.keterangan || "Pembayaran Pelatihan",
+              nominal,
+              runningSaldo
+            ]);
+          });
+        }
+
+        // Baris Summary Total Paling Bawah
+        const summaryRowIdx = aoa.length;
+        aoa.push([
+          "JUMLAH SALDO BULAN INI",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          totalBulanIni,
+          runningSaldo
+        ]);
+
+        const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+
+        // Lebar Kolom
+        worksheet["!cols"] = [
+          { wch: 6 },  // NO
+          { wch: 32 }, // NAMA SISWA
+          { wch: 22 }, // TANGGAL PEMBAYARAN
+          { wch: 14 }, // NO. INDUK
+          { wch: 22 }, // PROGRAM PELATIHAN
+          { wch: 16 }, // METODE
+          { wch: 28 }, // KETERANGAN
+          { wch: 28 }, // PEMBAYARAN BULAN INI (RP)
+          { wch: 26 }, // AKUMULASI SALDO (RP)
+        ];
+
+        // Penggabungan Cell
+        worksheet["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 8 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 8 } },
+          // Merge summary label di baris terakhir (kolom 0 sampai 6)
+          { s: { r: summaryRowIdx, c: 0 }, e: { r: summaryRowIdx, c: 6 } },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, `Rekap ${namaBulan}`);
+
+        const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        const filenameKeuangan = `Rekap_Keuangan_${namaBulan}_${paramTahun}.xlsx`;
+
+        return new NextResponse(excelBuffer, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="${filenameKeuangan}"`,
+          },
         });
       }
     } else if (modul === "presensi") {

@@ -94,6 +94,12 @@ export default function KeuanganSuperadminPage() {
   const [modalHistoryOpen, setModalHistoryOpen] = useState(false);
   const [historySiswa, setHistorySiswa] = useState<SiswaKeuanganItem | null>(null);
 
+  // Modal Ekspor Rekap Keuangan Bulanan
+  const [modalExportOpen, setModalExportOpen] = useState(false);
+  const [exportBulan, setExportBulan] = useState<number>(() => new Date().getMonth() + 1);
+  const [exportTahun, setExportTahun] = useState<number>(() => new Date().getFullYear());
+  const [exportType, setExportType] = useState<"bulanan" | "rekap_siswa">("bulanan");
+
   // Load programs for dropdown filter
   useEffect(() => {
     async function loadPrograms() {
@@ -467,13 +473,12 @@ export default function KeuanganSuperadminPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <a
-            href="/api/v1/excel/export?modul=keuangan&type=rekap"
-            download
+          <button
+            onClick={() => setModalExportOpen(true)}
             className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] hover:bg-[#1F2937] text-xs font-medium text-[#D1D5DB] transition-colors"
           >
             <Download className="h-3.5 w-3.5" aria-hidden="true" /> Ekspor Rekap Excel
-          </a>
+          </button>
           <button
             onClick={loadData}
             className="p-2 rounded-lg border border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-white transition-colors"
@@ -992,6 +997,132 @@ export default function KeuanganSuperadminPage() {
             </div>
           </div>
         )}
+      </Modal>
+      {/* MODAL EKSPOR REKAP KEUANGAN */}
+      <Modal
+        open={modalExportOpen}
+        onClose={() => setModalExportOpen(false)}
+        title="Ekspor Rekap Keuangan"
+        description="Unduh rekapitulasi data keuangan ke dalam format spreadsheet Microsoft Excel (.xlsx)."
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[#9CA3AF]">Format Ekspor</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setExportType("bulanan")}
+                className={`p-3 rounded-xl border text-left transition-colors ${
+                  exportType === "bulanan"
+                    ? "border-[#DC2626] bg-[#DC2626]/10 text-white"
+                    : "border-[#1F2937] bg-[#0B0F17] text-[#9CA3AF] hover:bg-[#111827]"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Receipt className="h-4 w-4 text-[#DC2626]" />
+                  <span className="text-xs font-semibold text-[#F9FAFB]">Rekap Kas Bulanan</span>
+                </div>
+                <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
+                  Format buku kas fisik dengan tanggal, pembayaran, akumulasi saldo berjalan, dan total saldo bulanan.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExportType("rekap_siswa")}
+                className={`p-3 rounded-xl border text-left transition-colors ${
+                  exportType === "rekap_siswa"
+                    ? "border-[#DC2626] bg-[#DC2626]/10 text-white"
+                    : "border-[#1F2937] bg-[#0B0F17] text-[#9CA3AF] hover:bg-[#111827]"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Wallet className="h-4 w-4 text-[#DC2626]" />
+                  <span className="text-xs font-semibold text-[#F9FAFB]">Rekap Status Siswa</span>
+                </div>
+                <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
+                  Daftar seluruh siswa aktif beserta total biaya, status pelunasan, dan sisa tagihan.
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {exportType === "bulanan" && (
+            <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-[#D1D5DB]">Pilih Periode Bulan & Tahun</span>
+                <span className="text-[11px] text-[#9CA3AF]">Buku Kas Jurnal</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="select-export-bulan" className="text-xs font-medium text-[#9CA3AF]">
+                    Bulan
+                  </label>
+                  <select
+                    id="select-export-bulan"
+                    value={exportBulan}
+                    onChange={(e) => setExportBulan(Number(e.target.value))}
+                    className="h-9 w-full rounded-lg border border-[#374151] bg-[#111827] px-3 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                  >
+                    <option value={1}>Januari</option>
+                    <option value={2}>Februari</option>
+                    <option value={3}>Maret</option>
+                    <option value={4}>April</option>
+                    <option value={5}>Mei</option>
+                    <option value={6}>Juni</option>
+                    <option value={7}>Juli</option>
+                    <option value={8}>Agustus</option>
+                    <option value={9}>September</option>
+                    <option value={10}>Oktober</option>
+                    <option value={11}>November</option>
+                    <option value={12}>Desember</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="input-export-tahun" className="text-xs font-medium text-[#9CA3AF]">
+                    Tahun
+                  </label>
+                  <input
+                    id="input-export-tahun"
+                    type="number"
+                    value={exportTahun}
+                    onChange={(e) => setExportTahun(Number(e.target.value))}
+                    className="h-9 w-full rounded-lg border border-[#374151] bg-[#111827] px-3 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                    min={2020}
+                    max={2035}
+                  />
+                </div>
+              </div>
+
+              <p className="text-[11px] text-[#6B7280]">
+                File Excel akan berisi kolom: No, Nama Siswa, Tanggal Pembayaran, No. Induk, Program, Metode, Keterangan, Pembayaran Bulan Ini, Akumulasi Saldo, dan Total Jumlah Saldo Bulan Ini di baris bawah.
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1F2937]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setModalExportOpen(false)}
+            >
+              Batal
+            </Button>
+            <a
+              href={
+                exportType === "bulanan"
+                  ? `/api/v1/excel/export?modul=keuangan&bulan=${exportBulan}&tahun=${exportTahun}`
+                  : `/api/v1/excel/export?modul=keuangan&type=rekap_siswa`
+              }
+              download
+              onClick={() => setModalExportOpen(false)}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-semibold text-white transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" /> Unduh File Excel (.xlsx)
+            </a>
+          </div>
+        </div>
       </Modal>
     </div>
   );
