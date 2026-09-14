@@ -24,9 +24,120 @@ export async function GET(request: NextRequest) {
       siswaId = selfSiswa.id;
     }
 
+    // Jika tidak ada siswa_id dan user adalah superadmin, kembalikan daftar seluruh siswa aktif beserta agregat penilaian
     if (!siswaId) {
-      return errorResponse("MISSING_PARAM", "Parameter siswa_id wajib disertakan.", 400);
+      const today = new Date().toISOString().split("T")[0];
+      const programId = searchParams.get("program_id");
+
+      let siswaQuery = supabase
+        .from("siswa")
+        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program_id, program:master_program(id, kode_program, nama)")
+        .not("nik", "like", "ANON-%")
+        .neq("alamat_lengkap", "[DATA DIHAPUS]")
+        .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+        .order("urutan_nomor", { ascending: true, nullsFirst: false })
+        .order("nomor_induk", { ascending: true });
+
+      if (programId) {
+        siswaQuery = siswaQuery.eq("program_id", programId);
+      }
+
+      const { data: siswaList, error: siswaError } = await siswaQuery;
+      if (siswaError) {
+        return errorResponse("DATABASE_ERROR", "Gagal memuat data siswa aktif.", 500, siswaError.message);
+      }
+
+      const siswaIds = (siswaList || []).map((s) => s.id);
+
+      // Ambil seluruh master kriteria
+      const { data: masterKriteria } = await supabase
+        .from("master_kriteria")
+        .select("id, nama_kriteria, batas_lulus, urutan")
+        .order("urutan", { ascending: true });
+
+      const totalKriteriaCount = masterKriteria?.length || 5;
+
+      // Ambil seluruh riwayat penilaian siswa aktif
+      const { data: allNilai, error: nilaiError } = await supabase
+        .from("penilaian_harian")
+        .select("id, siswa_id, tanggal, nilai, kriteria_id")
+        .in("siswa_id", siswaIds.length > 0 ? siswaIds : ["00000000-0000-0000-0000-000000000000"])
+        .order("tanggal", { ascending: true });
+
+      if (nilaiError) {
+        return errorResponse("DATABASE_ERROR", "Gagal memuat riwayat penilaian siswa.", 500, nilaiError.message);
+      }
+
+      // Group per siswa_id
+      const nilaiMap = new Map<string, typeof allNilai>();
+      allNilai?.forEach((n) => {
+        if (!nilaiMap.has(n.siswa_id)) nilaiMap.set(n.siswa_id, []);
+        nilaiMap.get(n.siswa_id)!.push(n);
+      });
+
+      const studentResults = (siswaList || []).map((s) => {
+        const studentScores = nilaiMap.get(s.id) || [];
+        const uniqueDates = new Set<string>();
+        let sumScore = 0;
+        let highestScore = 0;
+        let latestDate: string | null = null;
+        const maxPerKriteria = new Map<string, number>();
+
+        studentScores.forEach((row) => {
+          uniqueDates.add(row.tanggal);
+          const score = Number(row.nilai || 0);
+          sumScore += score;
+          if (score > highestScore) highestScore = score;
+          if (!latestDate || row.tanggal > latestDate) latestDate = row.tanggal;
+
+          const currMax = maxPerKriteria.get(row.kriteria_id) || 0;
+          if (score > currMax) maxPerKriteria.set(row.kriteria_id, score);
+        });
+
+        const totalHari = uniqueDates.size;
+        const rataRata = studentScores.length > 0 ? Math.round((sumScore / studentScores.length) * 10) / 10 : 0;
+
+        let kriteriaLulusCount = 0;
+        masterKriteria?.forEach((k) => {
+          const maxK = maxPerKriteria.get(k.id) || 0;
+          if (maxK >= k.batas_lulus) kriteriaLulusCount++;
+        });
+
+        const siapUjian = kriteriaLulusCount === totalKriteriaCount && totalKriteriaCount > 0;
+        let status: "Siap Ujian" | "Dalam Bimbingan" | "Belum Dinilai" = "Belum Dinilai";
+        if (studentScores.length > 0) {
+          status = siapUjian ? "Siap Ujian" : "Dalam Bimbingan";
+        }
+
+        return {
+          id: s.id,
+          nomor_induk: s.nomor_induk,
+          nama_lengkap: s.nama_lengkap,
+          tgl_masuk: s.tgl_masuk,
+          tgl_keluar: s.tgl_keluar,
+          program: s.program,
+          total_hari: totalHari,
+          total_penilaian: studentScores.length,
+          rata_rata: rataRata,
+          nilai_tertinggi: highestScore,
+          kriteria_kompeten: kriteriaLulusCount,
+          total_kriteria: totalKriteriaCount,
+          siap_ujian: siapUjian,
+          status,
+          terakhir_dinilai: latestDate,
+        };
+      });
+
+      return successResponse(studentResults);
     }
+
+    // MODE DETAIL TRANSKRIP SISWA (Bila ada siswa_id)
+    // 0. Ambil profil siswa
+    const { data: studentInfo } = await supabase
+      .from("siswa")
+      .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, kode_program, nama)")
+      .eq("id", siswaId)
+      .single();
 
     // 1. Ambil seluruh master kriteria
     const { data: masterKriteria } = await supabase
@@ -89,6 +200,7 @@ export async function GET(request: NextRequest) {
 
     return successResponse({
       siswa_id: siswaId,
+      siswa: studentInfo || null,
       grafik_tren: grafikTren,
       status_kelayakan: statusKelayakan,
       ringkasan_kelayakan: {

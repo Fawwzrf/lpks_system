@@ -426,8 +426,285 @@ export async function GET(request: NextRequest) {
           "Content-Disposition": `attachment; filename="${filenamePresensi}"`,
         },
       });
+    } else if (modul === "penilaian") {
+      const siswaId = request.nextUrl.searchParams.get("siswa_id");
+
+      // CASE A: EKSPOR TRANSKRIP NILAI INDIVIDUAL SISWA
+      if (siswaId) {
+        // Ambil data siswa
+        const { data: siswaData, error: sErr } = await supabase
+          .from("siswa")
+          .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(nama)")
+          .eq("id", siswaId)
+          .single();
+
+        if (sErr || !siswaData) {
+          return errorResponse("STUDENT_NOT_FOUND", "Data siswa tidak ditemukan.", 404);
+        }
+
+        const progName = ((siswaData.program as unknown) as { nama: string })?.nama || "-";
+
+        // Ambil master kriteria
+        const { data: masterKriteria } = await supabase
+          .from("master_kriteria")
+          .select("id, nama_kriteria, batas_lulus, urutan")
+          .order("urutan", { ascending: true });
+
+        // Ambil riwayat penilaian harian
+        const { data: riwayatNilai } = await supabase
+          .from("penilaian_harian")
+          .select("id, tanggal, nilai, created_by, catatan, kriteria:master_kriteria(id, nama_kriteria, batas_lulus)")
+          .eq("siswa_id", siswaId)
+          .order("tanggal", { ascending: true });
+
+        // Hitung nilai tertinggi & rata-rata per kriteria
+        const kriteriaStats = new Map<string, { max: number; sum: number; count: number }>();
+        riwayatNilai?.forEach((r) => {
+          const kId = (r.kriteria as unknown as { id: string })?.id;
+          if (!kId) return;
+          const current = kriteriaStats.get(kId) || { max: 0, sum: 0, count: 0 };
+          const val = Number(r.nilai || 0);
+          current.max = Math.max(current.max, val);
+          current.sum += val;
+          current.count += 1;
+          kriteriaStats.set(kId, current);
+        });
+
+        const aoa: (string | number)[][] = [];
+        // Kop Header
+        aoa.push(["TRANSKRIP HASIL EVALUASI PENILAIAN PRAKTEK"]);
+        aoa.push(["LPKS PENGELASAN SUMBU HIDUP CILACAP"]);
+        aoa.push([]);
+        aoa.push(["IDENTITAS SISWA", ""]);
+        aoa.push(["Nomor Induk", siswaData.nomor_induk || "-"]);
+        aoa.push(["Nama Siswa", siswaData.nama_lengkap || "-"]);
+        aoa.push(["Program Pelatihan", progName]);
+        aoa.push(["Periode Pelatihan", `${siswaData.tgl_masuk || "-"} s.d. ${siswaData.tgl_keluar || "-"}`]);
+        aoa.push([]);
+
+        // Bagian I: Ringkasan Kompetensi Kriteria
+        aoa.push(["BAGIAN I: STATUS KOMPETENSI KRITERIA (STANDAR KKM: 80)"]);
+        aoa.push(["NO", "KRITERIA PENILAIAN", "STANDAR KKM", "NILAI TERTINGGI", "RATA-RATA", "STATUS KELAYAKAN"]);
+
+        let totalKompeten = 0;
+        masterKriteria?.forEach((k, idx) => {
+          const stats = kriteriaStats.get(k.id) || { max: 0, sum: 0, count: 0 };
+          const isLulus = stats.max >= k.batas_lulus;
+          if (isLulus) totalKompeten++;
+          const avg = stats.count > 0 ? Math.round((stats.sum / stats.count) * 10) / 10 : 0;
+          aoa.push([
+            idx + 1,
+            k.nama_kriteria,
+            k.batas_lulus,
+            stats.max,
+            avg,
+            isLulus ? "KOMPETEN" : "BELUM KOMPETEN"
+          ]);
+        });
+
+        const totalKriteria = masterKriteria?.length || 5;
+        const siapUjian = totalKompeten === totalKriteria && totalKriteria > 0;
+        aoa.push(["STATUS KELAYAKAN UJIAN", "", "", "", "", siapUjian ? "SIAP UJIAN" : "DALAM BIMBINGAN"]);
+        aoa.push([]);
+
+        // Bagian II: Rincian Riwayat Penilaian Harian
+        const startRiwayatRow = aoa.length;
+        aoa.push(["BAGIAN II: RINCIAN RIWAYAT PENILAIAN HARIAN"]);
+        aoa.push(["NO", "TANGGAL", "KRITERIA", "NILAI", "STATUS INPUT", "CATATAN INSTRUKTUR"]);
+
+        if (!riwayatNilai || riwayatNilai.length === 0) {
+          aoa.push(["-", "Belum ada riwayat penilaian harian yang tercatat", "-", "-", "-", "-"]);
+        } else {
+          riwayatNilai.forEach((r, idx) => {
+            const kName = (r.kriteria as unknown as { nama_kriteria: string })?.nama_kriteria || "-";
+            aoa.push([
+              idx + 1,
+              r.tanggal,
+              kName,
+              r.nilai,
+              r.created_by === "superadmin" ? "Instruktur" : "Mandiri Siswa",
+              r.catatan || "-"
+            ]);
+          });
+        }
+
+        const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+        worksheet["!cols"] = [
+          { wch: 6 },  // No
+          { wch: 28 }, // Kriteria / Tanggal
+          { wch: 18 }, // Standar KKM / Kriteria
+          { wch: 18 }, // Nilai Tertinggi / Nilai
+          { wch: 18 }, // Rata-rata / Status Input
+          { wch: 32 }, // Status Kelayakan / Catatan
+        ];
+
+        worksheet["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } },
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 1 } },
+          { s: { r: 9, c: 0 }, e: { r: 9, c: 5 } },
+          { s: { r: 16, c: 0 }, e: { r: 16, c: 4 } },
+          { s: { r: startRiwayatRow, c: 0 }, e: { r: startRiwayatRow, c: 5 } },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Transkrip Nilai");
+
+        const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        const cleanName = (siswaData.nama_lengkap || "Siswa").replace(/[\s\/:]+/g, "_");
+        const cleanNo = (siswaData.nomor_induk || "00").replace(/[\s\/:]+/g, ".");
+        const filenameTranskrip = `Transkrip_Nilai_${cleanNo}_${cleanName}.xlsx`;
+
+        return new NextResponse(excelBuffer, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="${filenameTranskrip}"`,
+          },
+        });
+      } else {
+        // CASE B: EKSPOR REKAPITULASI PENILAIAN HARIAN SELURUH SISWA AKTIF
+        const today = new Date().toISOString().split("T")[0];
+        const programId = request.nextUrl.searchParams.get("program_id");
+
+        let siswaQuery = supabase
+          .from("siswa")
+          .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(nama)")
+          .not("nik", "like", "ANON-%")
+          .neq("alamat_lengkap", "[DATA DIHAPUS]")
+          .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+          .order("urutan_nomor", { ascending: true, nullsFirst: false })
+          .order("nomor_induk", { ascending: true });
+
+        if (programId) {
+          siswaQuery = siswaQuery.eq("program_id", programId);
+        }
+
+        const { data: siswaList } = await siswaQuery;
+        const siswaIds = (siswaList || []).map((s) => s.id);
+
+        const { data: masterKriteria } = await supabase
+          .from("master_kriteria")
+          .select("id, nama_kriteria, batas_lulus, urutan")
+          .order("urutan", { ascending: true });
+
+        const totalKriteriaCount = masterKriteria?.length || 5;
+
+        const { data: allNilai } = await supabase
+          .from("penilaian_harian")
+          .select("siswa_id, tanggal, nilai, kriteria_id")
+          .in("siswa_id", siswaIds.length > 0 ? siswaIds : ["00000000-0000-0000-0000-000000000000"]);
+
+        const nilaiMap = new Map<string, typeof allNilai>();
+        allNilai?.forEach((n) => {
+          if (!nilaiMap.has(n.siswa_id)) nilaiMap.set(n.siswa_id, []);
+          nilaiMap.get(n.siswa_id)!.push(n);
+        });
+
+        const aoa: (string | number)[][] = [];
+        aoa.push(["REKAPITULASI PENILAIAN HARIAN PRAKTEK SISWA"]);
+        aoa.push(["LPKS PENGELASAN SUMBU HIDUP CILACAP"]);
+        aoa.push([`Tanggal Ekspor: ${today}`]);
+        aoa.push([]);
+
+        aoa.push([
+          "NO",
+          "NO. INDUK",
+          "NAMA SISWA",
+          "PROGRAM PELATIHAN",
+          "TOTAL HARI DINILAI",
+          "RATA-RATA NILAI",
+          "NILAI TERTINGGI",
+          "KRITERIA KOMPETEN",
+          "STATUS UJIAN",
+          "TERAKHIR DINILAI"
+        ]);
+
+        (siswaList || []).forEach((s, idx) => {
+          const progName = ((s.program as unknown) as { nama: string })?.nama || "-";
+          const studentScores = nilaiMap.get(s.id) || [];
+          const uniqueDates = new Set<string>();
+          let sumScore = 0;
+          let highestScore = 0;
+          let latestDate: string = "-";
+          const maxPerKriteria = new Map<string, number>();
+
+          studentScores.forEach((row) => {
+            uniqueDates.add(row.tanggal);
+            const score = Number(row.nilai || 0);
+            sumScore += score;
+            if (score > highestScore) highestScore = score;
+            if (latestDate === "-" || row.tanggal > latestDate) latestDate = row.tanggal;
+
+            const currMax = maxPerKriteria.get(row.kriteria_id) || 0;
+            if (score > currMax) maxPerKriteria.set(row.kriteria_id, score);
+          });
+
+          const totalHari = uniqueDates.size;
+          const rataRata = studentScores.length > 0 ? Math.round((sumScore / studentScores.length) * 10) / 10 : 0;
+
+          let kriteriaLulusCount = 0;
+          masterKriteria?.forEach((k) => {
+            const maxK = maxPerKriteria.get(k.id) || 0;
+            if (maxK >= k.batas_lulus) kriteriaLulusCount++;
+          });
+
+          const siapUjian = kriteriaLulusCount === totalKriteriaCount && totalKriteriaCount > 0;
+          let statusStr = "Belum Dinilai";
+          if (studentScores.length > 0) {
+            statusStr = siapUjian ? "Siap Ujian" : "Dalam Bimbingan";
+          }
+
+          aoa.push([
+            idx + 1,
+            s.nomor_induk || "-",
+            s.nama_lengkap || "-",
+            progName,
+            totalHari,
+            rataRata,
+            highestScore,
+            `${kriteriaLulusCount}/${totalKriteriaCount}`,
+            statusStr,
+            latestDate
+          ]);
+        });
+
+        const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+        worksheet["!cols"] = [
+          { wch: 6 },  // NO
+          { wch: 14 }, // NO. INDUK
+          { wch: 30 }, // NAMA SISWA
+          { wch: 22 }, // PROGRAM PELATIHAN
+          { wch: 20 }, // TOTAL HARI DINILAI
+          { wch: 18 }, // RATA-RATA NILAI
+          { wch: 16 }, // NILAI TERTINGGI
+          { wch: 20 }, // KRITERIA KOMPETEN
+          { wch: 18 }, // STATUS UJIAN
+          { wch: 18 }, // TERAKHIR DINILAI
+        ];
+
+        worksheet["!merges"] = [
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 9 } },
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 9 } },
+          { s: { r: 2, c: 0 }, e: { r: 2, c: 9 } },
+        ];
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Rekap Penilaian");
+
+        const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+        const filenameRekap = `Rekap_Penilaian_Harian_${today}.xlsx`;
+
+        return new NextResponse(excelBuffer, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "Content-Disposition": `attachment; filename="${filenameRekap}"`,
+          },
+        });
+      }
     } else {
-      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan, presensi.", 400);
+      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan, presensi, penilaian.", 400);
     }
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
