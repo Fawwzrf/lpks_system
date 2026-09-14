@@ -1,7 +1,7 @@
-# Graph Report - LPKS System  (2026-09-12)
+# Graph Report - LPKS System  (2026-09-14)
 
 ## Corpus Check
-- 99 files · ~94,659 words
+- 99 files · ~95,571 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `0e070c7d`
+- Built from commit: `4f19c0e2`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
