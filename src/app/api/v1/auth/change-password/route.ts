@@ -13,9 +13,10 @@ export async function POST(request: NextRequest) {
       return errorResponse("UNAUTHORIZED", "Sesi tidak valid. Silakan login ulang.", 401);
     }
 
-    // Hanya siswa yang boleh pakai endpoint ini
-    if (user.user_metadata?.role !== "siswa") {
-      return errorResponse("FORBIDDEN", "Endpoint ini hanya untuk siswa.", 403);
+    // Verifikasi role
+    const userRole = user.user_metadata?.role || "siswa";
+    if (userRole !== "siswa" && userRole !== "superadmin") {
+      return errorResponse("FORBIDDEN", "Anda tidak memiliki izin untuk mengubah kata sandi.", 403);
     }
 
     const body = await request.json();
@@ -42,11 +43,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Tandai is_password_default = false
-    await supabase
-      .from("siswa")
-      .update({ is_password_default: false })
-      .eq("auth_id", user.id);
+    // Tandai is_password_default = false jika akun siswa
+    if (userRole === "siswa") {
+      await supabase
+        .from("siswa")
+        .update({ is_password_default: false })
+        .eq("auth_id", user.id);
+    }
 
     return successResponse({ message: "Kata sandi berhasil diubah." });
   } catch (err) {
