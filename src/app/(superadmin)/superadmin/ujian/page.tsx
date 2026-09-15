@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Award, CheckCircle2, XCircle, AlertTriangle, Printer, Plus, Loader2, RefreshCw, Search, X, Users } from "lucide-react";
+import { Award, CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Plus, Loader2, RefreshCw, Search, X, Users, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -226,23 +226,34 @@ export default function UjianPage() {
     }
   }
 
-  function handlePrintSertifikat(siswaId: string) {
-    window.open(`/api/v1/sertifikat/${siswaId}`, "_blank");
+  function handleExportSertifikatSingle(siswaId: string) {
+    window.open(`/api/v1/excel/export?modul=sertifikat&siswa_id=${siswaId}`, "_blank");
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-base font-bold text-[#F9FAFB]">Ujian &amp; Sertifikat</h1>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Gate-check kelayakan ujian dan verifikasi pencetakan sertifikat PDF resmi.
+            Gate-check kelayakan ujian dan ekspor data siswa lulus untuk percetakan sertifikat fisik.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-          Segarkan
-        </Button>
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/v1/excel/export?modul=sertifikat"
+            download
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#10B981]/40 bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/25 hover:text-white transition-colors"
+            title="Unduh template Excel data seluruh siswa lulus untuk dikirim ke percetakan"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span>Ekspor Data Percetakan (Excel)</span>
+          </a>
+          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+            Segarkan
+          </Button>
+        </div>
       </div>
 
       {/* Metric Summary Cards */}
@@ -553,16 +564,17 @@ export default function UjianPage() {
                   </Button>
                   <Button
                     size="sm"
-                    className="flex-1 gap-1 text-xs bg-[#DC2626] hover:bg-[#B91C1C] text-white disabled:opacity-40"
+                    className="flex-1 gap-1 text-xs bg-[#10B981] hover:bg-[#059669] text-white disabled:opacity-40 disabled:bg-[#1F2937] disabled:text-[#6B7280]"
                     disabled={!gateSertifikat}
-                    onClick={() => handlePrintSertifikat(s.id)}
+                    onClick={() => handleExportSertifikatSingle(s.id)}
                     title={
                       !gateSertifikat
-                        ? "Syarat sertifikat belum terpenuhi (wajib Lunas dan Nilai Ujian Lulus)"
-                        : "Cetak Sertifikat Kelulusan PDF"
+                        ? "Belum memenuhi syarat percetakan sertifikat (wajib Lunas dan Nilai Ujian Lulus)"
+                        : "Ekspor data siswa ini ke format Excel percetakan"
                     }
                   >
-                    <Printer className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Sertifikat
+                    <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span>Ekspor Percetakan</span>
                   </Button>
                 </div>
 

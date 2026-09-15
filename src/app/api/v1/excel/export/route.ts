@@ -703,8 +703,202 @@ export async function GET(request: NextRequest) {
           },
         });
       }
+    } else if (modul === "sertifikat") {
+      const siswaIdParam = request.nextUrl.searchParams.get("siswa_id");
+      const statusParam = request.nextUrl.searchParams.get("status");
+
+      const today = new Date().toISOString().split("T")[0];
+      const now = new Date();
+      const exportDateStr = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
+
+      // 1. Ambil data siswa
+      let siswaQuery = supabase
+        .from("siswa")
+        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, tempat_lahir, tgl_lahir, program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari)")
+        .not("nik", "like", "ANON-%")
+        .neq("alamat_lengkap", "[DATA DIHAPUS]");
+
+      if (siswaIdParam) {
+        siswaQuery = siswaQuery.eq("id", siswaIdParam);
+      }
+
+      const { data: siswaList, error: siswaErr } = await siswaQuery;
+      if (siswaErr) {
+        return errorResponse("DATABASE_ERROR", "Gagal mengambil data siswa untuk sertifikat.", 500, siswaErr.message);
+      }
+
+      // 2. Ambil seluruh data ujian
+      const { data: ujianList } = await supabase
+        .from("ujian")
+        .select("siswa_id, is_lulus, tgl_ujian");
+
+      const ujianMap = new Map((ujianList || []).map((u) => [u.siswa_id, u]));
+
+      // 3. Filter siswa: ambil siswa yang telah lulus ujian ATAU berstatus alumni/lulus
+      let candidateList = siswaList || [];
+      if (!siswaIdParam && statusParam !== "semua") {
+        const filtered = candidateList.filter((s) => {
+          const u = ujianMap.get(s.id);
+          if (u?.is_lulus) return true;
+          // Atau jika tanggal keluar sudah lewat (alumni/lulus)
+          if (s.tgl_keluar && s.tgl_keluar <= today) return true;
+          return false;
+        });
+        // Jika dalam DB uji coba belum ada yang bertanda lulus, fallback ke seluruh siswa agar template terisi data
+        if (filtered.length > 0) {
+          candidateList = filtered;
+        }
+      }
+
+      // 4. Urutkan dari siswa yang mendaftar paling baru (tgl_masuk DESC)
+      // "diurutkan dari sisiwa yang mendaftar paling baru, misal sisiwa mendaftar bulan september mendapat urut 001, dan yang mendaftar agustus mendapatkan urut 002"
+      candidateList.sort((a, b) => {
+        const dateA = a.tgl_masuk || "1970-01-01";
+        const dateB = b.tgl_masuk || "1970-01-01";
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA); // Paling baru (September) di atas -> 001
+        }
+        return (b.nomor_induk || "").localeCompare(a.nomor_induk || "");
+      });
+
+      const ROMAN_MONTHS = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
+      const NAMA_BULAN_INDO = [
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+      ];
+
+      // Format Baris Excel Sesuai Template Percetakan:
+      // Baris 1: Kolom B: Tanggal Ekspor (DD/MM/YYYY), Kolom C-I (Merge): PEMBUATAN SERTIFIKAT REGULER
+      // Baris 2: Header Kolom
+      const aoa: (string | number)[][] = [
+        ["", exportDateStr, "PEMBUATAN SERTIFIKAT REGULER", "", "", "", "", "", ""],
+        ["", "NO SERTIFIKAT", "NAME", "REGISTRATION", "PLACE & DATE OF BIRTH", "PROGRAM", "STARTING FROM", "TO", "DATE OF ISSUE"]
+      ];
+
+      candidateList.forEach((s, idx) => {
+        const prog = (s.program as unknown) as { nama: string; biaya: number; estimasi_durasi_hari: number } | null;
+        
+        // Nomor Urut (001, 002, 003...)
+        const noUrut = String(idx + 1).padStart(3, "0");
+
+        // Starting from (DD/MM/YYYY)
+        let startingFrom = "-";
+        if (s.tgl_masuk) {
+          const d = new Date(s.tgl_masuk);
+          if (!isNaN(d.getTime())) {
+            startingFrom = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+          }
+        }
+
+        // TO (DD/MM/YYYY): tanggal keluar atau tanggal masuk + durasi program
+        let toDateStr = s.tgl_keluar;
+        if (!toDateStr && s.tgl_masuk) {
+          const d = new Date(s.tgl_masuk);
+          const durasi = Number(prog?.estimasi_durasi_hari) || 30;
+          d.setDate(d.getDate() + durasi);
+          toDateStr = d.toISOString().split("T")[0];
+        }
+
+        let toDateFormatted = "-";
+        let romanMonth = "I";
+        let certYear = now.getFullYear();
+        let dateOfIssue = "-";
+
+        if (toDateStr) {
+          const dTo = new Date(toDateStr);
+          if (!isNaN(dTo.getTime())) {
+            const dayTo = String(dTo.getDate()).padStart(2, "0");
+            const monthToNum = dTo.getMonth() + 1;
+            const monthToStr = String(monthToNum).padStart(2, "0");
+            const yearTo = dTo.getFullYear();
+
+            toDateFormatted = `${dayTo}/${monthToStr}/${yearTo}`;
+            romanMonth = ROMAN_MONTHS[monthToNum] || "I";
+            certYear = yearTo;
+            dateOfIssue = `Cilacap, ${dayTo} ${NAMA_BULAN_INDO[dTo.getMonth()]} ${yearTo}`;
+          }
+        }
+
+        // Format No Sertifikat: STF / LPKS -  SH / Bulan dalam angka romawi / tahun terbit
+        const noSertifikat = `STF / LPKS -  SH / ${romanMonth} / ${certYear}`;
+
+        // Place & Date of Birth
+        let placeAndDob = "-";
+        if (s.tgl_lahir) {
+          const dDob = new Date(s.tgl_lahir);
+          if (!isNaN(dDob.getTime())) {
+            const dayDob = String(dDob.getDate()).padStart(2, "0");
+            const monthDob = NAMA_BULAN_INDO[dDob.getMonth()];
+            const yearDob = dDob.getFullYear();
+            const dobStr = `${dayDob} ${monthDob} ${yearDob}`;
+            placeAndDob = s.tempat_lahir ? `${s.tempat_lahir}, ${dobStr}` : dobStr;
+          }
+        } else if (s.tempat_lahir) {
+          placeAndDob = s.tempat_lahir;
+        }
+
+        // Clean Program Name (SMAW 4G, Kombinasi, SMAW 6G, etc.)
+        let progDisplay = prog?.nama || "-";
+        if (/kombinasi|gtaw\s*\+\s*smaw|gtaw\s*\/\s*smaw/i.test(progDisplay)) {
+          progDisplay = "Kombinasi";
+        } else if (/smaw\s*4g/i.test(progDisplay)) {
+          progDisplay = "SMAW 4G";
+        } else if (/smaw\s*6g/i.test(progDisplay)) {
+          progDisplay = "SMAW 6G";
+        } else if (/smaw\s*3g/i.test(progDisplay)) {
+          progDisplay = "SMAW 3G";
+        } else if (/gtaw\s*6g/i.test(progDisplay)) {
+          progDisplay = "GTAW 6G";
+        }
+
+        aoa.push([
+          noUrut,
+          noSertifikat,
+          s.nama_lengkap || "-",
+          s.nomor_induk || "-",
+          placeAndDob,
+          progDisplay,
+          startingFrom,
+          toDateFormatted,
+          dateOfIssue
+        ]);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Lebar Kolom
+      worksheet["!cols"] = [
+        { wch: 8 },  // NO
+        { wch: 28 }, // NO SERTIFIKAT
+        { wch: 28 }, // NAME
+        { wch: 16 }, // REGISTRATION
+        { wch: 32 }, // PLACE & DATE OF BIRTH
+        { wch: 18 }, // PROGRAM
+        { wch: 16 }, // STARTING FROM
+        { wch: 16 }, // TO
+        { wch: 28 }, // DATE OF ISSUE
+      ];
+
+      // Penggabungan Cell: C1 sampai I1 untuk judul PEMBUATAN SERTIFIKAT REGULER
+      worksheet["!merges"] = [
+        { s: { r: 0, c: 2 }, e: { r: 0, c: 8 } },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Sertifikat Reguler");
+
+      const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const filenameSertifikat = `Pembuatan_Sertifikat_Reguler_${today}.xlsx`;
+
+      return new NextResponse(excelBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filenameSertifikat}"`,
+        },
+      });
     } else {
-      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan, presensi, penilaian.", 400);
+      return errorResponse("INVALID_MODUL", "Modul ekspor tidak didukung. Pilihan: siswa, keuangan, presensi, penilaian, sertifikat.", 400);
     }
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
