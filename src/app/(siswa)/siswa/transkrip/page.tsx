@@ -266,7 +266,7 @@ export default function TranskripPage() {
                 ujianData
                   ? ujianData.is_lulus
                     ? "success"
-                    : "destructive"
+                    : "danger"
                   : siapUjian
                     ? "spark"
                     : "neutral"
