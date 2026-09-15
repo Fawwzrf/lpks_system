@@ -1,7 +1,28 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Award, CheckCircle2, XCircle, AlertTriangle, FileSpreadsheet, Plus, Loader2, RefreshCw, Search, X, Users, Download } from "lucide-react";
+import {
+  Award,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  FileSpreadsheet,
+  Plus,
+  Loader2,
+  RefreshCw,
+  Search,
+  Users,
+  Download,
+  ClipboardCheck,
+  History,
+  Eye,
+  Trash2,
+  RotateCcw,
+  Printer,
+  Calendar,
+  UserCheck,
+  ArrowRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -13,10 +34,15 @@ interface SiswaUjianItem {
   nomor_induk: string;
   nama_lengkap: string;
   program_nama: string;
+  tgl_masuk?: string;
+  tgl_keluar?: string | null;
   total_biaya: number;
   total_terbayar: number;
   is_lunas: boolean;
   nilai_harian_ok: boolean;
+  status_sertifikat?: "antrean" | "dicetak" | null;
+  tgl_cetak_sertifikat?: string | null;
+  tgl_antrean_sertifikat?: string | null;
   ujian: {
     id: string;
     tgl_ujian: string;
@@ -29,6 +55,52 @@ interface SiswaUjianItem {
     is_lulus: boolean;
     catatan_penguji?: string | null;
   } | null;
+}
+
+interface QueueItem {
+  id: string;
+  siswa_id: string;
+  status: "antrean" | "dicetak";
+  no_sertifikat: string;
+  tgl_antrean: string;
+  tgl_cetak?: string | null;
+  urutan_cetak?: number | null;
+  siswa: {
+    id: string;
+    nomor_induk: string;
+    nama_lengkap: string;
+    nik: string;
+    tempat_lahir?: string;
+    tgl_lahir?: string;
+    alamat_lengkap?: string;
+    no_hp?: string;
+    tgl_masuk: string;
+    tgl_keluar?: string;
+    program?: {
+      id: string;
+      kode_program: string;
+      nama: string;
+      biaya: number;
+      estimasi_durasi_hari: number;
+    };
+  };
+  ujian?: {
+    teori: number;
+    root: number;
+    hotpass: number;
+    filler: number;
+    capping: number;
+    gerinda: number;
+    is_lulus: boolean;
+    tgl_ujian: string;
+  } | null;
+  formatted: {
+    place_and_dob: string;
+    program_name: string;
+    starting_from: string;
+    to: string;
+    date_of_issue: string;
+  };
 }
 
 const KRITERIA_LIST = [
@@ -54,16 +126,30 @@ function GateIndicator({ label, ok }: { label: string; ok: boolean }) {
 }
 
 export default function UjianPage() {
+  // Top-level Navigation Tab
+  const [activeMainTab, setActiveMainTab] = useState<"ujian" | "antrean" | "riwayat">("ujian");
+
+  // Data State
   const [data, setData] = useState<SiswaUjianItem[]>([]);
+  const [queueData, setQueueData] = useState<QueueItem[]>([]);
+  const [historyData, setHistoryData] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"semua" | "siap_ujian" | "lulus" | "dalam_bimbingan">("semua");
 
+  // Input Nilai Modal State
   const [inputModalOpen, setInputModalOpen] = useState(false);
   const [inputTarget, setInputTarget] = useState<SiswaUjianItem | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Review Modal State
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<QueueItem | null>(null);
 
   // Form fields
   const [scores, setScores] = useState({
@@ -76,6 +162,7 @@ export default function UjianPage() {
     catatan_penguji: "",
   });
 
+  // Fetch data ujian & siswa
   const fetchData = useCallback(async () => {
     setLoading(true);
     setErrorMsg("");
@@ -83,7 +170,7 @@ export default function UjianPage() {
       const res = await fetch("/api/v1/ujian");
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error?.message ?? (typeof json.error === "string" ? json.error : "Gagal memuat data ujian."));
+        throw new Error(json.error?.message ?? "Gagal memuat data ujian.");
       }
       setData(json.data || []);
     } catch (err) {
@@ -93,9 +180,34 @@ export default function UjianPage() {
     }
   }, []);
 
+  // Fetch antrean & riwayat percetakan
+  const fetchQueueAndHistory = useCallback(async () => {
+    setLoadingQueue(true);
+    try {
+      const [resQueue, resHistory] = await Promise.all([
+        fetch("/api/v1/sertifikat/queue?status=antrean"),
+        fetch("/api/v1/sertifikat/queue?status=dicetak"),
+      ]);
+
+      if (resQueue.ok) {
+        const jsonQ = await resQueue.json();
+        setQueueData(jsonQ.data || []);
+      }
+      if (resHistory.ok) {
+        const jsonH = await resHistory.json();
+        setHistoryData(jsonH.data || []);
+      }
+    } catch (err) {
+      console.error("Gagal memuat antrean sertifikat:", err);
+    } finally {
+      setLoadingQueue(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+    fetchQueueAndHistory();
+  }, [fetchData, fetchQueueAndHistory]);
 
   // Statistik Ringkasan
   const stats = useMemo(() => {
@@ -106,7 +218,7 @@ export default function UjianPage() {
     return { total, siapUjian, lulus, dalamBimbingan };
   }, [data]);
 
-  // Priority sorting: Siswa yang siap menjalani ujian internal berada paling atas
+  // Sorting nomor urut
   const getUrutan = (noInduk?: string | null) => {
     if (!noInduk) return 999999;
     if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5;
@@ -117,18 +229,15 @@ export default function UjianPage() {
   };
 
   const getPriority = (item: SiswaUjianItem) => {
-    // 0: Siap menjalani ujian internal (nilai harian ok, belum lulus ujian internal) -> Paling Atas
     if (item.nilai_harian_ok && !item.ujian?.is_lulus) return 0;
-    // 1: Sudah lulus ujian internal
-    if (item.nilai_harian_ok && item.ujian?.is_lulus) return 1;
-    // 2: Belum siap ujian internal (masih dalam bimbingan harian)
-    return 2;
+    if (item.nilai_harian_ok && item.ujian?.is_lulus && item.status_sertifikat !== "dicetak") return 1;
+    if (!item.nilai_harian_ok && !item.ujian?.is_lulus) return 2;
+    return 3;
   };
 
   const filteredAndSortedData = useMemo(() => {
     return data
       .filter((s) => {
-        // 1. Filter Pencarian Nama / Nomor Induk / Program
         if (search.trim()) {
           const q = search.toLowerCase().trim();
           const matchName = s.nama_lengkap.toLowerCase().includes(q);
@@ -137,7 +246,6 @@ export default function UjianPage() {
           if (!matchName && !matchNo && !matchProg) return false;
         }
 
-        // 2. Filter Status Tab
         if (statusFilter === "siap_ujian") {
           return s.nilai_harian_ok && !s.ujian?.is_lulus;
         }
@@ -157,6 +265,84 @@ export default function UjianPage() {
         return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
       });
   }, [data, search, statusFilter]);
+
+  // Handler: Tambahkan ke Antrean Percetakan
+  async function handleAddToQueue(siswaId: string) {
+    setActionLoadingId(siswaId);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch("/api/v1/sertifikat/queue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ siswa_id: siswaId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Gagal menambahkan ke antrean percetakan.");
+      }
+      setSuccessMsg(json.meta?.message || "Siswa berhasil ditambahkan ke antrean percetakan.");
+      await Promise.all([fetchData(), fetchQueueAndHistory()]);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan saat menambahkan antrean.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  // Handler: Keluarkan dari Antrean Percetakan
+  async function handleRemoveFromQueue(siswaId: string) {
+    setActionLoadingId(siswaId);
+    setErrorMsg("");
+    setSuccessMsg("");
+    try {
+      const res = await fetch(`/api/v1/sertifikat/queue?siswa_id=${siswaId}`, {
+        method: "DELETE",
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Gagal menghapus dari antrean.");
+      }
+      setSuccessMsg("Siswa berhasil dikeluarkan dari antrean percetakan.");
+      await Promise.all([fetchData(), fetchQueueAndHistory()]);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Gagal menghapus siswa dari antrean.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  // Handler: Ekspor Batch Percetakan
+  async function handleExportBatch() {
+    if (queueData.length === 0) {
+      setErrorMsg("Antrean percetakan masih kosong. Tambahkan siswa yang lulus terlebih dahulu.");
+      return;
+    }
+
+    try {
+      setErrorMsg("");
+      setSuccessMsg("Sedang menyiapkan dan mengunduh berkas Excel percetakan...");
+
+      // Download file via window location / anchor
+      const downloadUrl = "/api/v1/excel/export?modul=sertifikat&source=queue&mark_as_printed=true";
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.setAttribute("download", "");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Berikan delay singkat lalu segarkan status data (menjadi dicetak & alumni)
+      setTimeout(async () => {
+        await Promise.all([fetchData(), fetchQueueAndHistory()]);
+        setSuccessMsg(
+          `Sukses! ${queueData.length} data siswa telah diekspor dan dialihkan ke Riwayat Cetak (Alumni).`
+        );
+      }, 1500);
+    } catch (err) {
+      setErrorMsg("Gagal melakukan ekspor berkas percetakan.");
+    }
+  }
 
   function handleOpenInput(siswa: SiswaUjianItem) {
     setInputTarget(siswa);
@@ -202,7 +388,7 @@ export default function UjianPage() {
         filler: parseInt(scores.filler || "0", 10),
         capping: parseInt(scores.capping || "0", 10),
         gerinda: parseInt(scores.gerinda || "0", 10),
-        catatan_penguji: scores.catatan_penguji.trim() || undefined,
+        catatan_penguji: scores.catatan_penguji || null,
       };
 
       const res = await fetch("/api/v1/ujian", {
@@ -213,390 +399,841 @@ export default function UjianPage() {
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.error?.message ?? (typeof json.error === "string" ? json.error : "Gagal menyimpan nilai ujian."));
+        throw new Error(json.error?.message ?? "Gagal menyimpan nilai ujian.");
       }
 
-      setSuccessMsg(json.data?.message || "Nilai ujian internal berhasil disimpan!");
+      setSuccessMsg(`Nilai ujian untuk ${inputTarget.nama_lengkap} berhasil disimpan.`);
       setInputModalOpen(false);
-      await fetchData();
+      await Promise.all([fetchData(), fetchQueueAndHistory()]);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan.");
+      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan saat menyimpan nilai.");
     } finally {
       setSubmitting(false);
     }
   }
 
-  function handleExportSertifikatSingle(siswaId: string) {
-    window.open(`/api/v1/excel/export?modul=sertifikat&siswa_id=${siswaId}`, "_blank");
-  }
-
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="flex flex-col gap-6 max-w-7xl mx-auto pb-12">
+      {/* Header Utama */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-base font-bold text-[#F9FAFB]">Ujian &amp; Sertifikat</h1>
-          <p className="text-xs text-[#6B7280] mt-0.5">
-            Gate-check kelayakan ujian dan ekspor data siswa lulus untuk percetakan sertifikat fisik.
+          <h1 className="text-2xl font-bold text-[#F9FAFB] tracking-tight">Ujian & Sertifikat</h1>
+          <p className="text-xs text-[#9CA3AF] mt-1">
+            Penilaian ujian internal dan manajemen antrean ekspor data percetakan sertifikat fisik.
           </p>
         </div>
+
+        {/* Global Action Button */}
         <div className="flex items-center gap-2">
-          <a
-            href="/api/v1/excel/export?modul=sertifikat"
-            download
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-[#10B981]/40 bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/25 hover:text-white transition-colors"
-            title="Unduh template Excel data seluruh siswa lulus untuk dikirim ke percetakan"
+          {activeMainTab === "antrean" && (
+            <Button
+              size="sm"
+              className="gap-1.5 text-xs bg-[#10B981] hover:bg-[#059669] text-white shadow-sm font-semibold disabled:opacity-50"
+              disabled={queueData.length === 0}
+              onClick={handleExportBatch}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span>Ekspor Data Percetakan ({queueData.length} Siswa)</span>
+            </Button>
+          )}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 text-xs border-[#1F2937] text-[#D1D5DB] hover:text-white"
+            onClick={() => {
+              fetchData();
+              fetchQueueAndHistory();
+            }}
+            disabled={loading || loadingQueue}
           >
-            <Download className="h-3.5 w-3.5" />
-            <span>Ekspor Data Percetakan (Excel)</span>
-          </a>
-          <Button variant="outline" size="sm" onClick={fetchData} disabled={loading} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
-            Segarkan
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${loading || loadingQueue ? "animate-spin" : ""}`}
+              aria-hidden="true"
+            />
+            <span>Segarkan</span>
           </Button>
         </div>
       </div>
 
-      {/* Metric Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div
-          onClick={() => setStatusFilter("semua")}
-          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
-            statusFilter === "semua"
-              ? "border-[#DC2626] bg-[#DC2626]/5 shadow-sm"
-              : "border-[#1F2937] bg-[#111827] hover:border-[#374151]"
+      {/* Navigasi Level Atas: 3 Tab Utama */}
+      <div className="flex items-center gap-2 border-b border-[#1F2937] pb-1">
+        <button
+          onClick={() => setActiveMainTab("ujian")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-xs font-semibold transition-all border-b-2 ${
+            activeMainTab === "ujian"
+              ? "border-[#DC2626] text-white bg-[#111827]"
+              : "border-transparent text-[#9CA3AF] hover:text-white hover:bg-[#111827]/50"
           }`}
         >
-          <div className="h-9 w-9 rounded-lg bg-[#374151]/30 border border-[#374151] flex items-center justify-center shrink-0">
-            <Users className="h-4 w-4 text-[#9CA3AF]" />
-          </div>
-          <div>
-            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Total Siswa</p>
-            <p className="text-sm font-bold text-[#F9FAFB]">
-              {loading ? "..." : `${stats.total} Siswa`}
-            </p>
-          </div>
-        </div>
+          <ClipboardCheck className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
+          <span>Ujian Internal</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-[#1F2937] text-[#D1D5DB]">
+            {data.length}
+          </span>
+        </button>
 
-        <div
-          onClick={() => setStatusFilter("siap_ujian")}
-          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
-            statusFilter === "siap_ujian"
-              ? "border-[#10B981] bg-[#10B981]/10 shadow-sm"
-              : "border-[#1F2937] bg-[#111827] hover:border-[#10B981]/50"
+        <button
+          onClick={() => setActiveMainTab("antrean")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-xs font-semibold transition-all border-b-2 ${
+            activeMainTab === "antrean"
+              ? "border-[#10B981] text-white bg-[#111827]"
+              : "border-transparent text-[#9CA3AF] hover:text-white hover:bg-[#111827]/50"
           }`}
         >
-          <div className="h-9 w-9 rounded-lg bg-[#10B981]/15 border border-[#10B981]/30 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="h-4 w-4 text-[#10B981]" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Siap Ujian Internal</p>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-            </div>
-            <p className="text-sm font-bold text-[#10B981]">
-              {loading ? "..." : `${stats.siapUjian} Siswa`}
-            </p>
-          </div>
-        </div>
+          <FileSpreadsheet className="h-4 w-4 text-[#10B981]" aria-hidden="true" />
+          <span>Antrean Percetakan</span>
+          <span
+            className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+              queueData.length > 0
+                ? "bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30"
+                : "bg-[#1F2937] text-[#9CA3AF]"
+            }`}
+          >
+            {queueData.length}
+          </span>
+        </button>
 
-        <div
-          onClick={() => setStatusFilter("lulus")}
-          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
-            statusFilter === "lulus"
-              ? "border-[#38BDF8] bg-[#38BDF8]/10 shadow-sm"
-              : "border-[#1F2937] bg-[#111827] hover:border-[#38BDF8]/50"
+        <button
+          onClick={() => setActiveMainTab("riwayat")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-xs font-semibold transition-all border-b-2 ${
+            activeMainTab === "riwayat"
+              ? "border-[#38BDF8] text-white bg-[#111827]"
+              : "border-transparent text-[#9CA3AF] hover:text-white hover:bg-[#111827]/50"
           }`}
         >
-          <div className="h-9 w-9 rounded-lg bg-[#38BDF8]/15 border border-[#38BDF8]/30 flex items-center justify-center shrink-0">
-            <Award className="h-4 w-4 text-[#38BDF8]" />
-          </div>
-          <div>
-            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Lulus Ujian</p>
-            <p className="text-sm font-bold text-[#38BDF8]">
-              {loading ? "..." : `${stats.lulus} Siswa`}
-            </p>
-          </div>
-        </div>
-
-        <div
-          onClick={() => setStatusFilter("dalam_bimbingan")}
-          className={`cursor-pointer rounded-xl border p-3 flex items-center gap-3 transition-all ${
-            statusFilter === "dalam_bimbingan"
-              ? "border-[#F59E0B] bg-[#F59E0B]/10 shadow-sm"
-              : "border-[#1F2937] bg-[#111827] hover:border-[#F59E0B]/50"
-          }`}
-        >
-          <div className="h-9 w-9 rounded-lg bg-[#F59E0B]/15 border border-[#F59E0B]/30 flex items-center justify-center shrink-0">
-            <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
-          </div>
-          <div>
-            <p className="text-[10px] text-[#9CA3AF] uppercase tracking-wide">Dalam Bimbingan</p>
-            <p className="text-sm font-bold text-[#F59E0B]">
-              {loading ? "..." : `${stats.dalamBimbingan} Siswa`}
-            </p>
-          </div>
-        </div>
+          <History className="h-4 w-4 text-[#38BDF8]" aria-hidden="true" />
+          <span>Riwayat Cetak & Alumni</span>
+          <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-[#1F2937] text-[#D1D5DB]">
+            {historyData.length}
+          </span>
+        </button>
       </div>
 
-      {/* Search & Filter Tabs */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[260px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari siswa berdasarkan nama atau no. induk..."
-            className="h-9 w-full rounded-xl border border-[#1F2937] bg-[#111827] pl-8.5 pr-8 text-xs text-[#F9FAFB] placeholder-[#6B7280] focus:border-[#DC2626] focus:outline-none transition-colors"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#F9FAFB]"
-              title="Hapus pencarian"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[#111827] border border-[#1F2937] text-xs">
-          <button
-            onClick={() => setStatusFilter("semua")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              statusFilter === "semua"
-                ? "bg-[#DC2626] text-white"
-                : "text-[#9CA3AF] hover:text-white"
-            }`}
-          >
-            Semua ({stats.total})
-          </button>
-          <button
-            onClick={() => setStatusFilter("siap_ujian")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              statusFilter === "siap_ujian"
-                ? "bg-[#10B981] text-white"
-                : "text-[#9CA3AF] hover:text-white"
-            }`}
-          >
-            Siap Ujian ({stats.siapUjian})
-          </button>
-          <button
-            onClick={() => setStatusFilter("lulus")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              statusFilter === "lulus"
-                ? "bg-[#38BDF8] text-white"
-                : "text-[#9CA3AF] hover:text-white"
-            }`}
-          >
-            Lulus ({stats.lulus})
-          </button>
-          <button
-            onClick={() => setStatusFilter("dalam_bimbingan")}
-            className={`px-3 py-1.5 rounded-lg font-medium transition-colors ${
-              statusFilter === "dalam_bimbingan"
-                ? "bg-[#F59E0B] text-black font-semibold"
-                : "text-[#9CA3AF] hover:text-white"
-            }`}
-          >
-            Bimbingan ({stats.dalamBimbingan})
-          </button>
-        </div>
-      </div>
-
-      {/* Notifications */}
+      {/* Alert Messages */}
       {errorMsg && (
-        <div className="p-3 bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] text-xs rounded-xl flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>{errorMsg}</span>
+        <div className="flex items-center justify-between rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 px-4 py-3 text-xs text-[#F43F5E]">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{errorMsg}</span>
+          </div>
+          <button onClick={() => setErrorMsg("")} className="hover:opacity-75">
+            <XCircle className="h-4 w-4" />
+          </button>
         </div>
       )}
+
       {successMsg && (
-        <div className="p-3 bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981] text-xs rounded-xl flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>{successMsg}</span>
+        <div className="flex items-center justify-between rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 px-4 py-3 text-xs text-[#10B981]">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{successMsg}</span>
+          </div>
+          <button onClick={() => setSuccessMsg("")} className="hover:opacity-75">
+            <XCircle className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {/* Loading state */}
-      {loading && data.length === 0 ? (
-        <CardSkeleton count={6} className="md:grid-cols-2 lg:grid-cols-3" />
-      ) : filteredAndSortedData.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-[#1F2937] p-8 text-center text-xs text-[#6B7280]">
-          {search ? `Tidak ada siswa yang cocok dengan pencarian "${search}".` : "Belum ada data siswa terdaftar."}
-        </div>
-      ) : (
-        /* Siswa Cards Grid */
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAndSortedData.map((s) => {
-            const hasUjian = !!s.ujian;
-            const isReadyForInternal = s.nilai_harian_ok && !s.ujian?.is_lulus;
-            const avg = hasUjian
-              ? Math.round(
-                  (s.ujian!.teori +
-                    s.ujian!.root +
-                    s.ujian!.hotpass +
-                    s.ujian!.filler +
-                    s.ujian!.capping +
-                    s.ujian!.gerinda) /
-                    6
-                )
-              : null;
+      {/* ========================================================================= */}
+      {/* KONTEN TAB 1: UJIAN INTERNAL */}
+      {/* ========================================================================= */}
+      {activeMainTab === "ujian" && (
+        <div className="flex flex-col gap-6">
+          {/* Kartu Statistik Ringkasan */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-4 flex items-center gap-3 shadow-sm">
+              <div className="p-2.5 rounded-lg bg-[#1F2937] text-[#9CA3AF]">
+                <Users className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-[#6B7280] tracking-wider">Total Siswa</p>
+                <p className="text-lg font-extrabold text-[#F9FAFB]">{stats.total} Siswa</p>
+              </div>
+            </div>
 
-            const isUjianLulus = !!s.ujian?.is_lulus;
-            const gateSertifikat = s.is_lunas && isUjianLulus;
+            <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/10 p-4 flex items-center gap-3 shadow-sm">
+              <div className="p-2.5 rounded-lg bg-[#10B981]/20 text-[#10B981]">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-[#10B981] tracking-wider flex items-center gap-1">
+                  Siap Ujian Internal <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-ping" />
+                </p>
+                <p className="text-lg font-extrabold text-[#10B981]">{stats.siapUjian} Siswa</p>
+              </div>
+            </div>
 
-            return (
-              <div
-                key={s.id}
-                className={`rounded-xl border bg-[#111827] p-5 flex flex-col gap-4 shadow-sm transition-all ${
-                  isReadyForInternal
-                    ? "border-[#10B981]/50 ring-1 ring-[#10B981]/20"
-                    : "border-[#1F2937]"
+            <div className="rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/10 p-4 flex items-center gap-3 shadow-sm">
+              <div className="p-2.5 rounded-lg bg-[#38BDF8]/20 text-[#38BDF8]">
+                <Award className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-[#38BDF8] tracking-wider">Lulus Ujian</p>
+                <p className="text-lg font-extrabold text-[#38BDF8]">{stats.lulus} Siswa</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[#F59E0B]/30 bg-[#F59E0B]/10 p-4 flex items-center gap-3 shadow-sm">
+              <div className="p-2.5 rounded-lg bg-[#F59E0B]/20 text-[#F59E0B]">
+                <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div>
+                <p className="text-[10px] uppercase font-bold text-[#F59E0B] tracking-wider">Dalam Bimbingan</p>
+                <p className="text-lg font-extrabold text-[#F59E0B]">{stats.dalamBimbingan} Siswa</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filter & Pencarian Bar */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" aria-hidden="true" />
+              <input
+                type="text"
+                placeholder="Cari siswa berdasarkan nama atau no. induk..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 w-full rounded-lg border border-[#1F2937] bg-[#111827] pl-8 pr-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#111827] border border-[#1F2937] p-1 rounded-lg w-full sm:w-auto overflow-x-auto">
+              <button
+                onClick={() => setStatusFilter("semua")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  statusFilter === "semua" ? "bg-[#DC2626] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
                 }`}
               >
-                {/* Header Card */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap mb-1">
-                      <p className="text-xs font-bold text-[#F9FAFB] truncate">{s.nama_lengkap}</p>
-                      {isReadyForInternal && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2 py-0.5 rounded-full">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-                          Siap Ujian Internal
-                        </span>
-                      )}
-                      {isUjianLulus && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#38BDF8] bg-[#38BDF8]/15 border border-[#38BDF8]/30 px-2 py-0.5 rounded-full">
-                          Lulus Ujian
-                        </span>
-                      )}
-                      {!s.nilai_harian_ok && (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2 py-0.5 rounded-full">
-                          Dalam Bimbingan
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[#6B7280]">
-                      {s.nomor_induk} &bull; {s.program_nama}
-                    </p>
-                    {avg !== null ? (
-                      <p
-                        className={`text-xl font-bold mt-1 ${
-                          isUjianLulus ? "text-[#10B981]" : "text-[#F59E0B]"
+                Semua ({stats.total})
+              </button>
+              <button
+                onClick={() => setStatusFilter("siap_ujian")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  statusFilter === "siap_ujian" ? "bg-[#10B981] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                }`}
+              >
+                Siap Ujian ({stats.siapUjian})
+              </button>
+              <button
+                onClick={() => setStatusFilter("lulus")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  statusFilter === "lulus" ? "bg-[#38BDF8] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                }`}
+              >
+                Lulus ({stats.lulus})
+              </button>
+              <button
+                onClick={() => setStatusFilter("dalam_bimbingan")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  statusFilter === "dalam_bimbingan" ? "bg-[#F59E0B] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                }`}
+              >
+                Bimbingan ({stats.dalamBimbingan})
+              </button>
+            </div>
+          </div>
+
+          {/* Grid Kartu Siswa Ujian */}
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <CardSkeleton key={i} />
+              ))}
+            </div>
+          ) : filteredAndSortedData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center border border-[#1F2937] rounded-xl bg-[#111827]">
+              <AlertTriangle className="h-10 w-10 text-[#6B7280] mb-3" aria-hidden="true" />
+              <p className="text-sm font-semibold text-[#D1D5DB]">Tidak ada data siswa</p>
+              <p className="text-xs text-[#6B7280] mt-1">Coba sesuaikan pencarian atau filter status kelayakan.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAndSortedData.map((s) => {
+                const hasUjian = !!s.ujian;
+                const isUjianLulus = !!s.ujian?.is_lulus;
+                const isReadyForInternal = s.nilai_harian_ok && !s.ujian?.is_lulus;
+                const gateSertifikat = s.nilai_harian_ok && s.is_lunas && isUjianLulus;
+                const inQueue = s.status_sertifikat === "antrean";
+                const isPrinted = s.status_sertifikat === "dicetak";
+
+                let avg: number | null = null;
+                if (s.ujian) {
+                  const sum =
+                    s.ujian.teori +
+                    s.ujian.root +
+                    s.ujian.hotpass +
+                    s.ujian.filler +
+                    s.ujian.capping +
+                    s.ujian.gerinda;
+                  avg = Math.round(sum / 6);
+                }
+
+                return (
+                  <div
+                    key={s.id}
+                    className={`rounded-xl border bg-[#111827] p-5 flex flex-col gap-4 shadow-sm transition-all ${
+                      isReadyForInternal
+                        ? "border-[#10B981]/50 ring-1 ring-[#10B981]/20"
+                        : inQueue
+                        ? "border-[#38BDF8]/40 ring-1 ring-[#38BDF8]/20"
+                        : "border-[#1F2937]"
+                    }`}
+                  >
+                    {/* Header Card */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <p className="text-xs font-bold text-[#F9FAFB] truncate">{s.nama_lengkap}</p>
+                          {isReadyForInternal && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2 py-0.5 rounded-full">
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                              Siap Ujian Internal
+                            </span>
+                          )}
+                          {isUjianLulus && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#38BDF8] bg-[#38BDF8]/15 border border-[#38BDF8]/30 px-2 py-0.5 rounded-full">
+                              Lulus Ujian
+                            </span>
+                          )}
+                          {!s.nilai_harian_ok && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#F59E0B] bg-[#F59E0B]/15 border border-[#F59E0B]/30 px-2 py-0.5 rounded-full">
+                              Dalam Bimbingan
+                            </span>
+                          )}
+                          {inQueue && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/20 border border-[#10B981]/40 px-2 py-0.5 rounded-full">
+                              Di Antrean Cetak
+                            </span>
+                          )}
+                          {isPrinted && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#9CA3AF] bg-[#1F2937] border border-[#374151] px-2 py-0.5 rounded-full">
+                              Sudah Dicetak
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[#6B7280]">
+                          {s.nomor_induk} &bull; {s.program_nama}
+                        </p>
+                        {avg !== null ? (
+                          <p
+                            className={`text-xl font-bold mt-1 ${
+                              isUjianLulus ? "text-[#10B981]" : "text-[#F59E0B]"
+                            }`}
+                          >
+                            {avg}
+                            <span className="text-xs font-normal text-[#6B7280]"> / 100 rata-rata</span>
+                          </p>
+                        ) : (
+                          <p className="text-xs text-[#6B7280] mt-1 italic">Belum ada nilai ujian</p>
+                        )}
+                      </div>
+                      <div
+                        className={`h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 ${
+                          gateSertifikat
+                            ? "bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981]"
+                            : "bg-[#1F2937] border-[#374151] text-[#6B7280]"
                         }`}
                       >
-                        {avg}
-                        <span className="text-xs font-normal text-[#6B7280]"> / 100 rata-rata</span>
-                      </p>
-                    ) : (
-                      <p className="text-xs text-[#6B7280] mt-1 italic">Belum ada nilai ujian</p>
-                    )}
-                  </div>
-                  <div
-                    className={`h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 ${
-                      gateSertifikat
-                        ? "bg-[#10B981]/15 border-[#10B981]/30 text-[#10B981]"
-                        : "bg-[#1F2937] border-[#374151] text-[#6B7280]"
-                    }`}
-                  >
-                    <Award className="h-5 w-5" aria-hidden="true" />
-                  </div>
-                </div>
-
-                {/* Gate Check Box */}
-                <div className="flex flex-col gap-1.5 bg-[#0B0F17] rounded-lg p-3 border border-[#1F2937]">
-                  <p className="text-[10px] text-[#6B7280] font-semibold uppercase tracking-widest mb-0.5">
-                    Syarat Sertifikasi
-                  </p>
-                  <GateIndicator label="Semua nilai harian ≥ 80" ok={s.nilai_harian_ok} />
-                  <GateIndicator
-                    label={`Biaya Lunas (Rp ${s.total_terbayar.toLocaleString("id-ID")})`}
-                    ok={s.is_lunas}
-                  />
-                  {hasUjian ? (
-                    <GateIndicator
-                      label={`Hasil Ujian: ${isUjianLulus ? "Lulus (Semua ≥ 80)" : "Belum Memenuhi Syarat"}`}
-                      ok={isUjianLulus}
-                    />
-                  ) : (
-                    <div className="text-[11px] text-[#6B7280] flex items-center gap-1.5 mt-0.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#6B7280]" />
-                      <span>Ujian internal belum ditempuh</span>
+                        <Award className="h-5 w-5" aria-hidden="true" />
+                      </div>
                     </div>
-                  )}
-                </div>
 
-                {/* Nilai Ujian Details Grid */}
-                {s.ujian && (
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {KRITERIA_LIST.map(({ key, label }) => {
-                      const v = s.ujian ? (s.ujian as unknown as Record<string, number>)[key] : 0;
-                      const ok = v >= 80;
-                      return (
-                        <div key={key} className="rounded-lg bg-[#0B0F17] border border-[#1F2937] p-2 text-center">
-                          <p className="text-[9px] text-[#6B7280] truncate" title={label}>
-                            {label.split(" ")[0]}
-                          </p>
-                          <p className={`text-sm font-bold ${ok ? "text-[#10B981]" : "text-[#F59E0B]"}`}>
-                            {v}
+                    {/* Gate Check Box */}
+                    <div className="flex flex-col gap-1.5 bg-[#0B0F17] rounded-lg p-3 border border-[#1F2937]">
+                      <p className="text-[10px] text-[#6B7280] font-semibold uppercase tracking-widest mb-0.5">
+                        Syarat Sertifikasi
+                      </p>
+                      <GateIndicator label="Semua nilai harian ≥ 80" ok={s.nilai_harian_ok} />
+                      <GateIndicator
+                        label={`Biaya Lunas (Rp ${s.total_terbayar.toLocaleString("id-ID")})`}
+                        ok={s.is_lunas}
+                      />
+                      {hasUjian ? (
+                        <GateIndicator
+                          label={`Hasil Ujian: ${isUjianLulus ? "Lulus (Semua ≥ 80)" : "Belum Memenuhi Syarat"}`}
+                          ok={isUjianLulus}
+                        />
+                      ) : (
+                        <div className="text-[11px] text-[#6B7280] flex items-center gap-1.5 mt-0.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#6B7280]" />
+                          <span>Ujian internal belum ditempuh</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nilai Ujian Details Grid */}
+                    {hasUjian && s.ujian && (
+                      <div className="grid grid-cols-3 gap-2 bg-[#0B0F17] rounded-lg p-3 border border-[#1F2937]">
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Teori</p>
+                          <p className={`text-xs font-bold ${s.ujian.teori >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.teori}
                           </p>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Root</p>
+                          <p className={`text-xs font-bold ${s.ujian.root >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.root}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Hot</p>
+                          <p className={`text-xs font-bold ${s.ujian.hotpass >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.hotpass}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Filler</p>
+                          <p className={`text-xs font-bold ${s.ujian.filler >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.filler}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Capping</p>
+                          <p className={`text-xs font-bold ${s.ujian.capping >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.capping}
+                          </p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[10px] text-[#6B7280]">Teknik</p>
+                          <p className={`text-xs font-bold ${s.ujian.gerinda >= 80 ? "text-[#10B981]" : "text-[#F43F5E]"}`}>
+                            {s.ujian.gerinda}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 mt-auto pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`flex-1 gap-1 text-xs whitespace-nowrap px-2 ${
-                      isReadyForInternal
-                        ? "border-[#10B981] bg-[#10B981]/15 text-[#10B981] hover:bg-[#10B981]/25 hover:text-white"
-                        : ""
-                    }`}
-                    onClick={() => handleOpenInput(s)}
-                  >
-                    <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>{s.ujian ? "Edit Nilai Internal" : "Input Nilai Internal"}</span>
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1 gap-1 text-xs bg-[#10B981] hover:bg-[#059669] text-white disabled:opacity-40 disabled:bg-[#1F2937] disabled:text-[#6B7280]"
-                    disabled={!gateSertifikat}
-                    onClick={() => handleExportSertifikatSingle(s.id)}
-                    title={
-                      !gateSertifikat
-                        ? "Belum memenuhi syarat percetakan sertifikat (wajib Lunas dan Nilai Ujian Lulus)"
-                        : "Ekspor data siswa ini ke format Excel percetakan"
-                    }
-                  >
-                    <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>Ekspor Percetakan</span>
-                  </Button>
-                </div>
+                    {/* Tombol Aksi Kartu Siswa */}
+                    <div className="flex flex-col gap-2 mt-auto">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-1.5 text-xs border-[#1F2937] hover:bg-[#1F2937] text-[#D1D5DB]"
+                        onClick={() => handleOpenInput(s)}
+                      >
+                        <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span>{s.ujian ? "Edit Nilai Internal" : "Input Nilai Internal"}</span>
+                      </Button>
 
-                {!gateSertifikat && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#F59E0B] bg-[#F59E0B]/10 border border-[#F59E0B]/20 rounded-lg px-2.5 py-1.5">
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span>
-                      {!s.is_lunas
-                        ? "Keuangan belum lunas"
-                        : !isUjianLulus
-                        ? "Nilai ujian belum lulus (min 80 tiap kriteria)"
-                        : "Syarat belum lengkap"}
-                    </span>
+                      {/* Tombol Tambahkan ke Antrean Percetakan */}
+                      {gateSertifikat && (
+                        <div>
+                          {inQueue ? (
+                            <button
+                              onClick={() => setActiveMainTab("antrean")}
+                              className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-semibold bg-[#10B981]/15 border border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/25 transition-all"
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              <span>Di Antrean Percetakan &rarr;</span>
+                            </button>
+                          ) : isPrinted ? (
+                            <div className="flex items-center gap-2">
+                              <span className="flex-1 text-[11px] text-[#9CA3AF] py-1 text-center bg-[#0B0F17] rounded border border-[#1F2937]">
+                                Sudah Dicetak
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-1 text-xs border-[#38BDF8]/40 text-[#38BDF8] hover:bg-[#38BDF8]/10"
+                                disabled={actionLoadingId === s.id}
+                                onClick={() => handleAddToQueue(s.id)}
+                                title="Masukkan kembali ke antrean percetakan untuk dicetak ulang"
+                              >
+                                {actionLoadingId === s.id ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="h-3.5 w-3.5" />
+                                )}
+                                <span>Cetak Ulang</span>
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              className="w-full gap-1.5 text-xs bg-[#10B981] hover:bg-[#059669] text-white font-semibold shadow-sm"
+                              disabled={actionLoadingId === s.id}
+                              onClick={() => handleAddToQueue(s.id)}
+                            >
+                              {actionLoadingId === s.id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Printer className="h-3.5 w-3.5" />
+                              )}
+                              <span>Tambahkan ke Percetakan</span>
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Modal Input Nilai Ujian */}
+      {/* ========================================================================= */}
+      {/* KONTEN TAB 2: ANTREAN PERCETAKAN SERTIFIKAT (THE BATCH QUEUE) */}
+      {/* ========================================================================= */}
+      {activeMainTab === "antrean" && (
+        <div className="flex flex-col gap-5">
+          {/* Header Penjelasan Antrean */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-[#10B981]/30 bg-[#10B981]/10">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-[#10B981]/20 text-[#10B981]">
+                <FileSpreadsheet className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#F9FAFB]">
+                  Antrean Batch Percetakan ({queueData.length} Siswa Siap Cetak)
+                </h2>
+                <p className="text-xs text-[#9CA3AF] mt-0.5">
+                  Data pada antrean ini akan diekspor ke template Excel percetakan fisik. Setelah diekspor, siswa otomatis
+                  ditandai selesai (Alumni).
+                </p>
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              className="gap-2 text-xs bg-[#10B981] hover:bg-[#059669] text-white font-semibold disabled:opacity-40"
+              disabled={queueData.length === 0}
+              onClick={handleExportBatch}
+            >
+              <Download className="h-4 w-4" aria-hidden="true" />
+              <span>Ekspor Data Percetakan (Excel)</span>
+            </Button>
+          </div>
+
+          {/* Tabel / Daftar Siswa dalam Antrean */}
+          {loadingQueue ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-xl bg-[#111827] border border-[#1F2937] animate-pulse" />
+              ))}
+            </div>
+          ) : queueData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center border border-[#1F2937] rounded-xl bg-[#111827]">
+              <FileSpreadsheet className="h-12 w-12 text-[#6B7280] mb-3" aria-hidden="true" />
+              <p className="text-sm font-semibold text-[#D1D5DB]">Antrean Percetakan Masih Kosong</p>
+              <p className="text-xs text-[#6B7280] mt-1 max-w-md">
+                Buka tab <strong>Ujian Internal</strong>, lalu klik tombol{" "}
+                <span className="text-[#10B981] font-semibold">"Tambahkan ke Percetakan"</span> pada siswa yang telah lulus
+                ujian dan lunas administrasi.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-4 text-xs gap-1.5 border-[#1F2937] text-[#D1D5DB] hover:text-white"
+                onClick={() => setActiveMainTab("ujian")}
+              >
+                <span>Buka Tab Ujian Internal</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          ) : (
+            <div className="border border-[#1F2937] rounded-xl bg-[#111827] overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0B0F17] text-[#9CA3AF] uppercase text-[10px] tracking-wider border-b border-[#1F2937]">
+                    <tr>
+                      <th className="py-3 px-4 w-12">No</th>
+                      <th className="py-3 px-4">No Sertifikat</th>
+                      <th className="py-3 px-4">Nama Siswa</th>
+                      <th className="py-3 px-4">No. Induk</th>
+                      <th className="py-3 px-4">Tempat & Tanggal Lahir</th>
+                      <th className="py-3 px-4">Program</th>
+                      <th className="py-3 px-4">Periode Belajar</th>
+                      <th className="py-3 px-4">Date of Issue</th>
+                      <th className="py-3 px-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1F2937]">
+                    {queueData.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-[#1F2937]/30 transition-colors">
+                        <td className="py-3 px-4 font-mono font-bold text-[#9CA3AF]">
+                          {String(idx + 1).padStart(3, "0")}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#38BDF8] whitespace-nowrap">
+                          {item.no_sertifikat}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-[#F9FAFB] whitespace-nowrap">
+                          {item.siswa.nama_lengkap}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[#DC2626] font-bold">
+                          {item.siswa.nomor_induk}
+                        </td>
+                        <td className="py-3 px-4 text-[#D1D5DB] whitespace-nowrap">
+                          {item.formatted.place_and_dob}
+                        </td>
+                        <td className="py-3 px-4 text-[#D1D5DB] whitespace-nowrap">
+                          {item.formatted.program_name}
+                        </td>
+                        <td className="py-3 px-4 text-[#9CA3AF] whitespace-nowrap">
+                          {item.formatted.starting_from} &ndash; {item.formatted.to}
+                        </td>
+                        <td className="py-3 px-4 text-[#D1D5DB] whitespace-nowrap">
+                          {item.formatted.date_of_issue}
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-xs gap-1 border-[#1F2937] hover:border-[#38BDF8]/50 text-[#D1D5DB] hover:text-[#38BDF8]"
+                              onClick={() => {
+                                setReviewTarget(item);
+                                setReviewModalOpen(true);
+                              }}
+                              title="Tinjau kelengkapan data sertifikat"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Review</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs border-[#1F2937] hover:border-[#F43F5E]/50 text-[#9CA3AF] hover:text-[#F43F5E]"
+                              disabled={actionLoadingId === item.siswa_id}
+                              onClick={() => handleRemoveFromQueue(item.siswa_id)}
+                              title="Keluarkan dari antrean percetakan"
+                            >
+                              {actionLoadingId === item.siswa_id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-3.5 w-3.5" />
+                              )}
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* KONTEN TAB 3: RIWAYAT CETAK & ALUMNI */}
+      {/* ========================================================================= */}
+      {activeMainTab === "riwayat" && (
+        <div className="flex flex-col gap-5">
+          <div className="p-4 rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/10 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-lg bg-[#38BDF8]/20 text-[#38BDF8]">
+                <History className="h-6 w-6" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-[#F9FAFB]">
+                  Arsip Riwayat Cetak Sertifikat ({historyData.length} Siswa)
+                </h2>
+                <p className="text-xs text-[#9CA3AF] mt-0.5">
+                  Daftar siswa yang sertifikat fisiknya telah diekspor dan berstatus Alumni. Jika file hilang atau salah cetak,
+                  klik tombol <strong>Cetak Ulang</strong> untuk memasukkan kembali ke antrean percetakan.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {loadingQueue ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-xl bg-[#111827] border border-[#1F2937] animate-pulse" />
+              ))}
+            </div>
+          ) : historyData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center border border-[#1F2937] rounded-xl bg-[#111827]">
+              <History className="h-12 w-12 text-[#6B7280] mb-3" aria-hidden="true" />
+              <p className="text-sm font-semibold text-[#D1D5DB]">Belum Ada Riwayat Percetakan</p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Data siswa yang diekspor dari Antrean Percetakan akan tersimpan di sini secara otomatis.
+              </p>
+            </div>
+          ) : (
+            <div className="border border-[#1F2937] rounded-xl bg-[#111827] overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#0B0F17] text-[#9CA3AF] uppercase text-[10px] tracking-wider border-b border-[#1F2937]">
+                    <tr>
+                      <th className="py-3 px-4 w-12">No</th>
+                      <th className="py-3 px-4">No Sertifikat</th>
+                      <th className="py-3 px-4">Nama Siswa</th>
+                      <th className="py-3 px-4">No. Induk</th>
+                      <th className="py-3 px-4">Program</th>
+                      <th className="py-3 px-4">Tanggal Dicetak</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#1F2937]">
+                    {historyData.map((item, idx) => (
+                      <tr key={item.id} className="hover:bg-[#1F2937]/30 transition-colors">
+                        <td className="py-3 px-4 font-mono text-[#9CA3AF]">{idx + 1}</td>
+                        <td className="py-3 px-4 font-mono text-[11px] text-[#38BDF8] whitespace-nowrap">
+                          {item.no_sertifikat}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-[#F9FAFB] whitespace-nowrap">
+                          {item.siswa.nama_lengkap}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[#DC2626] font-bold">
+                          {item.siswa.nomor_induk}
+                        </td>
+                        <td className="py-3 px-4 text-[#D1D5DB] whitespace-nowrap">
+                          {item.formatted.program_name}
+                        </td>
+                        <td className="py-3 px-4 text-[#9CA3AF] whitespace-nowrap">
+                          {item.tgl_cetak ? new Date(item.tgl_cetak).toLocaleDateString("id-ID") : "—"}
+                        </td>
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 px-2 py-0.5 rounded-full">
+                            Tercetak &bull; Alumni
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-xs gap-1 border-[#1F2937] hover:border-[#38BDF8]/50 text-[#D1D5DB] hover:text-[#38BDF8]"
+                              onClick={() => {
+                                setReviewTarget(item);
+                                setReviewModalOpen(true);
+                              }}
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>Lihat</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2.5 text-xs gap-1 border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10"
+                              disabled={actionLoadingId === item.siswa_id}
+                              onClick={() => handleAddToQueue(item.siswa_id)}
+                              title="Masukkan kembali ke antrean percetakan untuk dicetak ulang"
+                            >
+                              {actionLoadingId === item.siswa_id ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              )}
+                              <span>Cetak Ulang</span>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL REVIEW DATA PESERTA PERCETAKAN */}
+      {/* ========================================================================= */}
+      <Modal
+        open={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        title="Review Data Percetakan Sertifikat Fisik"
+        description="Pastikan ejaan nama lengkap, tanggal lahir, nomor induk, dan nama program sudah tepat sesuai kartu identitas peserta."
+      >
+        {reviewTarget && (
+          <div className="flex flex-col gap-4">
+            {/* Box Preview Sertifikat */}
+            <div className="p-4 rounded-xl border border-[#1F2937] bg-[#0B0F17] flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-[#1F2937] pb-2">
+                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">
+                  LPKS Sumbu Hidup &bull; Cilacap
+                </span>
+                <span className="font-mono text-xs font-bold text-[#38BDF8] bg-[#38BDF8]/10 px-2.5 py-0.5 rounded border border-[#38BDF8]/30">
+                  {reviewTarget.no_sertifikat}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Nama Lengkap Peserta</p>
+                  <p className="font-bold text-[#F9FAFB] text-sm mt-0.5">{reviewTarget.siswa.nama_lengkap}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Nomor Induk / Registrasi</p>
+                  <p className="font-mono font-bold text-[#DC2626] text-sm mt-0.5">{reviewTarget.siswa.nomor_induk}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Tempat & Tanggal Lahir</p>
+                  <p className="font-medium text-[#D1D5DB] mt-0.5">{reviewTarget.formatted.place_and_dob}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Program Pelatihan</p>
+                  <p className="font-medium text-[#D1D5DB] mt-0.5">{reviewTarget.formatted.program_name}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Periode Pelatihan (Starting &ndash; To)</p>
+                  <p className="font-medium text-[#D1D5DB] mt-0.5">
+                    {reviewTarget.formatted.starting_from} s/d {reviewTarget.formatted.to}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#6B7280]">Date of Issue (Penerbitan)</p>
+                  <p className="font-medium text-[#D1D5DB] mt-0.5">{reviewTarget.formatted.date_of_issue}</p>
+                </div>
+              </div>
+
+              {/* Rekap Nilai Ujian */}
+              {reviewTarget.ujian && (
+                <div className="mt-2 pt-2 border-t border-[#1F2937]">
+                  <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1.5">
+                    Hasil Ujian Internal (Standar ≥ 80)
+                  </p>
+                  <div className="grid grid-cols-6 gap-2 text-center bg-[#111827] p-2 rounded-lg">
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Teori</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.teori}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Root</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.root}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Hotpass</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.hotpass}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Filler</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.filler}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Capping</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.capping}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-[#6B7280]">Gerinda</p>
+                      <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.gerinda}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => setReviewModalOpen(false)}>
+                Tutup
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL INPUT NILAI UJIAN */}
+      {/* ========================================================================= */}
       <Modal
         open={inputModalOpen}
         onClose={() => !submitting && setInputModalOpen(false)}
@@ -618,47 +1255,58 @@ export default function UjianPage() {
                 min={0}
                 max={100}
                 required
+                data-index={i}
                 value={scores[key as keyof typeof scores]}
-                onChange={(e) => setScores({ ...scores, [key]: e.target.value })}
-                placeholder="80"
-                data-next={KRITERIA_LIST[i + 1]?.key ?? "catatan"}
+                onChange={(e) =>
+                  setScores((prev) => ({
+                    ...prev,
+                    [key]: e.target.value,
+                  }))
+                }
+                placeholder="0–100"
               />
             </div>
           ))}
 
           <div className="col-span-2">
             <Input
-              id="catatan"
               label="Catatan Penguji (Opsional)"
               name="catatan_penguji"
+              type="text"
+              data-index={6}
               value={scores.catatan_penguji}
-              onChange={(e) => setScores({ ...scores, catatan_penguji: e.target.value })}
-              placeholder="Misal: Penetrasi root sangat rapi, capping sedikit tebal"
-              data-next="submit-btn"
+              onChange={(e) =>
+                setScores((prev) => ({
+                  ...prev,
+                  catatan_penguji: e.target.value,
+                }))
+              }
+              placeholder="Catatan hasil pengujian internal las..."
             />
           </div>
 
-          <div className="col-span-2 flex gap-2 justify-end mt-2">
+          <div className="col-span-2 flex justify-end gap-2 mt-2">
             <Button
               type="button"
               variant="outline"
+              size="sm"
               disabled={submitting}
               onClick={() => setInputModalOpen(false)}
             >
               Batal
             </Button>
             <Button
-              id="submit-btn"
               type="submit"
+              size="sm"
               disabled={submitting}
-              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5"
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Menyimpan...
+                  <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Menyimpan...
                 </>
               ) : (
-                "Simpan Nilai Internal"
+                "Simpan Nilai Ujian"
               )}
             </Button>
           </div>

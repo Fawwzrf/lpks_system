@@ -704,8 +704,11 @@ export async function GET(request: NextRequest) {
         });
       }
     } else if (modul === "sertifikat") {
-      const siswaIdParam = request.nextUrl.searchParams.get("siswa_id");
-      const statusParam = request.nextUrl.searchParams.get("status");
+      const searchParams = request.nextUrl.searchParams;
+      const statusParam = searchParams.get("status") || "aktif";
+      const siswaIdParam = searchParams.get("siswa_id");
+      const sourceParam = searchParams.get("source") || (statusParam === "semua" ? "all" : "queue"); // 'queue' | 'history' | 'all'
+      const markAsPrinted = searchParams.get("mark_as_printed") !== "false";
 
       const today = new Date().toISOString().split("T")[0];
       const now = new Date();
@@ -734,19 +737,34 @@ export async function GET(request: NextRequest) {
 
       const ujianMap = new Map((ujianList || []).map((u) => [u.siswa_id, u]));
 
-      // 3. Filter siswa: ambil siswa yang telah lulus ujian ATAU berstatus alumni/lulus
+      // 2.1 Ambil data antrean atau riwayat percetakan sertifikat
+      const { data: sertifikatRecords } = await supabase
+        .from("sertifikat")
+        .select("siswa_id, status, no_sertifikat, tgl_antrean, tgl_cetak");
+
+      const sertifikatStatusMap = new Map((sertifikatRecords || []).map((st) => [st.siswa_id, st.status]));
+
+      // 3. Filter siswa berdasarkan sumber (antrean, riwayat, atau semua yang lulus)
       let candidateList = siswaList || [];
-      if (!siswaIdParam && statusParam !== "semua") {
-        const filtered = candidateList.filter((s) => {
-          const u = ujianMap.get(s.id);
-          if (u?.is_lulus) return true;
-          // Atau jika tanggal keluar sudah lewat (alumni/lulus)
-          if (s.tgl_keluar && s.tgl_keluar <= today) return true;
-          return false;
-        });
-        // Jika dalam DB uji coba belum ada yang bertanda lulus, fallback ke seluruh siswa agar template terisi data
-        if (filtered.length > 0) {
-          candidateList = filtered;
+      if (!siswaIdParam) {
+        if (sourceParam === "queue") {
+          const inQueue = candidateList.filter((s) => sertifikatStatusMap.get(s.id) === "antrean");
+          // Jika ada di antrean, ambil yang di antrean. Jika kosong dan dalam testing/semua, fallback ke yang lulus
+          if (inQueue.length > 0) {
+            candidateList = inQueue;
+          } else if (statusParam !== "semua") {
+            candidateList = []; // Antrean kosong
+          }
+        } else if (sourceParam === "history") {
+          candidateList = candidateList.filter((s) => sertifikatStatusMap.get(s.id) === "dicetak");
+        } else {
+          // 'all': siswa yang telah lulus ujian ATAU berstatus alumni/lulus
+          candidateList = candidateList.filter((s) => {
+            const u = ujianMap.get(s.id);
+            if (u?.is_lulus) return true;
+            if (s.tgl_keluar && s.tgl_keluar <= today) return true;
+            return false;
+          });
         }
       }
 
@@ -889,6 +907,33 @@ export async function GET(request: NextRequest) {
 
       const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
       const filenameSertifikat = `Pembuatan_Sertifikat_Reguler_${today}.xlsx`;
+
+      // Jika diekspor dari antrean percetakan dan opsi mark_as_printed aktif:
+      // Tandai status sertifikat menjadi 'dicetak' dan jadikan siswa sebagai Alumni
+      if (sourceParam === "queue" && markAsPrinted && candidateList.length > 0) {
+        const exportedIds = candidateList.map((s) => s.id);
+        const nowIso = new Date().toISOString();
+
+        // 1. Update status sertifikat
+        await supabase
+          .from("sertifikat")
+          .update({
+            status: "dicetak",
+            tgl_cetak: nowIso,
+            updated_at: nowIso,
+          })
+          .in("siswa_id", exportedIds);
+
+        // 2. Tandai siswa sebagai Alumni jika tgl_keluar belum tercatat atau masih di masa depan
+        for (const cand of candidateList) {
+          if (!cand.tgl_keluar || cand.tgl_keluar > today) {
+            await supabase
+              .from("siswa")
+              .update({ tgl_keluar: today })
+              .eq("id", cand.id);
+          }
+        }
+      }
 
       return new NextResponse(excelBuffer, {
         status: 200,

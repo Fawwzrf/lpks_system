@@ -134,3 +134,16 @@ export interface AuditLog {
   ip_address?: string | null;
   created_at: string;
 }
+
+export interface Sertifikat {
+  id: string;
+  siswa_id: string;
+  status: "antrean" | "dicetak";
+  no_sertifikat?: string | null;
+  urutan_cetak?: number | null;
+  tgl_antrean: string;
+  tgl_cetak?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+

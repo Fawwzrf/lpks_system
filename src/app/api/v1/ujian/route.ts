@@ -11,13 +11,12 @@ export async function GET() {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // 1. Ambil seluruh siswa aktif (abaikan siswa yang dinonaktifkan / dihapus)
+    // 1. Ambil seluruh siswa aktif & alumni yang belum dihapus
     const { data: siswaList, error: siswaErr } = await supabase
       .from("siswa")
       .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, nama, biaya)")
       .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]")
-      .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
       .order("urutan_nomor", { ascending: true, nullsFirst: false })
       .order("nomor_induk", { ascending: true });
 
@@ -31,6 +30,13 @@ export async function GET() {
       .select("*");
 
     const ujianMap = new Map((ujianList || []).map((u) => [u.siswa_id, u]));
+
+    // 2.1 Ambil seluruh status sertifikat percetakan
+    const { data: sertifikatList } = await supabase
+      .from("sertifikat")
+      .select("siswa_id, status, tgl_cetak, tgl_antrean");
+
+    const sertifikatMap = new Map((sertifikatList || []).map((st) => [st.siswa_id, st]));
 
     // 3. Ambil seluruh data transaksi keuangan
     const { data: txList } = await supabase
@@ -66,6 +72,7 @@ export async function GET() {
 
     const result = (siswaList || []).map((s) => {
       const u = ujianMap.get(s.id) || null;
+      const st = sertifikatMap.get(s.id) || null;
       const program = (s.program as unknown) as { nama: string; biaya: number } | null;
       const totalBiaya = Number(program?.biaya || 0);
       const totalTerbayar = txMap.get(s.id) || 0;
@@ -78,11 +85,16 @@ export async function GET() {
         nomor_induk: s.nomor_induk,
         nama_lengkap: s.nama_lengkap,
         program_nama: program?.nama || "Umum",
+        tgl_masuk: s.tgl_masuk,
+        tgl_keluar: s.tgl_keluar,
         total_biaya: totalBiaya,
         total_terbayar: totalTerbayar,
         is_lunas: isLunas,
         nilai_harian_ok: isNilaiHarianOk,
         ujian: u,
+        status_sertifikat: st?.status || null,
+        tgl_cetak_sertifikat: st?.tgl_cetak || null,
+        tgl_antrean_sertifikat: st?.tgl_antrean || null,
       };
     });
 
@@ -90,8 +102,9 @@ export async function GET() {
     result.sort((a, b) => {
       const getPriority = (item: typeof a) => {
         if (item.nilai_harian_ok && !item.ujian?.is_lulus) return 0; // Siap & menunggu ujian internal
-        if (item.nilai_harian_ok && item.ujian?.is_lulus) return 1;  // Sudah lulus ujian internal
-        return 2; // Belum memenuhi syarat nilai harian
+        if (item.nilai_harian_ok && item.ujian?.is_lulus && item.status_sertifikat !== "dicetak") return 1;  // Sudah lulus & antrean/belum cetak
+        if (!item.nilai_harian_ok && !item.ujian?.is_lulus) return 2; // Belum memenuhi syarat nilai harian
+        return 3; // Sudah dicetak (arsip)
       };
 
       const pDiff = getPriority(a) - getPriority(b);
