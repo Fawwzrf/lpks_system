@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import * as XLSX from "xlsx";
+import { NAMA_BULAN, NAMA_BULAN_UPPER, ROMAN_MONTHS, toRomanMonth, formatIndoDate, formatDDMMYYYY } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -101,10 +102,6 @@ export async function GET(request: NextRequest) {
         });
       } else {
         // Format Rekap Kas Bulanan (sesuai buku kas fisik: No, Nama Siswa, Tanggal Pembayaran, Pembayaran Bulan Ini, Akumulasi Saldo, Jumlah Saldo Bulan Ini)
-        const NAMA_BULAN = [
-          "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-          "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-        ];
         const now = new Date();
         const paramBulan = parseInt(request.nextUrl.searchParams.get("bulan") || String(now.getMonth() + 1), 10);
         const paramTahun = parseInt(request.nextUrl.searchParams.get("tahun") || String(now.getFullYear()), 10);
@@ -248,10 +245,7 @@ export async function GET(request: NextRequest) {
       let periodeLabel = "";
       let monthName = "";
 
-      const NAMA_BULAN = [
-        "JANUARI", "FEBRUARI", "MARET", "APRIL", "MEI", "JUNI",
-        "JULI", "AGUSTUS", "SEPTEMBER", "OKTOBER", "NOVEMBER", "DESEMBER"
-      ];
+      const NAMA_BULAN = NAMA_BULAN_UPPER;
 
       if (paramStartDate && paramEndDate) {
         const start = new Date(paramStartDate);
@@ -779,11 +773,6 @@ export async function GET(request: NextRequest) {
         return (b.nomor_induk || "").localeCompare(a.nomor_induk || "");
       });
 
-      const ROMAN_MONTHS = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
-      const NAMA_BULAN_INDO = [
-        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-      ];
 
       // Format Baris Excel Sesuai Template Percetakan:
       // Baris 1: Kolom B: Tanggal Ekspor (DD/MM/YYYY), Kolom C-I (Merge): PEMBUATAN SERTIFIKAT REGULER
@@ -831,9 +820,9 @@ export async function GET(request: NextRequest) {
             const yearTo = dTo.getFullYear();
 
             toDateFormatted = `${dayTo}/${monthToStr}/${yearTo}`;
-            romanMonth = ROMAN_MONTHS[monthToNum] || "I";
+            romanMonth = toRomanMonth(monthToNum);
             certYear = yearTo;
-            dateOfIssue = `Cilacap, ${dayTo} ${NAMA_BULAN_INDO[dTo.getMonth()]} ${yearTo}`;
+            dateOfIssue = `Cilacap, ${dayTo} ${NAMA_BULAN[dTo.getMonth()]} ${yearTo}`;
           }
         }
 
@@ -846,7 +835,7 @@ export async function GET(request: NextRequest) {
           const dDob = new Date(s.tgl_lahir);
           if (!isNaN(dDob.getTime())) {
             const dayDob = String(dDob.getDate()).padStart(2, "0");
-            const monthDob = NAMA_BULAN_INDO[dDob.getMonth()];
+            const monthDob = NAMA_BULAN[dDob.getMonth()];
             const yearDob = dDob.getFullYear();
             const dobStr = `${dayDob} ${monthDob} ${yearDob}`;
             placeAndDob = s.tempat_lahir ? `${s.tempat_lahir}, ${dobStr}` : dobStr;

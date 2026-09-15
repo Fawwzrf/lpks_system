@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { buildKriteriaPassMap } from "@/lib/nilai-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,21 +49,18 @@ export async function GET(request: NextRequest) {
       .from("penilaian_harian")
       .select("siswa_id, kriteria_id, nilai");
 
-    const studentKriteriaPass = new Map<string, Set<string>>();
-    (nilaiHarian || []).forEach((nh) => {
-      if (nh.nilai >= 80) {
-        if (!studentKriteriaPass.has(nh.siswa_id)) {
-          studentKriteriaPass.set(nh.siswa_id, new Set());
-        }
-        studentKriteriaPass.get(nh.siswa_id)!.add(nh.kriteria_id);
-      }
-    });
+    const { count: totalKriteria } = await supabase
+      .from("master_kriteria")
+      .select("*", { count: "exact", head: true });
+    const kriteriaThreshold = totalKriteria || 5;
+
+    const studentKriteriaPass = buildKriteriaPassMap(nilaiHarian || []);
 
     let siapUjianCount = 0;
     activeSiswa.forEach((s) => {
       const passedCount = studentKriteriaPass.get(s.id)?.size || 0;
       const isLulus = lulusUjianSet.has(s.id);
-      if (passedCount >= 5 && !isLulus) {
+      if (passedCount >= kriteriaThreshold && !isLulus) {
         siapUjianCount++;
       }
     });

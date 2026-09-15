@@ -1,37 +1,7 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
-
-// Helper konversi angka ke angka romawi
-function toRomanMonth(monthNum: number): string {
-  const romanMonths = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
-  return romanMonths[monthNum - 1] || "I";
-}
-
-const BULAN_INDO = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-];
-
-function formatIndoDate(dateStr?: string | null): string {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "—";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = BULAN_INDO[d.getMonth()];
-  const year = d.getFullYear();
-  return `${day} ${month} ${year}`;
-}
-
-function formatDDMMYYYY(dateStr?: string | null): string {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "—";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-}
+import { toRomanMonth, formatIndoDate, formatDDMMYYYY } from "@/lib/date-utils";
 
 // GET: Ambil daftar siswa di antrean atau riwayat percetakan sertifikat
 export async function GET(request: NextRequest) {
