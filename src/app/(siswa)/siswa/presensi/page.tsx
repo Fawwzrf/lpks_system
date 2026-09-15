@@ -391,9 +391,9 @@ export default function PresensiSiswaPage() {
 
       {/* Absen & Izin Buttons */}
       {alreadyAbsen ? (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-[#111827] border border-[#1F2937]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-[#10B981]/8 border border-[#10B981]/30 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[#1F2937]">
+            <div className="h-10 w-10 rounded-xl bg-[#10B981]/15 border border-[#10B981]/30 flex items-center justify-center shrink-0">
               {STATUS_ICON[todayRecord?.status || "Hadir"]}
             </div>
             <div>
@@ -407,26 +407,48 @@ export default function PresensiSiswaPage() {
               )}
             </div>
           </div>
-          <div className="text-[11px] font-mono text-[#9CA3AF] bg-[#1F2937] px-2.5 py-1 rounded-md shrink-0">
+          <div className="text-[11px] font-mono text-[#10B981] bg-[#0B0F17] border border-[#10B981]/20 px-3 py-1 rounded-lg shrink-0 font-medium">
             {todayRecord?.jam ? `Pukul ${todayRecord.jam}` : "Hari ini"}
           </div>
         </div>
       ) : (
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="flex flex-col gap-2.5">
           <button
             onClick={doAbsen}
             disabled={!inZone || absenLoading || !isHariAktif || remainingAttempts <= 0}
-            className="flex-1 w-full h-12 rounded-xl bg-[#DC2626] hover:bg-[#B91C1C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-[#DC2626]/20"
+            className={`w-full h-12 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2.5 ${
+              inZone && isHariAktif && remainingAttempts > 0 && !absenLoading
+                ? "bg-gradient-to-r from-[#DC2626] via-[#E11D48] to-[#B91C1C] hover:brightness-110 active:scale-[0.98] text-white shadow-lg shadow-red-600/25 cursor-pointer"
+                : "bg-[#1F2937]/80 border border-[#374151]/70 text-[#9CA3AF] cursor-not-allowed opacity-75"
+            }`}
             aria-disabled={!inZone || !isHariAktif || remainingAttempts <= 0}
           >
             {absenLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" /> Mencatat absen...
               </>
+            ) : !isHariAktif ? (
+              <>
+                <Clock className="h-4 w-4 text-[#6B7280]" aria-hidden="true" /> Hari Libur — Presensi Tutup
+              </>
+            ) : remainingAttempts <= 0 ? (
+              <>
+                <AlertTriangle className="h-4 w-4 text-[#F59E0B]" aria-hidden="true" /> Batas Presensi Hari Ini Habis
+              </>
+            ) : !inZone ? (
+              <>
+                <MapPin className="h-4 w-4 text-[#6B7280]" aria-hidden="true" />
+                <span>Absen Sekarang (Di Luar Radius)</span>
+              </>
             ) : (
               <>
-                <MapPin className="h-4 w-4" aria-hidden="true" /> Absen Sekarang{" "}
-                {remainingAttempts < 3 && `(Sisa ${remainingAttempts}x)`}
+                <MapPin className="h-4 w-4 text-white" aria-hidden="true" />
+                <span>Absen Sekarang</span>
+                {remainingAttempts < 3 && (
+                  <span className="text-[10px] font-normal px-2 py-0.5 rounded-full bg-black/30 text-white/90">
+                    Sisa {remainingAttempts}x
+                  </span>
+                )}
               </>
             )}
           </button>
@@ -434,10 +456,10 @@ export default function PresensiSiswaPage() {
           <button
             onClick={() => setIzinModalOpen(true)}
             type="button"
-            className="w-full sm:w-auto h-12 px-5 rounded-xl border border-[#374151] hover:border-[#F59E0B] bg-[#111827] hover:bg-[#F59E0B]/10 text-[#F59E0B] text-xs font-bold transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+            className="w-full h-11 px-4 rounded-xl border border-[#374151] bg-[#161F30]/80 hover:bg-[#1F2937] hover:border-[#F59E0B]/50 text-[#D1D5DB] hover:text-white text-xs font-semibold transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] cursor-pointer"
           >
-            <AlertTriangle className="h-4 w-4" />
-            Ajukan Izin / Sakit
+            <FileText className="h-4 w-4 text-[#F59E0B]" />
+            <span>Ajukan Izin / Sakit</span>
           </button>
         </div>
       )}
@@ -566,20 +588,20 @@ export default function PresensiSiswaPage() {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+          <div className="flex items-center justify-end gap-2 pt-2.5 border-t border-[#1F2937]">
             <button
               type="button"
               onClick={() => setIzinModalOpen(false)}
-              className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white hover:bg-[#1F2937]"
+              className="h-9 px-3.5 rounded-xl border border-[#374151] text-xs text-[#9CA3AF] hover:text-white hover:bg-[#1F2937] transition-all cursor-pointer"
             >
               Batal
             </button>
             <button
               type="submit"
               disabled={izinSubmitting}
-              className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
+              className="h-9 px-4 rounded-xl bg-gradient-to-r from-[#DC2626] to-[#B91C1C] hover:brightness-110 active:scale-[0.98] text-xs font-bold text-white flex items-center gap-1.5 shadow-md shadow-red-900/20 disabled:opacity-50 transition-all cursor-pointer"
             >
-              {izinSubmitting && <Loader2 className="h-3 w-3 animate-spin" />}
+              {izinSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Kirim Pengajuan
             </button>
           </div>
