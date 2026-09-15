@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+const MAIN_NAV_ITEMS = [
   { href: "/superadmin/dashboard",   icon: LayoutDashboard, label: "Dashboard" },
   { href: "/superadmin/pendaftaran", icon: UserPlus,         label: "Pendaftaran" },
   { href: "/superadmin/siswa",       icon: Users,            label: "Data Siswa" },
@@ -18,9 +18,14 @@ const NAV_ITEMS = [
   { href: "/superadmin/keuangan",    icon: Wallet,           label: "Keuangan" },
   { href: "/superadmin/penilaian",   icon: ClipboardList,    label: "Penilaian Harian" },
   { href: "/superadmin/ujian",       icon: Award,            label: "Ujian & Sertifikat" },
+] as const;
+
+const BOTTOM_NAV_ITEMS = [
   { href: "/superadmin/master",      icon: Settings,         label: "Master Data" },
   { href: "/superadmin/ai",          icon: Bot,              label: "AI Showcase" },
 ] as const;
+
+type NavItemType = (typeof MAIN_NAV_ITEMS)[number] | (typeof BOTTOM_NAV_ITEMS)[number];
 
 function NavItem({
   item,
@@ -28,7 +33,7 @@ function NavItem({
   collapsed,
   onClick,
 }: {
-  item: (typeof NAV_ITEMS)[number];
+  item: NavItemType;
   active: boolean;
   collapsed?: boolean;
   onClick?: () => void;
@@ -122,9 +127,9 @@ function Sidebar({
         )}
       </div>
 
-      {/* Nav */}
+      {/* Nav Utama (Operasional Harian) */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 flex flex-col gap-1" aria-label="Menu utama">
-        {NAV_ITEMS.map((item) => (
+        {MAIN_NAV_ITEMS.map((item) => (
           <NavItem
             key={item.href}
             item={item}
@@ -135,11 +140,20 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 py-4 border-t border-[#1F2937]">
+      {/* Nav Bawah: Master Data & AI Showcase Menempel ke Tombol Keluar */}
+      <div className="px-3 py-3 border-t border-[#1F2937] flex flex-col gap-1">
+        {BOTTOM_NAV_ITEMS.map((item) => (
+          <NavItem
+            key={item.href}
+            item={item}
+            active={pathname.startsWith(item.href)}
+            collapsed={collapsed && !isMobile}
+            onClick={isMobile ? onClose : undefined}
+          />
+        ))}
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-xs font-medium text-[#9CA3AF] hover:text-[#F43F5E] hover:bg-[#F43F5E]/10 transition-all duration-150"
+          className="flex items-center gap-3 w-full rounded-xl px-3 py-2.5 text-xs font-medium text-[#9CA3AF] hover:text-[#F43F5E] hover:bg-[#F43F5E]/10 transition-all duration-150 mt-1"
         >
           <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
           {(!collapsed || isMobile) && <span>Keluar</span>}
