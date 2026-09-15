@@ -401,58 +401,6 @@
       "source_location": "L27"
     },
     {
-      "id": "src_app_superadmin_superadmin_siswa_page_filterstatus",
-      "label": "FilterStatus",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "filterstatus",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L41"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_programitem",
-      "label": "ProgramItem",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "programitem",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L35"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswaitem",
-      "label": "SiswaItem",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "siswaitem",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L17"
-    },
-    {
-      "id": "src_components_ui_badge_badgeprops",
-      "label": "BadgeProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "badgeprops",
-      "source_file": "src/components/ui/badge.tsx",
-      "source_location": "L4"
-    },
-    {
       "id": "src_components_ui_table_column",
       "label": "Column",
       "_callable": true,
@@ -477,6 +425,19 @@
       "norm_label": "tableprops",
       "source_file": "src/components/ui/table.tsx",
       "source_location": "L13"
+    },
+    {
+      "id": "src_components_ui_skeleton_skeletonprops",
+      "label": "SkeletonProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "skeletonprops",
+      "source_file": "src/components/ui/skeleton.tsx",
+      "source_location": "L4"
     },
     {
       "id": "src_app_siswa_siswa_transkrip_page_kriteriastatus",
@@ -505,26 +466,13 @@
       "source_location": "L6"
     },
     {
-      "id": "src_app_siswa_siswa_beranda_page_studentdashboarddata",
-      "label": "StudentDashboardData",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "studentdashboarddata",
-      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
-      "source_location": "L10"
-    },
-    {
       "id": "src_app_siswa_siswa_keuangan_page_keuangandata",
       "label": "KeuanganData",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "keuangandata",
       "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
@@ -537,7 +485,7 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "transaksiitem",
       "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
@@ -550,24 +498,11 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "dashboardstats",
       "source_file": "src/app/(superadmin)/superadmin/dashboard/page.tsx",
       "source_location": "L13"
-    },
-    {
-      "id": "src_components_ui_skeleton_skeletonprops",
-      "label": "SkeletonProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "skeletonprops",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L4"
     },
     {
       "id": "src_components_ui_stat_card_statcardprops",
@@ -576,50 +511,11 @@
       "_callable_class": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "statcardprops",
       "source_file": "src/components/ui/stat-card.tsx",
       "source_location": "L5"
-    },
-    {
-      "id": "src_app_siswa_siswa_nilai_page_kriteriaitem",
-      "label": "KriteriaItem",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "kriteriaitem",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L9"
-    },
-    {
-      "id": "src_app_siswa_siswa_nilai_page_riwayatgrouped",
-      "label": "RiwayatGrouped",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "riwayatgrouped",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L16"
-    },
-    {
-      "id": "src_app_siswa_siswa_presensi_page_presensiitem",
-      "label": "PresensiItem",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "presensiitem",
-      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
-      "source_location": "L14"
     },
     {
       "id": "src_app_superadmin_superadmin_master_page_berkasitem",
@@ -687,56 +583,43 @@
       "source_location": "L23"
     },
     {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_fielderrors",
+      "label": "FieldErrors",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "fielderrors",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L13"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_pageprops",
+      "label": "PageProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "pageprops",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L56"
+    },
+    {
       "id": "src_app_superadmin_superadmin_ujian_page_siswaujianitem",
       "label": "SiswaUjianItem",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
       "file_type": "code",
       "norm_label": "siswaujianitem",
       "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
       "source_location": "L11"
-    },
-    {
-      "id": "src_components_ui_button_buttonprops",
-      "label": "ButtonProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "buttonprops",
-      "source_file": "src/components/ui/button.tsx",
-      "source_location": "L4"
-    },
-    {
-      "id": "src_components_ui_input_inputprops",
-      "label": "InputProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "inputprops",
-      "source_file": "src/components/ui/input.tsx",
-      "source_location": "L4"
-    },
-    {
-      "id": "src_components_ui_modal_modalprops",
-      "label": "ModalProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "modalprops",
-      "source_file": "src/components/ui/modal.tsx",
-      "source_location": "L8"
     },
     {
       "id": "tests_integration_auth_rbac_test_authcontext",
@@ -750,6 +633,58 @@
       "norm_label": "authcontext",
       "source_file": "tests/integration/auth-rbac.test.ts",
       "source_location": "L6"
+    },
+    {
+      "id": "src_app_siswa_siswa_beranda_page_studentdashboarddata",
+      "label": "StudentDashboardData",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "studentdashboarddata",
+      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
+      "source_location": "L10"
+    },
+    {
+      "id": "src_components_ui_badge_badgeprops",
+      "label": "BadgeProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "badgeprops",
+      "source_file": "src/components/ui/badge.tsx",
+      "source_location": "L4"
+    },
+    {
+      "id": "src_app_siswa_siswa_nilai_page_kriteriaitem",
+      "label": "KriteriaItem",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "kriteriaitem",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L9"
+    },
+    {
+      "id": "src_app_siswa_siswa_nilai_page_riwayatgrouped",
+      "label": "RiwayatGrouped",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "riwayatgrouped",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L16"
     },
     {
       "id": "src_app_superadmin_superadmin_keuangan_page_programitem",
@@ -815,6 +750,71 @@
       "norm_label": "transaksiitem",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
       "source_location": "L31"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_filterstatus",
+      "label": "FilterStatus",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "filterstatus",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L41"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_programitem",
+      "label": "ProgramItem",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "programitem",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L35"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswaitem",
+      "label": "SiswaItem",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "siswaitem",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L17"
+    },
+    {
+      "id": "src_components_ui_button_buttonprops",
+      "label": "ButtonProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "buttonprops",
+      "source_file": "src/components/ui/button.tsx",
+      "source_location": "L4"
+    },
+    {
+      "id": "src_components_ui_modal_modalprops",
+      "label": "ModalProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "modalprops",
+      "source_file": "src/components/ui/modal.tsx",
+      "source_location": "L8"
     },
     {
       "id": "src_components_ui_select_selectprops",
@@ -908,6 +908,19 @@
       "source_location": "L103"
     },
     {
+      "id": "src_components_ui_input_inputprops",
+      "label": "InputProps",
+      "_callable": true,
+      "_callable_class": true,
+      "_origin": "ast",
+      "community": 40,
+      "community_name": "penilaian/page.tsx",
+      "file_type": "code",
+      "norm_label": "inputprops",
+      "source_file": "src/components/ui/input.tsx",
+      "source_location": "L4"
+    },
+    {
       "id": "src_app_mockup_page_activetab",
       "label": "ActiveTab",
       "_callable": true,
@@ -973,30 +986,17 @@
       "source_location": "L31"
     },
     {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_fielderrors",
-      "label": "FieldErrors",
+      "id": "src_app_siswa_siswa_presensi_page_presensiitem",
+      "label": "PresensiItem",
       "_callable": true,
       "_callable_class": true,
       "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
+      "community": 9,
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
-      "norm_label": "fielderrors",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L13"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_pageprops",
-      "label": "PageProps",
-      "_callable": true,
-      "_callable_class": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "pageprops",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L57"
+      "norm_label": "presensiitem",
+      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
+      "source_location": "L14"
     },
     {
       "id": "src_app_api_v1_ai_query_route_post",
@@ -1093,6 +1093,18 @@
       "norm_label": "get()",
       "source_file": "src/app/api/v1/excel/export/route.ts",
       "source_location": "L6"
+    },
+    {
+      "id": "src_app_api_v1_excel_import_route_parseexceldate",
+      "label": "parseExcelDate()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "parseexceldate()",
+      "source_file": "src/app/api/v1/excel/import/route.ts",
+      "source_location": "L9"
     },
     {
       "id": "src_app_api_v1_excel_import_route_post",
@@ -1407,6 +1419,18 @@
       "source_location": "L11"
     },
     {
+      "id": "src_app_api_v1_siswa_id_credentials_route_put",
+      "label": "PUT()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "put()",
+      "source_file": "src/app/api/v1/siswa/[id]/credentials/route.ts",
+      "source_location": "L7"
+    },
+    {
       "id": "src_app_api_v1_siswa_id_route_delete",
       "label": "DELETE()",
       "_callable": true,
@@ -1416,7 +1440,7 @@
       "file_type": "code",
       "norm_label": "delete()",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L129"
+      "source_location": "L180"
     },
     {
       "id": "src_app_api_v1_siswa_id_route_get",
@@ -1465,6 +1489,18 @@
       "norm_label": "get()",
       "source_file": "src/app/api/v1/siswa/route.ts",
       "source_location": "L7"
+    },
+    {
+      "id": "src_app_api_v1_siswa_route_post",
+      "label": "POST()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "post()",
+      "source_file": "src/app/api/v1/siswa/route.ts",
+      "source_location": "L87"
     },
     {
       "id": "src_app_api_v1_ujian_route_get",
@@ -1599,6 +1635,18 @@
       "source_location": "L29"
     },
     {
+      "id": "src_lib_gate_checks_generatestudentpassword",
+      "label": "generateStudentPassword()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "generatestudentpassword()",
+      "source_file": "src/lib/gate-checks.ts",
+      "source_location": "L153"
+    },
+    {
       "id": "src_lib_gemini_getgeminiclient",
       "label": "getGeminiClient()",
       "_callable": true,
@@ -1608,6 +1656,18 @@
       "file_type": "code",
       "norm_label": "getgeminiclient()",
       "source_file": "src/lib/gemini.ts",
+      "source_location": "L5"
+    },
+    {
+      "id": "src_lib_supabase_admin_createadminclient",
+      "label": "createAdminClient()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "createadminclient()",
+      "source_file": "src/lib/supabase/admin.ts",
       "source_location": "L5"
     },
     {
@@ -1635,88 +1695,124 @@
       "source_location": "L4"
     },
     {
-      "id": "src_app_superadmin_superadmin_master_page_masterpage",
-      "label": "MasterPage()",
+      "id": "src_app_auth_login_page_siswaloginpage",
+      "label": "SiswaLoginPage()",
       "_callable": true,
       "_origin": "ast",
       "community": 1,
-      "community_name": "MasterPage",
+      "community_name": "form-utils.ts",
       "file_type": "code",
-      "norm_label": "masterpage()",
-      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
-      "source_location": "L62"
+      "norm_label": "siswaloginpage()",
+      "source_file": "src/app/(auth)/login/page.tsx",
+      "source_location": "L9"
     },
     {
-      "id": "src_app_superadmin_superadmin_master_page_masterpage_handleaddsubmit",
-      "label": "handleAddSubmit()",
+      "id": "src_app_auth_login_page_siswaloginpage_handlesubmit",
+      "label": "handleSubmit()",
       "_callable": true,
       "_origin": "ast",
       "community": 1,
-      "community_name": "MasterPage",
+      "community_name": "form-utils.ts",
       "file_type": "code",
-      "norm_label": "handleaddsubmit()",
-      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
-      "source_location": "L128"
+      "norm_label": "handlesubmit()",
+      "source_file": "src/app/(auth)/login/page.tsx",
+      "source_location": "L16"
     },
     {
-      "id": "src_app_superadmin_superadmin_master_page_masterpage_handledelete",
-      "label": "handleDelete()",
+      "id": "src_app_auth_superadmin_login_page_adminloginpage",
+      "label": "AdminLoginPage()",
       "_callable": true,
       "_origin": "ast",
       "community": 1,
-      "community_name": "MasterPage",
+      "community_name": "form-utils.ts",
       "file_type": "code",
-      "norm_label": "handledelete()",
-      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
-      "source_location": "L186"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_master_page_masterpage_handlesavelokasi",
-      "label": "handleSaveLokasi()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 1,
-      "community_name": "MasterPage",
-      "file_type": "code",
-      "norm_label": "handlesavelokasi()",
-      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
-      "source_location": "L212"
-    },
-    {
-      "id": "src_app_page_home",
-      "label": "Home()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "home()",
-      "source_file": "src/app/page.tsx",
-      "source_location": "L6"
-    },
-    {
-      "id": "src_components_ui_badge_badge",
-      "label": "Badge()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "badge()",
-      "source_file": "src/components/ui/badge.tsx",
+      "norm_label": "adminloginpage()",
+      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
       "source_location": "L8"
     },
     {
-      "id": "src_components_ui_skeleton_tableskeleton",
-      "label": "TableSkeleton()",
+      "id": "src_app_auth_superadmin_login_page_adminloginpage_handlesubmit",
+      "label": "handleSubmit()",
       "_callable": true,
       "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
+      "community": 1,
+      "community_name": "form-utils.ts",
       "file_type": "code",
-      "norm_label": "tableskeleton()",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L17"
+      "norm_label": "handlesubmit()",
+      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
+      "source_location": "L14"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page_akunform",
+      "label": "AkunForm()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "akunform()",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L10"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page_akunform_handlesubmit",
+      "label": "handleSubmit()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "handlesubmit()",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L47"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page_akunform_loadme",
+      "label": "loadMe()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "loadme()",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L25"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page_akunpage",
+      "label": "AkunPage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "akunpage()",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L229"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page_akunskeleton",
+      "label": "AkunSkeleton()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "akunskeleton()",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L212"
+    },
+    {
+      "id": "src_lib_form_utils_handleentertonextfield",
+      "label": "handleEnterToNextField()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "handleentertonextfield()",
+      "source_file": "src/lib/form-utils.ts",
+      "source_location": "L9"
     },
     {
       "id": "src_components_ui_table_table",
@@ -1729,6 +1825,66 @@
       "norm_label": "table()",
       "source_file": "src/components/ui/table.tsx",
       "source_location": "L20"
+    },
+    {
+      "id": "src_app_siswa_loading_siswaloading",
+      "label": "SiswaLoading()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "siswaloading()",
+      "source_file": "src/app/(siswa)/loading.tsx",
+      "source_location": "L3"
+    },
+    {
+      "id": "src_app_superadmin_loading_loading",
+      "label": "Loading()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "loading()",
+      "source_file": "src/app/(superadmin)/loading.tsx",
+      "source_location": "L3"
+    },
+    {
+      "id": "src_components_ui_skeleton_cardskeleton",
+      "label": "CardSkeleton()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "cardskeleton()",
+      "source_file": "src/components/ui/skeleton.tsx",
+      "source_location": "L66"
+    },
+    {
+      "id": "src_components_ui_skeleton_pageskeleton",
+      "label": "PageSkeleton()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "pageskeleton()",
+      "source_file": "src/components/ui/skeleton.tsx",
+      "source_location": "L86"
+    },
+    {
+      "id": "src_components_ui_skeleton_skeleton",
+      "label": "Skeleton()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "skeleton()",
+      "source_file": "src/components/ui/skeleton.tsx",
+      "source_location": "L8"
     },
     {
       "id": "src_app_siswa_siswa_transkrip_page_kompetensiicon",
@@ -1815,52 +1971,40 @@
       "source_location": "L20"
     },
     {
-      "id": "src_app_siswa_loading_siswaloading",
-      "label": "SiswaLoading()",
+      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage",
+      "label": "KeuanganSiswaPage()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
-      "norm_label": "siswaloading()",
-      "source_file": "src/app/(siswa)/loading.tsx",
-      "source_location": "L3"
+      "norm_label": "keuangansiswapage()",
+      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
+      "source_location": "L26"
     },
     {
-      "id": "src_app_siswa_siswa_beranda_page_berandapage",
-      "label": "BerandaPage()",
+      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage_downloadsertifikat",
+      "label": "downloadSertifikat()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
-      "norm_label": "berandapage()",
-      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
-      "source_location": "L22"
+      "norm_label": "downloadsertifikat()",
+      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
+      "source_location": "L69"
     },
     {
-      "id": "src_app_siswa_siswa_beranda_page_berandapage_loaddashboard",
-      "label": "loadDashboard()",
+      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage_loadkeuangan",
+      "label": "loadKeuangan()",
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
-      "norm_label": "loaddashboard()",
-      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
-      "source_location": "L27"
-    },
-    {
-      "id": "src_app_superadmin_loading_loading",
-      "label": "Loading()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "loading()",
-      "source_file": "src/app/(superadmin)/loading.tsx",
-      "source_location": "L3"
+      "norm_label": "loadkeuangan()",
+      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
+      "source_location": "L35"
     },
     {
       "id": "src_app_superadmin_superadmin_dashboard_page_dashboardpage",
@@ -1868,7 +2012,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "dashboardpage()",
       "source_file": "src/app/(superadmin)/superadmin/dashboard/page.tsx",
@@ -1880,47 +2024,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "loaddashboard()",
       "source_file": "src/app/(superadmin)/superadmin/dashboard/page.tsx",
       "source_location": "L39"
-    },
-    {
-      "id": "src_components_ui_skeleton_cardskeleton",
-      "label": "CardSkeleton()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "cardskeleton()",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L66"
-    },
-    {
-      "id": "src_components_ui_skeleton_pageskeleton",
-      "label": "PageSkeleton()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "pageskeleton()",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L86"
-    },
-    {
-      "id": "src_components_ui_skeleton_skeleton",
-      "label": "Skeleton()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "skeleton()",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L8"
     },
     {
       "id": "src_components_ui_stat_card_statcard",
@@ -1928,10 +2036,22 @@
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "statcard()",
       "source_file": "src/components/ui/stat-card.tsx",
+      "source_location": "L16"
+    },
+    {
+      "id": "src_lib_utils_formatdateindo",
+      "label": "formatDateIndo()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 17,
+      "community_name": "utils.ts",
+      "file_type": "code",
+      "norm_label": "formatdateindo()",
+      "source_file": "src/lib/utils.ts",
       "source_location": "L16"
     },
     {
@@ -1940,7 +2060,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "formatrupiah()",
       "source_file": "src/lib/utils.ts",
@@ -1971,136 +2091,136 @@
       "source_location": "L4"
     },
     {
-      "id": "src_app_siswa_siswa_nilai_page_nilaipage",
-      "label": "NilaiPage()",
+      "id": "src_app_superadmin_superadmin_master_page_masterpage",
+      "label": "MasterPage()",
       "_callable": true,
       "_origin": "ast",
       "community": 19,
       "community_name": "master/page.tsx",
       "file_type": "code",
-      "norm_label": "nilaipage()",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L23"
+      "norm_label": "masterpage()",
+      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
+      "source_location": "L62"
     },
     {
-      "id": "src_app_siswa_siswa_nilai_page_nilaipage_handlechange",
-      "label": "handleChange()",
+      "id": "src_app_superadmin_superadmin_master_page_masterpage_handleaddsubmit",
+      "label": "handleAddSubmit()",
       "_callable": true,
       "_origin": "ast",
       "community": 19,
       "community_name": "master/page.tsx",
       "file_type": "code",
-      "norm_label": "handlechange()",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L87"
+      "norm_label": "handleaddsubmit()",
+      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
+      "source_location": "L128"
     },
     {
-      "id": "src_app_siswa_siswa_nilai_page_nilaipage_handlesubmit",
+      "id": "src_app_superadmin_superadmin_master_page_masterpage_handledelete",
+      "label": "handleDelete()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "master/page.tsx",
+      "file_type": "code",
+      "norm_label": "handledelete()",
+      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
+      "source_location": "L186"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_master_page_masterpage_handlesavelokasi",
+      "label": "handleSaveLokasi()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 19,
+      "community_name": "master/page.tsx",
+      "file_type": "code",
+      "norm_label": "handlesavelokasi()",
+      "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
+      "source_location": "L212"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage",
+      "label": "EditSiswaPage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "editsiswapage()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L60"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlefieldblur",
+      "label": "handleFieldBlur()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "handlefieldblur()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L154"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlefieldchange",
+      "label": "handleFieldChange()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "handlefieldchange()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L147"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlesubmit",
       "label": "handleSubmit()",
       "_callable": true,
       "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
       "file_type": "code",
       "norm_label": "handlesubmit()",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L93"
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L162"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_validatefield",
+      "label": "validateField()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "validatefield()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L15"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_validateform",
+      "label": "validateForm()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "validateform()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L47"
     },
     {
       "id": "src_app_superadmin_superadmin_ujian_page_gateindicator",
       "label": "GateIndicator()",
       "_callable": true,
       "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
       "file_type": "code",
       "norm_label": "gateindicator()",
       "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
       "source_location": "L43"
-    },
-    {
-      "id": "src_components_ui_modal_modal",
-      "label": "Modal()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "modal()",
-      "source_file": "src/components/ui/modal.tsx",
-      "source_location": "L17"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage",
-      "label": "SiswaPage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "siswapage()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L43"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handledeleteconfirm",
-      "label": "handleDeleteConfirm()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "handledeleteconfirm()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L176"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handleimport",
-      "label": "handleImport()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "handleimport()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L194"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handlesavecredentials",
-      "label": "handleSaveCredentials()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "handlesavecredentials()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L133"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_loadprograms",
-      "label": "loadPrograms()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "loadprograms()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L76"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_openkelolaakun",
-      "label": "openKelolaAkun()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 20,
-      "community_name": "SiswaPage",
-      "file_type": "code",
-      "norm_label": "openkelolaakun()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L125"
     },
     {
       "id": "src_app_superadmin_superadmin_ujian_page_ujianpage",
@@ -2108,11 +2228,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "UjianPage",
+      "community_name": "ujian/page.tsx",
       "file_type": "code",
       "norm_label": "ujianpage()",
       "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
       "source_location": "L56"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_ujian_page_ujianpage_handleexportsertifikatsingle",
+      "label": "handleExportSertifikatSingle()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
+      "file_type": "code",
+      "norm_label": "handleexportsertifikatsingle()",
+      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
+      "source_location": "L229"
     },
     {
       "id": "src_app_superadmin_superadmin_ujian_page_ujianpage_handleopeninput",
@@ -2120,23 +2252,11 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "UjianPage",
+      "community_name": "ujian/page.tsx",
       "file_type": "code",
       "norm_label": "handleopeninput()",
       "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
       "source_location": "L161"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_ujian_page_ujianpage_handleprintsertifikat",
-      "label": "handlePrintSertifikat()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 21,
-      "community_name": "UjianPage",
-      "file_type": "code",
-      "norm_label": "handleprintsertifikat()",
-      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
-      "source_location": "L229"
     },
     {
       "id": "src_app_superadmin_superadmin_ujian_page_ujianpage_handlesubmitnilai",
@@ -2144,7 +2264,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 21,
-      "community_name": "UjianPage",
+      "community_name": "ujian/page.tsx",
       "file_type": "code",
       "norm_label": "handlesubmitnilai()",
       "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
@@ -2271,6 +2391,78 @@
       "source_location": "L118"
     },
     {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage",
+      "label": "SiswaPage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "siswapage()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L43"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handledeleteconfirm",
+      "label": "handleDeleteConfirm()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "handledeleteconfirm()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L176"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handleimport",
+      "label": "handleImport()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "handleimport()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L194"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_handlesavecredentials",
+      "label": "handleSaveCredentials()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "handlesavecredentials()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L133"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_loadprograms",
+      "label": "loadPrograms()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "loadprograms()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L76"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page_siswapage_openkelolaakun",
+      "label": "openKelolaAkun()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 25,
+      "community_name": "PresensiAdminPage",
+      "file_type": "code",
+      "norm_label": "openkelolaakun()",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L125"
+    },
+    {
       "id": "tests_unit_api_response_test_fmterror",
       "label": "fmtError()",
       "_callable": true,
@@ -2295,6 +2487,54 @@
       "source_location": "L12"
     },
     {
+      "id": "src_app_page_home",
+      "label": "Home()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "home()",
+      "source_file": "src/app/page.tsx",
+      "source_location": "L6"
+    },
+    {
+      "id": "src_app_siswa_siswa_beranda_page_berandapage",
+      "label": "BerandaPage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "berandapage()",
+      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
+      "source_location": "L22"
+    },
+    {
+      "id": "src_app_siswa_siswa_beranda_page_berandapage_loaddashboard",
+      "label": "loadDashboard()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "loaddashboard()",
+      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
+      "source_location": "L27"
+    },
+    {
+      "id": "src_components_ui_badge_badge",
+      "label": "Badge()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "badge()",
+      "source_file": "src/components/ui/badge.tsx",
+      "source_location": "L8"
+    },
+    {
       "id": "src_app_auth_layout_authlayout",
       "label": "AuthLayout()",
       "_callable": true,
@@ -2307,12 +2547,48 @@
       "source_location": "L3"
     },
     {
+      "id": "src_app_siswa_siswa_nilai_page_nilaipage",
+      "label": "NilaiPage()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "nilaipage()",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L23"
+    },
+    {
+      "id": "src_app_siswa_siswa_nilai_page_nilaipage_handlechange",
+      "label": "handleChange()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "handlechange()",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L87"
+    },
+    {
+      "id": "src_app_siswa_siswa_nilai_page_nilaipage_handlesubmit",
+      "label": "handleSubmit()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "handlesubmit()",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L93"
+    },
+    {
       "id": "src_app_superadmin_superadmin_keuangan_page_keuangansuperadminpage",
       "label": "KeuanganSuperadminPage()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "keuangansuperadminpage()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
@@ -2323,8 +2599,8 @@
       "label": "handleOpenPaymentModal()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "handleopenpaymentmodal()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
@@ -2335,8 +2611,8 @@
       "label": "handleSelectQuickCicilan()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "handleselectquickcicilan()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
@@ -2347,8 +2623,8 @@
       "label": "handleSelectSkema()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "handleselectskema()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
@@ -2359,8 +2635,8 @@
       "label": "handleSubmitPayment()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "handlesubmitpayment()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
@@ -2371,48 +2647,72 @@
       "label": "loadPrograms()",
       "_callable": true,
       "_origin": "ast",
-      "community": 38,
-      "community_name": "superadmin/keuangan/page.tsx",
+      "community": 37,
+      "community_name": "KeuanganSuperadminPage",
       "file_type": "code",
       "norm_label": "loadprograms()",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
       "source_location": "L105"
     },
     {
-      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage",
-      "label": "KeuanganSiswaPage()",
+      "id": "src_components_ui_skeleton_tableskeleton",
+      "label": "TableSkeleton()",
       "_callable": true,
       "_origin": "ast",
-      "community": 40,
-      "community_name": "penilaian/page.tsx",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
       "file_type": "code",
-      "norm_label": "keuangansiswapage()",
-      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
-      "source_location": "L26"
+      "norm_label": "tableskeleton()",
+      "source_file": "src/components/ui/skeleton.tsx",
+      "source_location": "L17"
     },
     {
-      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage_downloadsertifikat",
-      "label": "downloadSertifikat()",
+      "id": "tests_unit_sertifikat_excel_test_formatdateofissue",
+      "label": "formatDateOfIssue()",
       "_callable": true,
       "_origin": "ast",
-      "community": 40,
-      "community_name": "penilaian/page.tsx",
+      "community": 39,
+      "community_name": "sertifikat_excel.test.ts",
       "file_type": "code",
-      "norm_label": "downloadsertifikat()",
-      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
-      "source_location": "L69"
+      "norm_label": "formatdateofissue()",
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L29"
     },
     {
-      "id": "src_app_siswa_siswa_keuangan_page_keuangansiswapage_loadkeuangan",
-      "label": "loadKeuangan()",
+      "id": "tests_unit_sertifikat_excel_test_formatnosertifikat",
+      "label": "formatNoSertifikat()",
       "_callable": true,
       "_origin": "ast",
-      "community": 40,
-      "community_name": "penilaian/page.tsx",
+      "community": 39,
+      "community_name": "sertifikat_excel.test.ts",
       "file_type": "code",
-      "norm_label": "loadkeuangan()",
-      "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
-      "source_location": "L35"
+      "norm_label": "formatnosertifikat()",
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L11"
+    },
+    {
+      "id": "tests_unit_sertifikat_excel_test_formatplaceanddob",
+      "label": "formatPlaceAndDob()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "sertifikat_excel.test.ts",
+      "file_type": "code",
+      "norm_label": "formatplaceanddob()",
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L18"
+    },
+    {
+      "id": "tests_unit_sertifikat_excel_test_formatprogramdisplay",
+      "label": "formatProgramDisplay()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "sertifikat_excel.test.ts",
+      "file_type": "code",
+      "norm_label": "formatprogramdisplay()",
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L37"
     },
     {
       "id": "src_app_superadmin_superadmin_penilaian_page_penilaiansuperadminpage",
@@ -2461,18 +2761,6 @@
       "norm_label": "loadmeta()",
       "source_file": "src/app/(superadmin)/superadmin/penilaian/page.tsx",
       "source_location": "L135"
-    },
-    {
-      "id": "src_lib_utils_formatdateindo",
-      "label": "formatDateIndo()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 40,
-      "community_name": "penilaian/page.tsx",
-      "file_type": "code",
-      "norm_label": "formatdateindo()",
-      "source_file": "src/lib/utils.ts",
-      "source_location": "L16"
     },
     {
       "id": "src_app_mockup_page_mockuppage",
@@ -2583,54 +2871,6 @@
       "source_location": "L4"
     },
     {
-      "id": "src_app_api_v1_excel_import_route_parseexceldate",
-      "label": "parseExcelDate()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "parseexceldate()",
-      "source_file": "src/app/api/v1/excel/import/route.ts",
-      "source_location": "L9"
-    },
-    {
-      "id": "src_app_api_v1_siswa_id_credentials_route_put",
-      "label": "PUT()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "put()",
-      "source_file": "src/app/api/v1/siswa/[id]/credentials/route.ts",
-      "source_location": "L7"
-    },
-    {
-      "id": "src_app_api_v1_siswa_route_post",
-      "label": "POST()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "post()",
-      "source_file": "src/app/api/v1/siswa/route.ts",
-      "source_location": "L87"
-    },
-    {
-      "id": "src_lib_gate_checks_generatestudentpassword",
-      "label": "generateStudentPassword()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "generatestudentpassword()",
-      "source_file": "src/lib/gate-checks.ts",
-      "source_location": "L153"
-    },
-    {
       "id": "src_lib_gate_checks_generatestudentusername",
       "label": "generateStudentUsername()",
       "_callable": true,
@@ -2715,126 +2955,6 @@
       "source_location": "L129"
     },
     {
-      "id": "src_lib_supabase_admin_createadminclient",
-      "label": "createAdminClient()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "createadminclient()",
-      "source_file": "src/lib/supabase/admin.ts",
-      "source_location": "L5"
-    },
-    {
-      "id": "src_app_auth_login_page_siswaloginpage",
-      "label": "SiswaLoginPage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "siswaloginpage()",
-      "source_file": "src/app/(auth)/login/page.tsx",
-      "source_location": "L9"
-    },
-    {
-      "id": "src_app_auth_login_page_siswaloginpage_handlesubmit",
-      "label": "handleSubmit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlesubmit()",
-      "source_file": "src/app/(auth)/login/page.tsx",
-      "source_location": "L16"
-    },
-    {
-      "id": "src_app_auth_superadmin_login_page_adminloginpage",
-      "label": "AdminLoginPage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "adminloginpage()",
-      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
-      "source_location": "L8"
-    },
-    {
-      "id": "src_app_auth_superadmin_login_page_adminloginpage_handlesubmit",
-      "label": "handleSubmit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlesubmit()",
-      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
-      "source_location": "L14"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page_akunform",
-      "label": "AkunForm()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "akunform()",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
-      "source_location": "L10"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page_akunform_handlesubmit",
-      "label": "handleSubmit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlesubmit()",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
-      "source_location": "L47"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page_akunform_loadme",
-      "label": "loadMe()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "loadme()",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
-      "source_location": "L25"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page_akunpage",
-      "label": "AkunPage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "akunpage()",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
-      "source_location": "L229"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page_akunskeleton",
-      "label": "AkunSkeleton()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "akunskeleton()",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
-      "source_location": "L212"
-    },
-    {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage",
       "label": "PendaftaranPage()",
       "_callable": true,
@@ -2844,7 +2964,7 @@
       "file_type": "code",
       "norm_label": "pendaftaranpage()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L87"
+      "source_location": "L86"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_gotostep2",
@@ -2856,7 +2976,7 @@
       "file_type": "code",
       "norm_label": "gotostep2()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L229"
+      "source_location": "L228"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_handlecopy",
@@ -2868,7 +2988,7 @@
       "file_type": "code",
       "norm_label": "handlecopy()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L359"
+      "source_location": "L362"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_handlefieldblur",
@@ -2880,7 +3000,7 @@
       "file_type": "code",
       "norm_label": "handlefieldblur()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L144"
+      "source_location": "L143"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_handlefieldchange",
@@ -2892,7 +3012,7 @@
       "file_type": "code",
       "norm_label": "handlefieldchange()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L132"
+      "source_location": "L131"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_handlesubmit",
@@ -2904,7 +3024,7 @@
       "file_type": "code",
       "norm_label": "handlesubmit()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L234"
+      "source_location": "L233"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_loadnextid",
@@ -2916,7 +3036,7 @@
       "file_type": "code",
       "norm_label": "loadnextid()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L177"
+      "source_location": "L176"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_loadprograms",
@@ -2928,7 +3048,7 @@
       "file_type": "code",
       "norm_label": "loadprograms()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L153"
+      "source_location": "L152"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_toggleallberkas",
@@ -2940,7 +3060,7 @@
       "file_type": "code",
       "norm_label": "toggleallberkas()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L221"
+      "source_location": "L220"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_pendaftaranpage_toggleberkas",
@@ -2952,7 +3072,7 @@
       "file_type": "code",
       "norm_label": "toggleberkas()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L212"
+      "source_location": "L211"
     },
     {
       "id": "src_app_superadmin_superadmin_pendaftaran_page_validatefield",
@@ -2976,91 +3096,7 @@
       "file_type": "code",
       "norm_label": "validateform()",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L78"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage",
-      "label": "EditSiswaPage()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "editsiswapage()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L61"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlefieldblur",
-      "label": "handleFieldBlur()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlefieldblur()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L155"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlefieldchange",
-      "label": "handleFieldChange()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlefieldchange()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L148"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_editsiswapage_handlesubmit",
-      "label": "handleSubmit()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handlesubmit()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L163"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_validatefield",
-      "label": "validateField()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "validatefield()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L15"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page_validateform",
-      "label": "validateForm()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "validateform()",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L48"
-    },
-    {
-      "id": "src_lib_form_utils_handleentertonextfield",
-      "label": "handleEnterToNextField()",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "handleentertonextfield()",
-      "source_file": "src/lib/form-utils.ts",
-      "source_location": "L9"
+      "source_location": "L77"
     },
     {
       "id": "src_app_siswa_siswa_presensi_page_presensisiswapage",
@@ -3068,7 +3104,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "presensisiswapage()",
       "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
@@ -3080,7 +3116,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "doabsen()",
       "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
@@ -3092,11 +3128,23 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "handleajukanizin()",
       "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
       "source_location": "L193"
+    },
+    {
+      "id": "src_components_ui_modal_modal",
+      "label": "Modal()",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "siswa/presensi/page.tsx",
+      "file_type": "code",
+      "norm_label": "modal()",
+      "source_file": "src/components/ui/modal.tsx",
+      "source_location": "L17"
     },
     {
       "id": "src_lib_geo_formatdistance",
@@ -3104,7 +3152,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "formatdistance()",
       "source_file": "src/lib/geo.ts",
@@ -3116,7 +3164,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "haversinedistance()",
       "source_file": "src/lib/geo.ts",
@@ -3128,7 +3176,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "iswithingeofence()",
       "source_file": "src/lib/geo.ts",
@@ -3140,7 +3188,7 @@
       "_callable": true,
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "validatepresensisubmission()",
       "source_file": "tests/integration/flow-presensi.test.ts",
@@ -3232,6 +3280,17 @@
       "file_type": "code",
       "norm_label": "export/route.ts",
       "source_file": "src/app/api/v1/excel/export/route.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_api_v1_excel_import_route",
+      "label": "import/route.ts",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "import/route.ts",
+      "source_file": "src/app/api/v1/excel/import/route.ts",
       "source_location": "L1"
     },
     {
@@ -3389,6 +3448,17 @@
       "source_location": "L1"
     },
     {
+      "id": "src_app_api_v1_siswa_id_credentials_route",
+      "label": "credentials/route.ts",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "credentials/route.ts",
+      "source_file": "src/app/api/v1/siswa/[id]/credentials/route.ts",
+      "source_location": "L1"
+    },
+    {
       "id": "src_app_api_v1_siswa_id_route",
       "label": "siswa/[id]/route.ts",
       "_origin": "ast",
@@ -3408,6 +3478,17 @@
       "file_type": "code",
       "norm_label": "next-id/route.ts",
       "source_file": "src/app/api/v1/siswa/next-id/route.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_api_v1_siswa_route",
+      "label": "siswa/route.ts",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "siswa/route.ts",
+      "source_file": "src/app/api/v1/siswa/route.ts",
       "source_location": "L1"
     },
     {
@@ -3455,6 +3536,17 @@
       "source_location": "L1"
     },
     {
+      "id": "src_lib_supabase_admin",
+      "label": "admin.ts",
+      "_origin": "ast",
+      "community": 0,
+      "community_name": "errorResponse",
+      "file_type": "code",
+      "norm_label": "admin.ts",
+      "source_file": "src/lib/supabase/admin.ts",
+      "source_location": "L1"
+    },
+    {
       "id": "src_lib_supabase_server",
       "label": "server.ts",
       "_origin": "ast",
@@ -3463,6 +3555,50 @@
       "file_type": "code",
       "norm_label": "server.ts",
       "source_file": "src/lib/supabase/server.ts",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_auth_login_page",
+      "label": "(auth)/login/page.tsx",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "(auth)/login/page.tsx",
+      "source_file": "src/app/(auth)/login/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_auth_superadmin_login_page",
+      "label": "superadmin/login/page.tsx",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "superadmin/login/page.tsx",
+      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_siswa_siswa_akun_page",
+      "label": "akun/page.tsx",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "akun/page.tsx",
+      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_lib_form_utils",
+      "label": "form-utils.ts",
+      "_origin": "ast",
+      "community": 1,
+      "community_name": "form-utils.ts",
+      "file_type": "code",
+      "norm_label": "form-utils.ts",
+      "source_file": "src/lib/form-utils.ts",
       "source_location": "L1"
     },
     {
@@ -3609,17 +3745,6 @@
       "source_location": "L3"
     },
     {
-      "id": "src_app_page",
-      "label": "app/page.tsx",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "app/page.tsx",
-      "source_file": "src/app/page.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_app_superadmin_superadmin_presensi_page",
       "label": "superadmin/presensi/page.tsx",
       "_origin": "ast",
@@ -3653,28 +3778,6 @@
       "source_location": "L25"
     },
     {
-      "id": "src_app_superadmin_superadmin_siswa_page",
-      "label": "siswa/page.tsx",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "siswa/page.tsx",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ui_badge",
-      "label": "badge.tsx",
-      "_origin": "ast",
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "file_type": "code",
-      "norm_label": "badge.tsx",
-      "source_file": "src/components/ui/badge.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_components_ui_table",
       "label": "table.tsx",
       "_origin": "ast",
@@ -3683,6 +3786,39 @@
       "file_type": "code",
       "norm_label": "table.tsx",
       "source_file": "src/components/ui/table.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_siswa_loading",
+      "label": "(siswa)/loading.tsx",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "(siswa)/loading.tsx",
+      "source_file": "src/app/(siswa)/loading.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_superadmin_loading",
+      "label": "(superadmin)/loading.tsx",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "(superadmin)/loading.tsx",
+      "source_file": "src/app/(superadmin)/loading.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ui_skeleton",
+      "label": "skeleton.tsx",
+      "_origin": "ast",
+      "community": 13,
+      "community_name": "skeleton.tsx",
+      "file_type": "code",
+      "norm_label": "skeleton.tsx",
+      "source_file": "src/components/ui/skeleton.tsx",
       "source_location": "L1"
     },
     {
@@ -3774,47 +3910,14 @@
       "source_location": "L15"
     },
     {
-      "id": "src_app_siswa_loading",
-      "label": "(siswa)/loading.tsx",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "(siswa)/loading.tsx",
-      "source_file": "src/app/(siswa)/loading.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_siswa_siswa_beranda_page",
-      "label": "beranda/page.tsx",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "beranda/page.tsx",
-      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_app_siswa_siswa_keuangan_page",
       "label": "siswa/keuangan/page.tsx",
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "siswa/keuangan/page.tsx",
       "source_file": "src/app/(siswa)/siswa/keuangan/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_superadmin_loading",
-      "label": "(superadmin)/loading.tsx",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "(superadmin)/loading.tsx",
-      "source_file": "src/app/(superadmin)/loading.tsx",
       "source_location": "L1"
     },
     {
@@ -3822,7 +3925,7 @@
       "label": "dashboard/page.tsx",
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "dashboard/page.tsx",
       "source_file": "src/app/(superadmin)/superadmin/dashboard/page.tsx",
@@ -3833,29 +3936,18 @@
       "label": "QUICK_ACCESS",
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "quick_access",
       "source_file": "src/app/(superadmin)/superadmin/dashboard/page.tsx",
       "source_location": "L21"
     },
     {
-      "id": "src_components_ui_skeleton",
-      "label": "skeleton.tsx",
-      "_origin": "ast",
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "file_type": "code",
-      "norm_label": "skeleton.tsx",
-      "source_file": "src/components/ui/skeleton.tsx",
-      "source_location": "L1"
-    },
-    {
       "id": "src_components_ui_stat_card",
       "label": "stat-card.tsx",
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "stat-card.tsx",
       "source_file": "src/components/ui/stat-card.tsx",
@@ -3866,7 +3958,7 @@
       "label": "utils.ts",
       "_origin": "ast",
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "file_type": "code",
       "norm_label": "utils.ts",
       "source_file": "src/lib/utils.ts",
@@ -3906,50 +3998,6 @@
       "source_location": "L8"
     },
     {
-      "id": "src_app_siswa_siswa_nilai_page",
-      "label": "nilai/page.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "nilai/page.tsx",
-      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_siswa_siswa_presensi_page",
-      "label": "siswa/presensi/page.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "siswa/presensi/page.tsx",
-      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_siswa_siswa_presensi_page_status_color",
-      "label": "STATUS_COLOR",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "status_color",
-      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
-      "source_location": "L30"
-    },
-    {
-      "id": "src_app_siswa_siswa_presensi_page_status_icon",
-      "label": "STATUS_ICON",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "status_icon",
-      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
-      "source_location": "L23"
-    },
-    {
       "id": "src_app_superadmin_superadmin_master_page",
       "label": "master/page.tsx",
       "_origin": "ast",
@@ -3970,83 +4018,6 @@
       "norm_label": "tabs",
       "source_file": "src/app/(superadmin)/superadmin/master/page.tsx",
       "source_location": "L25"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_ujian_page",
-      "label": "ujian/page.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "ujian/page.tsx",
-      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_superadmin_superadmin_ujian_page_kriteria_list",
-      "label": "KRITERIA_LIST",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "kriteria_list",
-      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
-      "source_location": "L34"
-    },
-    {
-      "id": "src_components_ui_button",
-      "label": "button.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "button.tsx",
-      "source_file": "src/components/ui/button.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ui_button_button",
-      "label": "Button",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "button",
-      "source_file": "src/components/ui/button.tsx",
-      "source_location": "L10"
-    },
-    {
-      "id": "src_components_ui_input",
-      "label": "input.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "input.tsx",
-      "source_file": "src/components/ui/input.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_components_ui_input_input",
-      "label": "Input",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "input",
-      "source_file": "src/components/ui/input.tsx",
-      "source_location": "L10"
-    },
-    {
-      "id": "src_components_ui_modal",
-      "label": "modal.tsx",
-      "_origin": "ast",
-      "community": 19,
-      "community_name": "master/page.tsx",
-      "file_type": "code",
-      "norm_label": "modal.tsx",
-      "source_file": "src/components/ui/modal.tsx",
-      "source_location": "L1"
     },
     {
       "id": "tsconfig",
@@ -4377,6 +4348,39 @@
       "norm_label": "**/*.tsx",
       "source_file": "tsconfig.json",
       "source_location": "L26"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_edit_id_page",
+      "label": "[id]/page.tsx",
+      "_origin": "ast",
+      "community": 20,
+      "community_name": "[id]/page.tsx",
+      "file_type": "code",
+      "norm_label": "[id]/page.tsx",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_ujian_page",
+      "label": "ujian/page.tsx",
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
+      "file_type": "code",
+      "norm_label": "ujian/page.tsx",
+      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_ujian_page_kriteria_list",
+      "label": "KRITERIA_LIST",
+      "_origin": "ast",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
+      "file_type": "code",
+      "norm_label": "kriteria_list",
+      "source_file": "src/app/(superadmin)/superadmin/ujian/page.tsx",
+      "source_location": "L34"
     },
     {
       "id": "tests_integration_auth_rbac_test",
@@ -4842,6 +4846,39 @@
       "source_location": "L5"
     },
     {
+      "id": "src_app_page",
+      "label": "app/page.tsx",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "app/page.tsx",
+      "source_file": "src/app/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_siswa_siswa_beranda_page",
+      "label": "beranda/page.tsx",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "beranda/page.tsx",
+      "source_file": "src/app/(siswa)/siswa/beranda/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ui_badge",
+      "label": "badge.tsx",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "badge.tsx",
+      "file_type": "code",
+      "norm_label": "badge.tsx",
+      "source_file": "src/components/ui/badge.tsx",
+      "source_location": "L1"
+    },
+    {
       "id": "next_config",
       "label": "next.config.ts",
       "_origin": "ast",
@@ -5005,6 +5042,17 @@
       "source_location": "L18"
     },
     {
+      "id": "src_app_siswa_siswa_nilai_page",
+      "label": "nilai/page.tsx",
+      "_origin": "ast",
+      "community": 36,
+      "community_name": "nilai/page.tsx",
+      "file_type": "code",
+      "norm_label": "nilai/page.tsx",
+      "source_file": "src/app/(siswa)/siswa/nilai/page.tsx",
+      "source_location": "L1"
+    },
+    {
       "id": "src_app_superadmin_superadmin_keuangan_page",
       "label": "superadmin/keuangan/page.tsx",
       "_origin": "ast",
@@ -5013,6 +5061,50 @@
       "file_type": "code",
       "norm_label": "superadmin/keuangan/page.tsx",
       "source_file": "src/app/(superadmin)/superadmin/keuangan/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_app_superadmin_superadmin_siswa_page",
+      "label": "siswa/page.tsx",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "siswa/page.tsx",
+      "source_file": "src/app/(superadmin)/superadmin/siswa/page.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ui_button",
+      "label": "button.tsx",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "button.tsx",
+      "source_file": "src/components/ui/button.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ui_button_button",
+      "label": "Button",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "button",
+      "source_file": "src/components/ui/button.tsx",
+      "source_location": "L10"
+    },
+    {
+      "id": "src_components_ui_modal",
+      "label": "modal.tsx",
+      "_origin": "ast",
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "file_type": "code",
+      "norm_label": "modal.tsx",
+      "source_file": "src/components/ui/modal.tsx",
       "source_location": "L1"
     },
     {
@@ -5036,6 +5128,17 @@
       "norm_label": "select",
       "source_file": "src/components/ui/select.tsx",
       "source_location": "L9"
+    },
+    {
+      "id": "tests_unit_sertifikat_excel_test",
+      "label": "sertifikat_excel.test.ts",
+      "_origin": "ast",
+      "community": 39,
+      "community_name": "sertifikat_excel.test.ts",
+      "file_type": "code",
+      "norm_label": "sertifikat_excel.test.ts",
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L1"
     },
     {
       "id": "package_dependencies",
@@ -5355,6 +5458,28 @@
       "norm_label": "warna_palette",
       "source_file": "src/app/(superadmin)/superadmin/penilaian/page.tsx",
       "source_location": "L43"
+    },
+    {
+      "id": "src_components_ui_input",
+      "label": "input.tsx",
+      "_origin": "ast",
+      "community": 40,
+      "community_name": "penilaian/page.tsx",
+      "file_type": "code",
+      "norm_label": "input.tsx",
+      "source_file": "src/components/ui/input.tsx",
+      "source_location": "L1"
+    },
+    {
+      "id": "src_components_ui_input_input",
+      "label": "Input",
+      "_origin": "ast",
+      "community": 40,
+      "community_name": "penilaian/page.tsx",
+      "file_type": "code",
+      "norm_label": "input",
+      "source_file": "src/components/ui/input.tsx",
+      "source_location": "L10"
     },
     {
       "id": "package",
@@ -5786,39 +5911,6 @@
       "source_location": "L31"
     },
     {
-      "id": "src_app_api_v1_excel_import_route",
-      "label": "import/route.ts",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "import/route.ts",
-      "source_file": "src/app/api/v1/excel/import/route.ts",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_api_v1_siswa_id_credentials_route",
-      "label": "credentials/route.ts",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "credentials/route.ts",
-      "source_file": "src/app/api/v1/siswa/[id]/credentials/route.ts",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_api_v1_siswa_route",
-      "label": "siswa/route.ts",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "siswa/route.ts",
-      "source_file": "src/app/api/v1/siswa/route.ts",
-      "source_location": "L1"
-    },
-    {
       "id": "src_lib_gate_checks",
       "label": "gate-checks.ts",
       "_origin": "ast",
@@ -5852,17 +5944,6 @@
       "source_location": "L24"
     },
     {
-      "id": "src_lib_supabase_admin",
-      "label": "admin.ts",
-      "_origin": "ast",
-      "community": 7,
-      "community_name": "gate-checks.ts",
-      "file_type": "code",
-      "norm_label": "admin.ts",
-      "source_file": "src/lib/supabase/admin.ts",
-      "source_location": "L1"
-    },
-    {
       "id": "tests_unit_gates_test",
       "label": "gates.test.ts",
       "_origin": "ast",
@@ -5882,39 +5963,6 @@
       "file_type": "code",
       "norm_label": "validation.test.ts",
       "source_file": "tests/unit/validation.test.ts",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_auth_login_page",
-      "label": "(auth)/login/page.tsx",
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "(auth)/login/page.tsx",
-      "source_file": "src/app/(auth)/login/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_auth_superadmin_login_page",
-      "label": "superadmin/login/page.tsx",
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "superadmin/login/page.tsx",
-      "source_file": "src/app/(auth)/superadmin/login/page.tsx",
-      "source_location": "L1"
-    },
-    {
-      "id": "src_app_siswa_siswa_akun_page",
-      "label": "akun/page.tsx",
-      "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
-      "file_type": "code",
-      "norm_label": "akun/page.tsx",
-      "source_file": "src/app/(siswa)/siswa/akun/page.tsx",
       "source_location": "L1"
     },
     {
@@ -5940,33 +5988,44 @@
       "source_location": "L13"
     },
     {
-      "id": "src_app_superadmin_superadmin_siswa_edit_id_page",
-      "label": "[id]/page.tsx",
+      "id": "src_app_siswa_siswa_presensi_page",
+      "label": "siswa/presensi/page.tsx",
       "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
+      "community": 9,
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
-      "norm_label": "[id]/page.tsx",
-      "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
+      "norm_label": "siswa/presensi/page.tsx",
+      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
       "source_location": "L1"
     },
     {
-      "id": "src_lib_form_utils",
-      "label": "form-utils.ts",
+      "id": "src_app_siswa_siswa_presensi_page_status_color",
+      "label": "STATUS_COLOR",
       "_origin": "ast",
-      "community": 8,
-      "community_name": "pendaftaran/page.tsx",
+      "community": 9,
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
-      "norm_label": "form-utils.ts",
-      "source_file": "src/lib/form-utils.ts",
-      "source_location": "L1"
+      "norm_label": "status_color",
+      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
+      "source_location": "L30"
+    },
+    {
+      "id": "src_app_siswa_siswa_presensi_page_status_icon",
+      "label": "STATUS_ICON",
+      "_origin": "ast",
+      "community": 9,
+      "community_name": "siswa/presensi/page.tsx",
+      "file_type": "code",
+      "norm_label": "status_icon",
+      "source_file": "src/app/(siswa)/siswa/presensi/page.tsx",
+      "source_location": "L23"
     },
     {
       "id": "src_lib_geo",
       "label": "geo.ts",
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "geo.ts",
       "source_file": "src/lib/geo.ts",
@@ -5977,7 +6036,7 @@
       "label": "flow-presensi.test.ts",
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "flow-presensi.test.ts",
       "source_file": "tests/integration/flow-presensi.test.ts",
@@ -5988,41 +6047,11 @@
       "label": "geofencing.test.ts",
       "_origin": "ast",
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "file_type": "code",
       "norm_label": "geofencing.test.ts",
       "source_file": "tests/unit/geofencing.test.ts",
       "source_location": "L1"
-    },
-    {
-      "id": "docs_analysis_prd_modul_siswa",
-      "label": "Modul Direktori Data Siswa",
-      "_origin": "semantic",
-      "author": null,
-      "captured_at": null,
-      "community": 12,
-      "community_name": "superadmin/presensi/page.tsx",
-      "contributor": null,
-      "file_type": "concept",
-      "norm_label": "modul direktori data siswa",
-      "source_file": "docs/analysis/prd.md",
-      "source_location": null,
-      "source_url": null
-    },
-    {
-      "id": "docs_design_uiux_portal_siswa",
-      "label": "Portal Mandiri Siswa Mobile-Responsive",
-      "_origin": "semantic",
-      "author": null,
-      "captured_at": null,
-      "community": 17,
-      "community_name": "skeleton.tsx",
-      "contributor": null,
-      "file_type": "concept",
-      "norm_label": "portal mandiri siswa mobile-responsive",
-      "source_file": "docs/design/uiux.md",
-      "source_location": null,
-      "source_url": null
     },
     {
       "id": "docs_design_uiux_portal_superadmin",
@@ -6031,7 +6060,7 @@
       "author": null,
       "captured_at": null,
       "community": 17,
-      "community_name": "skeleton.tsx",
+      "community_name": "utils.ts",
       "contributor": null,
       "file_type": "concept",
       "norm_label": "portal superadmin web dashboard",
@@ -6045,8 +6074,8 @@
       "_origin": "semantic",
       "author": null,
       "captured_at": null,
-      "community": 19,
-      "community_name": "master/page.tsx",
+      "community": 21,
+      "community_name": "ujian/page.tsx",
       "contributor": null,
       "file_type": "concept",
       "norm_label": "modul ujian internal & kelulusan",
@@ -6130,6 +6159,21 @@
       "source_url": null
     },
     {
+      "id": "docs_design_uiux_portal_siswa",
+      "label": "Portal Mandiri Siswa Mobile-Responsive",
+      "_origin": "semantic",
+      "author": null,
+      "captured_at": null,
+      "community": 3,
+      "community_name": "badge.tsx",
+      "contributor": null,
+      "file_type": "concept",
+      "norm_label": "portal mandiri siswa mobile-responsive",
+      "source_file": "docs/design/uiux.md",
+      "source_location": null,
+      "source_url": null
+    },
+    {
       "id": "docs_analysis_prd_modul_sertifikat",
       "label": "Modul Penerbitan Sertifikat Kelulusan",
       "_origin": "semantic",
@@ -6175,6 +6219,21 @@
       "source_url": null
     },
     {
+      "id": "docs_analysis_prd_modul_siswa",
+      "label": "Modul Direktori Data Siswa",
+      "_origin": "semantic",
+      "author": null,
+      "captured_at": null,
+      "community": 38,
+      "community_name": "superadmin/keuangan/page.tsx",
+      "contributor": null,
+      "file_type": "concept",
+      "norm_label": "modul direktori data siswa",
+      "source_file": "docs/analysis/prd.md",
+      "source_location": null,
+      "source_url": null
+    },
+    {
       "id": "docs_analysis_prd_modul_penilaian",
       "label": "Modul Penilaian 5 Kriteria Fluktuasi",
       "_origin": "semantic",
@@ -6211,7 +6270,7 @@
       "author": null,
       "captured_at": null,
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "contributor": null,
       "file_type": "concept",
       "norm_label": "modul presensi geofencing gps",
@@ -6226,7 +6285,7 @@
       "author": null,
       "captured_at": null,
       "community": 9,
-      "community_name": "geo.ts",
+      "community_name": "siswa/presensi/page.tsx",
       "contributor": null,
       "file_type": "concept",
       "norm_label": "geofencing verification engine (haversine)",
@@ -7853,7 +7912,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L132",
+      "source_location": "L183",
       "weight": 1.0
     },
     {
@@ -7865,7 +7924,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L135",
+      "source_location": "L186",
       "weight": 1.0
     },
     {
@@ -7877,7 +7936,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L136",
+      "source_location": "L187",
       "weight": 1.0
     },
     {
@@ -7889,7 +7948,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L146",
+      "source_location": "L197",
       "weight": 1.0
     },
     {
@@ -7901,7 +7960,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L168",
+      "source_location": "L219",
       "weight": 1.0
     },
     {
@@ -7961,7 +8020,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L118",
+      "source_location": "L169",
       "weight": 1.0
     },
     {
@@ -7997,7 +8056,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L86",
+      "source_location": "L55",
       "weight": 1.0
     },
     {
@@ -8165,7 +8224,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/api/v1/siswa/route.ts",
-      "source_location": "L284",
+      "source_location": "L297",
       "weight": 1.0
     },
     {
@@ -8465,7 +8524,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L145",
+      "source_location": "L144",
       "weight": 1.0
     },
     {
@@ -8477,7 +8536,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L244",
+      "source_location": "L243",
       "weight": 1.0
     },
     {
@@ -8489,7 +8548,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L81",
+      "source_location": "L80",
       "weight": 1.0
     },
     {
@@ -8513,7 +8572,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L156",
+      "source_location": "L155",
       "weight": 1.0
     },
     {
@@ -8525,7 +8584,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L172",
+      "source_location": "L171",
       "weight": 1.0
     },
     {
@@ -8537,7 +8596,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L51",
+      "source_location": "L50",
       "weight": 1.0
     },
     {
@@ -9065,7 +9124,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L132",
+      "source_location": "L131",
       "weight": 1.0
     },
     {
@@ -9077,7 +9136,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L144",
+      "source_location": "L143",
       "weight": 1.0
     },
     {
@@ -9089,7 +9148,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L153",
+      "source_location": "L152",
       "weight": 1.0
     },
     {
@@ -9101,7 +9160,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L177",
+      "source_location": "L176",
       "weight": 1.0
     },
     {
@@ -9113,7 +9172,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L212",
+      "source_location": "L211",
       "weight": 1.0
     },
     {
@@ -9173,7 +9232,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L148",
+      "source_location": "L147",
       "weight": 1.0
     },
     {
@@ -9185,7 +9244,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L155",
+      "source_location": "L154",
       "weight": 1.0
     },
     {
@@ -9226,7 +9285,7 @@
     },
     {
       "source": "src_app_superadmin_superadmin_ujian_page_ujianpage",
-      "target": "src_app_superadmin_superadmin_ujian_page_ujianpage_handleprintsertifikat",
+      "target": "src_app_superadmin_superadmin_ujian_page_ujianpage_handleexportsertifikatsingle",
       "relation": "contains",
       "_origin": "ast",
       "confidence": "EXTRACTED",
@@ -15728,7 +15787,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/api/v1/siswa/[id]/route.ts",
-      "source_location": "L129",
+      "source_location": "L180",
       "weight": 1.0
     },
     {
@@ -16641,7 +16700,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L78",
+      "source_location": "L77",
       "weight": 1.0
     },
     {
@@ -16652,7 +16711,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L87",
+      "source_location": "L86",
       "weight": 1.0
     },
     {
@@ -16663,7 +16722,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L221",
+      "source_location": "L220",
       "weight": 1.0
     },
     {
@@ -16674,7 +16733,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L229",
+      "source_location": "L228",
       "weight": 1.0
     },
     {
@@ -16685,7 +16744,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L234",
+      "source_location": "L233",
       "weight": 1.0
     },
     {
@@ -16696,7 +16755,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/pendaftaran/page.tsx",
-      "source_location": "L359",
+      "source_location": "L362",
       "weight": 1.0
     },
     {
@@ -16971,7 +17030,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L48",
+      "source_location": "L47",
       "weight": 1.0
     },
     {
@@ -16982,7 +17041,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L57",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -16993,7 +17052,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L61",
+      "source_location": "L60",
       "weight": 1.0
     },
     {
@@ -17004,7 +17063,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "src/app/(superadmin)/superadmin/siswa/edit/[id]/page.tsx",
-      "source_location": "L163",
+      "source_location": "L162",
       "weight": 1.0
     },
     {
@@ -18042,6 +18101,50 @@
       "weight": 1.0
     },
     {
+      "source": "tests_unit_sertifikat_excel_test",
+      "target": "tests_unit_sertifikat_excel_test_formatnosertifikat",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L11",
+      "weight": 1.0
+    },
+    {
+      "source": "tests_unit_sertifikat_excel_test",
+      "target": "tests_unit_sertifikat_excel_test_formatplaceanddob",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L18",
+      "weight": 1.0
+    },
+    {
+      "source": "tests_unit_sertifikat_excel_test",
+      "target": "tests_unit_sertifikat_excel_test_formatdateofissue",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L29",
+      "weight": 1.0
+    },
+    {
+      "source": "tests_unit_sertifikat_excel_test",
+      "target": "tests_unit_sertifikat_excel_test_formatprogramdisplay",
+      "relation": "contains",
+      "_origin": "ast",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "tests/unit/sertifikat_excel.test.ts",
+      "source_location": "L37",
+      "weight": 1.0
+    },
+    {
       "source": "tsconfig",
       "target": "tsconfig_compileroptions",
       "relation": "contains",
@@ -18424,5 +18527,5 @@
       "source_file": "docs/analysis/prd.md"
     }
   ],
-  "built_at_commit": "d2a79899bcfbe2b4719a53e26cceb84fa36f9439"
+  "built_at_commit": "61e9452aadb1e6c5269e9fb5cd98c8b9f0c13c95"
 }
