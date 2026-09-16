@@ -38,15 +38,16 @@ LPKS Sumbu Hidup
 │   ├── Presensi GPS (Log Kehadiran Harian, Jarak Meter, Override Manual Izin/Sakit/Alpa, Rekap Excel)
 │   ├── Keuangan (Pencatatan Transaksi Pembayaran, Status Lunas/Cicil, Sisa Tagihan, Ekspor Excel)
 │   ├── Penilaian Harian (Monitoring Nilai Siswa, Input/Override Admin, Riwayat & Grafik Tren)
-│   ├── Ujian & Sertifikat (Input Nilai Ujian Teori & 5 Praktek, Gate Check Kelulusan & Cetak PDF)
+│   ├── Ujian & Sertifikat (3 Tab: Penilaian & Ujian, Antrean Cetak Percetakan, Riwayat Cetak)
 │   ├── Master Data Dinamis (Titik Lokasi & Radius GPS, Program Pelatihan, Kriteria Nilai, Syarat Berkas)
 │   └── AI Showcase (Chatbot Analitik RAG & Generator Ringkasan Mingguan)
-└── (siswa) [Bottom Navigation Bar Mobile]
-    ├── Beranda (Ringkasan Status Pribadi, Pengumuman, AI Weekly Narrative Summary)
-    ├── Presensi (Tombol Presensi GPS 1-Tap, Indikator Jarak, Log Kehadiran)
-    ├── Input Nilai (Form Input Nilai Mandiri per Kriteria yang Dinilai Instruktur)
-    ├── Transkrip & Grafik (Visualisasi Tren 5 Kriteria, Status Kompetensi >= 80)
-    └── Keuangan & Sertifikat (Rincian Cicilan/Lunas, Download E-Sertifikat PDF)
+└── (siswa) [Bottom Navigation Bar Mobile & Header Actions]
+    ├── Beranda (Ringkasan Status Pribadi, Banner Peringatan Password Default + Tombol Silang, AI Weekly Narrative)
+    ├── Presensi (Tombol Presensi GPS 1-Tap, Indikator Jarak Meter, Log Kehadiran)
+    ├── Input Nilai (Form Input Nilai Mandiri 5 Kriteria Las)
+    ├── Transkrip & Grafik (Visualisasi Tren 5 Kriteria, Status Kelayakan Ujian >= 80)
+    ├── Keuangan (Rincian Cicilan/Lunas, Riwayat Transaksi Pembayaran)
+    └── Akun & Sesi (Modal Ganti Password Mandiri, Modal Konfirmasi Logout)
 ```
 
 ---
@@ -215,15 +216,26 @@ Sesuai database **UI/UX Pro Max** untuk tema *Industrial Craftsmanship & Clean T
   - Tombol `[+ Input Nilai Manual / Koreksi]`: Memungkinkan instruktur menginput nilai langsung atas nama siswa atau mengoreksi salah input dari siswa.
   - Tombol `[Template Excel]`, `[Import Excel]`, `[Export Excel]`.
 
-### Layar 6: Superadmin — Ujian Internal & Cetak Sertifikat (Desktop View)
-- **Tabel Siswa Siap Ujian:**
-  - Siswa yang kelima kriteria hariannya sudah mencapai $\ge 80$.
-- **Form Input Ujian:**
-  - Input Nilai Teori (0-100) + Input 5 Kriteria Praktek Ujian (Root, Hotpass, Filler, Capping, Gerinda).
-- **Gate-Check & Cetak Sertifikat Panel:**
-  - Indikator Syarat 1: Ujian Internal $\ge 80$ di semua kriteria $\rightarrow$ `[TERPENUHI / BELUM]`.
-  - Indikator Syarat 2: Keuangan $\rightarrow$ `[LUNAS (Rp 0 sisa) / BELUM LUNAS]`.
-  - Tombol Aksi: `[Cetak Sertifikat Resmi (PDF)]` (Aktif hanya jika kedua syarat hijau; jika belum, muncul tooltip rincian kekurangan).
+### Layar 6: Superadmin — Ujian Internal & Manajemen Antrean Sertifikat (Desktop View)
+- **Struktur Navigasi Tab (3 Tab):**
+  1. **Tab 1: Penilaian & Ujian:**
+     - **Tabel Siswa Siap Ujian:** Siswa yang kelima kriteria harian sudah mencapai $\ge 80$.
+     - **Form Input Ujian:** Input Nilai Teori (0-100) + Input 5 Kriteria Praktek Ujian (Root, Hotpass, Filler, Capping, Gerinda).
+     - **Gate-Check Panel:**
+       - Indikator Syarat 1: Ujian Internal $\ge 80$ di semua kriteria $\rightarrow$ `[TERPENUHI / BELUM]`.
+       - Indikator Syarat 2: Keuangan $\rightarrow$ `[LUNAS (Rp 0 sisa) / BELUM LUNAS]`.
+       - Tombol Aksi: `[+ Masukkan ke Antrean Cetak]` (Aktif hanya jika kedua syarat terpenuhi).
+  2. **Tab 2: Antrean Cetak (Percetakan Fisik):**
+     - **Tabel Antrean:** Daftar siswa yang siap dicetak sertifikat resminya ke vendor percetakan.
+     - Kolom: No Urut Antrean (`001`, `002`), Nomor Induk, Nama Lengkap, Program, Tgl Antrean, Status.
+     - **Tombol Aksi per Baris:**
+       - `[Review Detail]`: Membuka modal pratinjau data lengkap siswa (NIK, Nama, Tempat/Tgl Lahir, Program, Nilai Ujian Teori & Praktek, serta Format No Sertifikat resmi dengan bulan Romawi).
+       - `[Hapus dari Antrean]`: Membatalkan antrean jika ada revisi data sebelum dicetak.
+     - **Aksi Massal:** `[Ekspor Excel & Tandai Sudah Dicetak]`: Mengunduh file `.xlsx` format percetakan fisik, mengubah status di database menjadi `dicetak` dan mengisi `tgl_cetak`, serta mengalihkan siswa ke status Alumni.
+  3. **Tab 3: Riwayat Cetak:**
+     - **Tabel Riwayat:** Arsip alumni yang sertifikat fisiknya telah selesai dicetak.
+     - Kolom: No Urut, Nomor Sertifikat, Nama Siswa, Program, Tanggal Cetak.
+     - Tombol `[Cetak Ulang / Re-Queue]`: Memungkinkan admin memasukkan kembali siswa ke antrean jika sertifikat fisik hilang/rusak (duplikat).
 
 ---
 
@@ -235,8 +247,10 @@ Sesuai database **UI/UX Pro Max** untuk tema *Industrial Craftsmanship & Clean T
    `Siswa buka Input Nilai` $\rightarrow$ `Input Skor Praktek dari Instruktur` $\rightarrow$ `Simpan` $\rightarrow$ `Grafik Transkrip Otomatis Mengupdate Titik Data Baru` $\rightarrow$ `Admin memantau di tabel Penilaian Harian (dapat mengedit bila ada revisi)`.
 3. **Alur Pendaftaran hingga Penerbitan No Induk:**
    `Admin buka Pendaftaran` $\rightarrow$ `Ceklis 5 Berkas Fisik` $\rightarrow$ `Form Biodata Aktif` $\rightarrow$ `Submit` $\rightarrow$ `No Induk 01.XXXX Terbit` $\rightarrow$ `Data Masuk ke Direktori Siswa Aktif`.
-4. **Alur Gate-Check Sertifikat:**
-   `Admin buka modul Ujian` $\rightarrow$ `Sistem memverifikasi status LUNAS dan UJIAN >= 80` $\rightarrow$ `Tombol Cetak Aktif` $\rightarrow$ `Unduh PDF Sertifikat Instan`.
+4. **Alur Gate-Check & Siklus Antrean Cetak Sertifikat:**
+   `Admin buka modul Ujian` $\rightarrow$ `Sistem memverifikasi status LUNAS dan UJIAN >= 80` $\rightarrow$ `Admin klik Masukkan ke Antrean` $\rightarrow$ `Data berpindah ke Tab Antrean Cetak` $\rightarrow$ `Admin review modal sertifikat` $\rightarrow$ `Admin klik Ekspor Excel & Tandai Sudah Dicetak` $\rightarrow$ `File Excel percetakan terunduh & data masuk ke Riwayat Cetak Alumni`.
+5. **Alur Ganti Sandi Mandiri & Dismissal:**
+   `Siswa login dengan kredensial default` $\rightarrow$ `Banner peringatan tampil di beranda` $\rightarrow$ `Siswa dapat menutup peringatan via tombol [X] per sesi` ATAU `Klik tombol Ganti Sandi` $\rightarrow$ `Isi sandi baru di modal` $\rightarrow$ `Banner hilang permanen & status di admin menjadi Pass Diubah Siswa`.
 
 ---
 

@@ -38,7 +38,7 @@ Semua modul diuji silang dengan Acceptance Criteria PRD:
 ## Strategi Pengujian
 
 ### Tahap 2 — Pengujian Fungsional
-Unit, Integration, System, dan Regression test menggunakan **Jest** (test runner existing, 51 test pass) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR.
+Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (72 test, 23 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR.
 
 ### Tahap 3 — Pengujian Non-Fungsional
 - **Performance:** Lighthouse + Chrome DevTools MCP untuk CWV (LCP, INP, FID)
@@ -46,7 +46,7 @@ Unit, Integration, System, dan Regression test menggunakan **Jest** (test runner
 - **Compatibility:** Playwright MCP multi-device viewport (mobile 375px, tablet 768px, desktop 1280px)
 
 ### Tahap 4 — UAT
-Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & Siswa simultan), difokuskan pada alur kritis: Pendaftaran → Presensi → Penilaian → Ujian → Sertifikat.
+Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & Siswa simultan), difokuskan pada alur kritis: Pendaftaran → Presensi → Penilaian → Ujian → Antrean Cetak & Sertifikat.
 
 ---
 
@@ -55,7 +55,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 ### Entry Criteria (Sudah Terpenuhi ✅)
 - [x] Semua 7 tahap Development sudah dikonfirmasi
 - [x] Code review & refactoring selesai
-- [x] `npm test` → 51 pass, 0 fail (baseline clean)
+- [x] `npm test` → 72 pass, 23 suites, 0 fail (100% pass baseline clean)
 - [x] `tsc --noEmit` → 0 error
 - [x] `npm run lint` → 0 error
 - [x] Dev server aktif (`npm run dev`)
@@ -289,10 +289,13 @@ Semua **Kriteria Penerimaan (Exit Criteria)** untuk Tahap 3 (Non-Fungsional) tel
 | **UAT-07: Monitoring Penilaian & Excel** | Buka menu penilaian admin, filter program, uji tombol Template/Import/Export Excel. | Data nilai seluruh siswa terpusat, spreadsheet dapat diunduh/diunggah. | Tabel rekap nilai interaktif, toolbar Excel siap pakai. | ✅ PASS |
 | **UAT-08: Gate-Check Ujian & Sertifikat** | Pengujian status keuangan (Lunas vs Belum Lunas) & nilai ujian (>= 80 per kriteria). | Sertifikat hanya dapat dicetak jika LUNAS dan LULUS UJIAN. Salah satu belum terpenuhi = tombol cetak terkunci. | Indikator gembok dinamis, verifikasi kelulusan 100% konsisten. | ✅ PASS |
 | **UAT-09: AI Assistant Pelatihan** | Ajukan pertanyaan teknis seputar cacat las undercut/porosity atau SOP. | AI menjawab dengan rujukan standar pengelasan (WPS/AWS D1.1). | AI assistant merespons akurat dan terkonfigurasi dual-model. | ✅ PASS |
+| **UAT-10: Antrean Cetak Batch & Export Percetakan** | Memasukkan siswa lulus & lunas ke antrean, pratinjau modal detail format romawi, ekspor Excel percetakan. | Data masuk ke tab Antrean Cetak, modal detail akurat, ekspor otomatis mengalihkan status ke 'dicetak' dan menjadi Alumni. | Siklus antrean cetak batch berjalan lancar dan otomatis memindahkan siswa ke Riwayat Cetak. | ✅ PASS |
+| **UAT-11: Dismissal Peringatan Sandi & Logout Siswa** | Siswa menutup banner peringatan ganti sandi dengan tombol [X], mengganti sandi mandiri via modal, dan logout. | Banner dapat di-dismiss per sesi tanpa mengganggu navigasi; ganti sandi sukses update status DB; logout menampilkan dialog konfirmasi. | Banner peringatan responsif, modal konfirmasi logout mencegah keluar tanpa sengaja. | ✅ PASS |
+| **UAT-12: Notifikasi Header Operasional** | Cek lonceng notifikasi di navbar header Superadmin dan Siswa. | Muncul unread badge real-time: alert antrean cetak & siap ujian untuk admin, alert sandi default untuk siswa. | Dropdown popover notifikasi informatif dan terintegrasi link navigasi langsung. | ✅ PASS |
 
 ---
 
 ## 4.2. Kesimpulan Akhir UAT
 
-Seluruh skenario User Acceptance Testing (UAT) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun serta keamanan password. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
+Seluruh skenario User Acceptance Testing (UAT 01-12) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun serta keamanan password. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
 

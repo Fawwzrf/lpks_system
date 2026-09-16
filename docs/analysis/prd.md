@@ -84,10 +84,15 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
 - Sistem HARUS menyediakan form penilaian Ujian Internal yang terdiri dari:
   - Nilai Ujian Tertulis (1 kolom nilai teori).
   - Nilai Ujian Praktek (**5 kolom**: *Root*, *Hotpass*, *Filler*, *Capping*, *Gerinda*), dengan standar kelulusan minimal nilai 80 di masing-masing kriteria.
-- Sistem HARUS memvalidasi dua syarat mutlak sebelum membuka opsi cetak sertifikat:
+- Sistem HARUS memvalidasi dua syarat mutlak (*double gate-check*) sebelum membuka opsi penerbitan sertifikat:
   1. Siswa telah **LULUS** Ujian Internal (tertulis & praktek kelima kriteria >= 80).
   2. Status keuangan siswa sudah **LUNAS**.
-- Sistem HARUS menyediakan fitur cetak / export sertifikat berformat PDF siap pakai berdasarkan template standar yang sudah ada.
+- Sistem HARUS mendukung siklus **Antrean Cetak Batch ke Percetakan Fisik**:
+  - Superadmin dapat memasukkan siswa yang memenuhi syarat ke dalam **Tab Antrean Cetak**.
+  - **Pratinjau Modal Detail:** Memeriksa kelengkapan identitas siswa, nilai ujian, serta penomoran resmi sertifikat dengan format bulan Romawi (`XX/LPKS-SH/ROMAN/TAHUN`).
+  - **Ekspor Excel Percetakan:** Mengunduh file `.xlsx` format percetakan fisik, secara otomatis mengubah status antrean menjadi `dicetak` dan mencatat tanggal cetak, serta memindahkan siswa ke status Alumni.
+  - **Riwayat Cetak & Re-Queue:** Menyimpan arsip sertifikat yang telah selesai dicetak, serta mengizinkan cetak ulang (re-queue) jika sertifikat fisik rusak/hilang.
+- Sistem HARUS tetap menyediakan opsi cetak / export sertifikat berformat PDF instan berdasarkan template resmi yang ada.
 
 ### 7. Modul Pengaturan & Master Data Dinamis (System Configuration & Master Data)
 - Sistem HARUS menyediakan manajemen Master Data dinamis yang dapat dikelola oleh Superadmin tanpa perlu mengubah source code:
@@ -99,6 +104,12 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
 ### 8. Modul AI Showcase (AI Engineer Integration)
 - **Asisten Analitik Operasional & Konsultan SOP Las (RAG):** Sistem HARUS menyediakan chatbot internal yang menggunakan kapabilitas *Dual-Model* (Gemini 2.5 Flash & Claude 3.7 Sonnet) untuk menjawab pertanyaan operasional, rekap nilai siswa, maupun *Welding SOP / Best Practices* berdasarkan referensi pengelasan.
 - **Ringkasan Progres Otomatis (Weekly Narrative Summary):** Sistem HARUS dapat meng-generate ringkasan naratif perkembangan belajar & kedisiplinan setiap siswa secara otomatis per minggu dalam bahasa natural yang siap diekspor/dikirim ke orang tua atau perusahaan sponsor.
+
+### 9. Portal Siswa, Keamanan Akun & Notifikasi Sistem
+- **Normalisasi Login:** Satu pintu login terpadu (`/login`) yang cerdas membedakan email admin dan format username siswa (`budi@0001` atau `budi@01`), dinormalisasi otomatis ke Supabase Auth.
+- **Peringatan Kata Sandi Default & Dismissal:** Banner peringatan ganti sandi di beranda siswa dilengkapi tombol silang `[X]` untuk menutup peringatan per sesi tanpa mengganggu interaksi, serta modal ganti kata sandi mandiri yang otomatis memperbarui status menjadi `Pass Diubah Siswa`.
+- **Konfirmasi Logout Siswa:** Dialog modal konfirmasi keluar untuk mencegah siswa keluar secara tidak sengaja.
+- **Notifikasi Operasional Header:** Ikon lonceng di navbar dengan unread count real-time (alert antrean cetak & siap ujian untuk admin; alert ganti sandi untuk siswa).
 
 ---
 

@@ -104,50 +104,71 @@ Desain sederhana dulu, *scale-ready* belakangan:
 
 ```
 lpks-system/
-├── app/                        # Next.js App Router
-│   ├── (auth)/                 # Route group: login/register
-│   ├── (superadmin)/           # Route group: halaman superadmin
-│   │   ├── dashboard/
-│   │   ├── pendaftaran/
-│   │   ├── siswa/              # Data Siswa (direktori)
-│   │   ├── presensi/
-│   │   ├── keuangan/
-│   │   ├── penilaian/
-│   │   ├── ujian/
-│   │   ├── pengaturan/         # Master Data Dinamis
-│   │   └── ai/                 # AI Showcase (RAG + Summary)
-│   ├── (siswa)/                # Route group: portal siswa
-│   │   ├── dashboard/
-│   │   ├── presensi/           # Self check-in GPS
-│   │   ├── nilai/
-│   │   └── sertifikat/
-│   └── api/                    # API Routes
-│       ├── auth/
-│       ├── siswa/
-│       ├── presensi/
-│       ├── keuangan/
-│       ├── penilaian/
-│       ├── ujian/
-│       ├── sertifikat/
-│       ├── master/
-│       ├── ai/
-│       │   ├── query/          # RAG endpoint
-│       │   └── summary/        # Trigger manual summary
-│       └── excel/
-│           ├── template/       # Download template xlsx
-│           ├── import/         # Import xlsx
-│           └── export/         # Export xlsx
-├── components/                 # Shared UI components
-├── lib/
-│   ├── supabase/               # Supabase client (server & browser)
-│   ├── ai/                     # Gemini API wrapper & RAG logic
-│   ├── excel/                  # SheetJS helpers (parse & generate)
-│   ├── pdf/                    # jsPDF sertifikat generator
-│   └── geo/                    # Geofencing calculation (Haversine)
-├── types/                      # TypeScript types (dari `supabase gen types`)
-└── supabase/
-    ├── migrations/             # SQL migration files
-    └── functions/              # Edge Functions (cron weekly summary)
+├── src/
+│   ├── app/                        # Next.js App Router
+│   │   ├── (auth)/                 # Route group: login/logout pages
+│   │   ├── (superadmin)/           # Route group: halaman superadmin
+│   │   │   ├── layout.tsx          # Sidebar nav + header (notifications bell)
+│   │   │   └── superadmin/
+│   │   │       ├── dashboard/
+│   │   │       ├── pendaftaran/
+│   │   │       ├── siswa/          # Data Siswa (direktori)
+│   │   │       ├── presensi/
+│   │   │       ├── keuangan/
+│   │   │       ├── penilaian/
+│   │   │       ├── ujian/          # Ujian + antrean cetak sertifikat batch
+│   │   │       ├── master/         # Master Data Dinamis (CRUD konfigurasi)
+│   │   │       └── ai/             # AI Showcase (RAG + Summary)
+│   │   ├── (siswa)/                # Route group: portal siswa
+│   │   │   ├── layout.tsx          # Bottom nav bar + header (notifikasi)
+│   │   │   └── siswa/
+│   │   │       ├── beranda/        # Dashboard ringkasan pribadi
+│   │   │       ├── presensi/       # Self check-in GPS geofencing
+│   │   │       ├── nilai/          # Penilaian harian (siswa view)
+│   │   │       ├── keuangan/       # Status keuangan siswa
+│   │   │       ├── transkrip/      # Transkrip nilai + grafik tren
+│   │   │       └── akun/           # Ganti password mandiri
+│   │   └── api/v1/                 # API Routes (semua diawali /api/v1/)
+│   │       ├── auth/
+│   │       │   ├── login/
+│   │       │   ├── logout/
+│   │       │   ├── me/
+│   │       │   └── change-password/
+│   │       ├── siswa/
+│   │       │   ├── next-id/
+│   │       │   └── [id]/credentials/
+│   │       ├── presensi/
+│   │       │   └── today/
+│   │       ├── keuangan/
+│   │       │   └── rekap/[siswa_id]/
+│   │       ├── penilaian/
+│   │       ├── ujian/
+│   │       ├── sertifikat/
+│   │       │   ├── queue/          # Antrean cetak sertifikat fisik batch
+│   │       │   └── [siswa_id]/
+│   │       ├── master/
+│   │       ├── notifications/      # Notifikasi sistem (bell icon)
+│   │       ├── ai/
+│   │       │   ├── query/          # RAG endpoint
+│   │       │   └── summary/[siswa_id]/
+│   │       ├── excel/
+│   │       │   ├── template/
+│   │       │   ├── import/
+│   │       │   └── export/
+│   │       └── health/             # Health check endpoint
+│   ├── components/                 # Shared UI components
+│   ├── lib/
+│   │   ├── supabase/               # Supabase client (server, browser, admin)
+│   │   ├── api-response.ts         # Shared response helpers + RBAC guards
+│   │   ├── gate-checks.ts          # Business logic gates (sertifikat eligibility, dll)
+│   │   ├── date-utils.ts           # Format tanggal Indo, Roman month, dll
+│   │   ├── nilai-utils.ts          # Kriteria pass map builder
+│   │   └── gemini.ts               # Gemini AI client
+│   └── types/
+│       └── database.ts             # TypeScript types (dari `supabase gen types`)
+└── tests/
+    ├── unit/                       # Jest unit tests (gates, validasi, geofencing, dll)
+    └── integration/                # Integration tests (auth-rbac, presensi flow)
 ```
 
 ---
@@ -155,76 +176,95 @@ lpks-system/
 ### Modul-Modul Utama
 
 #### M01 — Auth & Role Guard
-- **Tanggung Jawab:** Login/logout Superadmin & Siswa. Enforce route protection berdasarkan role via Supabase Auth JWT + RLS.
-- **Kontrak:** `POST /api/auth/login` → `{ session, role }`. Middleware Next.js cek role di setiap request `(superadmin)/*` dan `(siswa)/*`.
+- **Tanggung Jawab:** Login/logout Superadmin & Siswa. Normalisasi identifier login: email superadmin dipakai langsung, username siswa dinormalisasi ke `username@lpks.id`. Enforce route protection berdasarkan role via Supabase Auth JWT + Middleware Next.js. Ganti password mandiri via `/api/v1/auth/change-password` (siswa), reset via `/api/v1/siswa/[id]/credentials` (superadmin).
+- **Kontrak:** `POST /api/v1/auth/login` `{ identifier, password }` → `{ user: { role, is_password_default, ... } }`. Middleware cek role di setiap request ke `(superadmin)/*` dan `(siswa)/*`.
 - **Dependensi:** Supabase Auth, Next.js Middleware.
 
 #### M02 — Modul Pendaftaran
-- **Tanggung Jawab:** Verifikasi checklist berkas fisik (form boolean), input biodata siswa lengkap, auto-generate Nomor Induk.
-- **Kontrak:** `POST /api/siswa` → `{ siswa_id, nomor_induk }`. Nomor Induk digenerate di server: ambil `MAX(no_urut)` per `kode_program`, increment, format `kode_program.XXXX`.
-- **Dependensi:** M07 (Master Program untuk kode program), Supabase DB.
+- **Tanggung Jawab:** Verifikasi checklist berkas fisik (form boolean, default 5–6 syarat dari Master Berkas), input biodata siswa lengkap, auto-generate Nomor Induk. Email bersifat opsional (auto-fallback `username@lpks.id` jika kosong).
+- **Kontrak:** `POST /api/v1/siswa` → `{ siswa_id, nomor_induk }`. Nomor Induk digenerate di server: cari `no_urut` berikutnya yang tersedia via `GET /api/v1/siswa/next-id`, format `kode_program.XXXX`. Nomor urut dari siswa yang dihapus dapat digunakan kembali.
+- **Dependensi:** M08 (Master Program untuk kode program), Supabase DB.
 
 #### M03 — Modul Manajemen Data Siswa
-- **Tanggung Jawab:** CRUD biodata siswa, filter status Aktif/Alumni (via `tanggal_keluar`), Import/Export/Template Excel.
-- **Kontrak:** `GET/PUT/DELETE /api/siswa/[id]`, `GET /api/siswa?status=aktif`, `POST /api/excel/import?modul=siswa`, `GET /api/excel/export?modul=siswa`, `GET /api/excel/template?modul=siswa`.
+- **Tanggung Jawab:** CRUD biodata siswa, filter status Aktif/Alumni (via `tanggal_keluar`), Import/Export/Template Excel. Soft-delete dengan anonimisasi sesuai UU PDP.
+- **Kontrak:** `GET|PUT|DELETE /api/v1/siswa/[id]`, `GET /api/v1/siswa?status=aktif`, Excel I/O via `/api/v1/excel/*`.
 - **Dependensi:** Supabase DB, SheetJS (lib/excel).
 
 #### M04 — Modul Presensi GPS Geofencing
-- **Tanggung Jawab:** Terima koordinat GPS siswa, hitung jarak ke koordinat LPKS (Haversine formula di `lib/geo`), tolak jika > radius, catat presensi harian (1x/hari per siswa, cek duplikasi di DB).
-- **Kontrak:** `POST /api/presensi` `{ siswa_id, lat, lng }` → `{ status: 'hadir'|'ditolak', jarak_meter }`. Superadmin: `GET /api/presensi?tanggal=&siswa_id=`, `PUT /api/presensi/[id]` (override).
-- **Dependensi:** M07 (Master Lokasi & Radius), Supabase DB.
+- **Tanggung Jawab:** Terima koordinat GPS siswa, hitung jarak ke koordinat LPKS (Haversine formula), tolak jika > radius, catat presensi harian (1x/hari per siswa). Rate limit: max 3 percobaan/siswa/hari.
+- **Kontrak:** `POST /api/v1/presensi` `{ lat, lng }` → `{ status, jarak_meter }`. `GET /api/v1/presensi/today` untuk status hari ini. Superadmin: `GET|PUT /api/v1/presensi[/id]` (rekap & override manual).
+- **Dependensi:** M08 (Master Lokasi & Radius), Supabase DB.
 
 #### M05 — Modul Catatan Keuangan
-- **Tanggung Jawab:** CRUD transaksi pembayaran per siswa, kalkulasi sisa tagihan, status lunas/cicil.
-- **Kontrak:** `GET /api/keuangan?siswa_id=` → `{ tagihan_total, terbayar, sisa, status }`. `POST /api/keuangan` untuk tambah transaksi.
-- **Dependensi:** M03 (data siswa), M07 (harga program dari Master).
+- **Tanggung Jawab:** CRUD transaksi pembayaran per siswa, kalkulasi sisa tagihan, status lunas/cicil. Export bulanan format buku kas.
+- **Kontrak:** `GET /api/v1/keuangan/rekap/[siswa_id]` → `{ tagihan_total, terbayar, sisa, status }`. `POST /api/v1/keuangan` untuk tambah transaksi. `GET /api/v1/excel/export?modul=keuangan` untuk export buku kas.
+- **Dependensi:** M03 (data siswa), M08 (harga program dari Master).
 
 #### M06 — Modul Penilaian Harian
-- **Tanggung Jawab:** CRUD nilai harian per siswa per kriteria (skala 0-100). Tentukan kelayakan ujian (semua 5 kriteria ≥ 80 pernah dicapai — bukan rata-rata, tapi status "pernah ≥ 80" per kriteria).
-- **Kontrak:** `POST /api/penilaian` `{ siswa_id, tanggal, kriteria, nilai }`. `GET /api/penilaian?siswa_id=` → array riwayat nilai untuk grafik Recharts.
-- **Dependensi:** M07 (Master Kriteria), Supabase DB.
+- **Tanggung Jawab:** CRUD nilai harian per siswa per kriteria (skala 0-100). Tentukan kelayakan ujian (semua 5 kriteria ≥ 80 pernah dicapai). Grafik tren Recharts per kriteria. Export Excel rekapan nilai.
+- **Kontrak:** `POST /api/v1/penilaian` `{ siswa_id, tanggal, penilaian }`. `GET /api/v1/penilaian?siswa_id=` → riwayat nilai + status kelayakan.
+- **Dependensi:** M08 (Master Kriteria), Supabase DB.
 
 #### M07 — Modul Ujian Internal & Sertifikasi
-- **Tanggung Jawab:** Input nilai ujian tertulis & 5 kriteria praktek. Gate-check lunas (M05) + lulus ujian (semua kriteria ≥ 80) sebelum generate PDF sertifikat.
-- **Kontrak:** `POST /api/ujian` `{ siswa_id, tertulis, root, hotpass, filler, capping, gerinda }`. `GET /api/sertifikat/[siswa_id]` → PDF blob (jsPDF di server-side route).
-- **Dependensi:** M05 (status lunas), Supabase DB, jsPDF (lib/pdf).
+- **Tanggung Jawab:** Input nilai ujian 5 kriteria praktek + teori. Gate-check lunas (M05) + lulus ujian sebelum generate PDF sertifikat. Antrean cetak sertifikat fisik batch untuk percetakan.
+- **Kontrak:** `POST /api/v1/ujian` (input nilai). `GET /api/v1/sertifikat/[siswa_id]` → PDF blob. `POST /api/v1/sertifikat/queue` → batch antrean cetak.
+- **Dependensi:** M05 (status lunas), Supabase DB, jsPDF, date-utils.
 
 #### M08 — Modul Master Data Dinamis
-- **Tanggung Jawab:** CRUD tabel-tabel master (program pelatihan, kriteria penilaian, syarat berkas, titik lokasi & radius GPS).
-- **Kontrak:** `GET|POST|PUT|DELETE /api/master/program`, `/api/master/kriteria`, `/api/master/syarat`, `/api/master/lokasi`.
+- **Tanggung Jawab:** CRUD tabel-tabel master (program pelatihan, kriteria penilaian, syarat berkas, titik lokasi & radius GPS). Semua modul lain membaca konfigurasi dari master ini.
+- **Kontrak:** `GET|POST|PUT|DELETE /api/v1/master/program|kriteria|syarat-berkas|lokasi`.
 - **Dependensi:** Supabase DB.
 
 #### M09 — Modul AI Showcase
-- **Tanggung Jawab (RAG Query):** Terima query natural language dari Superadmin, translate ke SQL query (atau pilih query template pre-built), eksekusi ke DB, inject hasil ke prompt Gemini, return jawaban naratif.
-- **Tanggung Jawab (Weekly Summary):** Edge Function dijadwalkan tiap Senin 07.00 WIB. Ambil data progres semua siswa aktif, generate ringkasan per siswa, simpan ke tabel `ai_ringkasan_mingguan`.
-- **Kontrak:** `POST /api/ai/query` `{ pertanyaan }` → `{ jawaban: string }`. Edge Function: internal, tidak ada REST endpoint publik.
-- **Dependensi:** Gemini Flash API (lib/ai), Supabase DB, M06, M05.
+- **Tanggung Jawab (RAG Query):** Terima query natural language dari Superadmin, translate ke SQL query, inject hasil ke prompt Gemini, return jawaban naratif.
+- **Tanggung Jawab (Weekly Summary):** Edge Function terjadwal tiap Senin 07.00 WIB. Generate ringkasan progres per siswa, simpan ke `ai_ringkasan_mingguan`.
+- **Kontrak:** `POST /api/v1/ai/query` `{ pertanyaan }` → `{ jawaban }`. `GET /api/v1/ai/summary/[siswa_id]` → ringkasan per siswa.
+- **Dependensi:** Gemini Flash API (lib/gemini), Supabase DB, M06, M05.
 - `ponytail:` RAG menggunakan structured-data injection (SQL result → JSON → prompt), bukan vector embedding. Upgrade ke pgvector jika pertanyaan free-form menjadi terlalu kompleks untuk template query.
+
+#### M10 — Modul Notifikasi Sistem
+- **Tanggung Jawab:** Menampilkan notifikasi operasional di header bell icon. Siswa: alert ganti password default. Superadmin: alert operasional sistem. Badge unread count auto-refresh.
+- **Kontrak:** `GET /api/v1/notifications` → `{ data: [...notif], meta: { unread_count } }`.
+- **Dependensi:** Supabase DB, M01 (status `is_password_default`).
 
 ---
 
 ## Dokumen 3: Sequence Diagram
 
-### Alur 1 — Login & Role Routing
+### Alur 1 — Login & Role Routing (dengan Normalisasi Identifier)
 
 ```mermaid
 sequenceDiagram
     participant U as User (Browser)
     participant FE as Next.js Frontend
-    participant Mid as Next.js Middleware
+    participant API as /api/v1/auth/login
     participant Auth as Supabase Auth
+    participant DB as Supabase DB
+    participant Mid as Next.js Middleware
 
-    U->>FE: Buka /login, isi email+password
-    FE->>Auth: signInWithPassword(email, password)
-    Auth-->>FE: Session JWT (berisi role: superadmin|siswa)
-    FE->>Mid: Navigasi ke /dashboard
+    U->>FE: Isi form login (identifier + password)
+    FE->>API: POST /api/v1/auth/login { identifier, password }
+    API->>API: Normalisasi identifier
+    alt Email lengkap non-lpks.id (admin)
+        API->>Auth: signInWithPassword(email=identifier)
+    else Username siswa (budi@01 / budi@lpks.id)
+        API->>API: Strip @lpks.id → normalisasi → budi01@lpks.id
+        API->>Auth: signInWithPassword(email=budi01@lpks.id)
+    end
+    Auth-->>API: Session JWT (role: superadmin|siswa)
+    alt role = siswa
+        API->>DB: SELECT is_password_default, username FROM siswa
+        DB-->>API: { is_password_default: true, username: "budi@01" }
+    end
+    API-->>FE: { user: { role, is_password_default, ... } }
+    FE->>Mid: Navigasi ke dashboard
     Mid->>Mid: Cek JWT role dari cookie
     alt role = superadmin
-        Mid-->>FE: Redirect ke /(superadmin)/dashboard
+        Mid-->>FE: Redirect ke /(superadmin)/superadmin/dashboard
     else role = siswa
-        Mid-->>FE: Redirect ke /(siswa)/dashboard
+        Mid-->>FE: Redirect ke /(siswa)/siswa/beranda
     end
-    FE-->>U: Tampilkan dashboard sesuai role
+    FE-->>U: Dashboard sesuai role + banner jika password default
 ```
 
 ---
@@ -235,54 +275,63 @@ sequenceDiagram
 sequenceDiagram
     participant SA as Superadmin
     participant FE as Frontend
-    participant API as /api/siswa
+    participant API as /api/v1/siswa
     participant DB as Supabase DB
+    participant Auth as Supabase Auth
 
-    SA->>FE: Centang semua checklist berkas fisik
+    SA->>FE: Centang semua 5 checklist berkas fisik
     FE->>FE: Aktifkan form biodata (client-side gate)
-    SA->>FE: Isi biodata lengkap + pilih program
-    FE->>API: POST /api/siswa { biodata, kode_program }
-    API->>DB: SELECT MAX(no_urut) WHERE kode_program = X
-    DB-->>API: no_urut terakhir
-    API->>API: Hitung nomor_induk = kode_program.(no_urut+1).padStart(4,'0')
-    API->>DB: INSERT siswa { ...biodata, nomor_induk, tanggal_masuk }
+    SA->>FE: Pilih Program Pelatihan
+    FE->>API: GET /api/v1/siswa/next-id?programId=X
+    API->>DB: SELECT nomor_induk FROM siswa WHERE program_id=X ORDER BY created_at DESC
+    DB-->>API: Nomor urut terakhir
+    API-->>FE: Preview nomor_induk (misal: "01.0005")
+    SA->>FE: Isi biodata lengkap (NIK, nama, alamat, tgl_masuk, dll.)
+    FE->>API: POST /api/v1/siswa { ...biodata, program_id }
+    API->>API: Validasi NIK 16 digit & cek duplikasi
+    API->>DB: INSERT siswa { ...biodata, nomor_induk, is_password_default: true }
     DB-->>API: siswa_id
-    API-->>FE: { siswa_id, nomor_induk }
-    FE-->>SA: Tampilkan konfirmasi + No Induk baru
+    API->>Auth: admin.createUser({ email: budi05@lpks.id, password: "budi@0005" })
+    Auth-->>API: auth_user_id
+    API->>DB: UPDATE siswa SET auth_id = auth_user_id, username = "budi@0005"
+    API-->>FE: { siswa_id, nomor_induk, username, message: "Pendaftaran berhasil" }
+    FE-->>SA: Tampilkan kartu konfirmasi No Induk & kredensial login siswa
 ```
 
 ---
 
-### Alur 3 — Presensi Mandiri Siswa via GPS
+### Alur 3 — Presensi Mandiri Siswa via GPS Geofencing
 
 ```mermaid
 sequenceDiagram
     participant S as Siswa (Smartphone)
     participant FE as Frontend (Browser)
-    participant API as /api/presensi
+    participant API as /api/v1/presensi
     participant DB as Supabase DB
     participant Geo as lib/geo (Haversine)
 
-    S->>FE: Buka halaman Presensi, klik "Absen Sekarang"
+    S->>FE: Buka halaman Presensi, klik "Presensi Hadir"
     FE->>FE: navigator.geolocation.getCurrentPosition()
-    FE-->>S: Minta izin GPS browser
-    S-->>FE: Koordinat saat ini (lat, lng)
-    FE->>API: POST /api/presensi { siswa_id, lat, lng }
-    API->>DB: SELECT * FROM presensi WHERE siswa_id=X AND tanggal=today
-    DB-->>API: hasil (ada/tidak)
+    FE-->>S: Minta izin lokasi browser
+    S-->>FE: Koordinat GPS saat ini (lat, lng)
+    FE->>API: POST /api/v1/presensi { lat, lng } (Bearer cookie)
+    API->>API: Resolve siswa_id dari auth cookie
+    API->>DB: Cek presensi_attempts / duplikasi tanggal = hari ini
     alt Sudah presensi hari ini
-        API-->>FE: { status: 'duplikat', pesan: 'Sudah absen hari ini' }
-    else Belum presensi
-        API->>DB: SELECT lat_lpks, lng_lpks, radius FROM master_lokasi
-        DB-->>API: { lat_lpks, lng_lpks, radius: 100 }
+        API-->>FE: 400 Bad Request { error: "Anda sudah melakukan presensi hari ini" }
+    else Percobaan presensi > 3x hari ini
+        API-->>FE: 429 Too Many Requests { error: "Batas 3 kali percobaan presensi hari ini terlampaui" }
+    else Validasi radius
+        API->>DB: SELECT lat, lng, radius_meter FROM master_lokasi
+        DB-->>API: Titik koordinat LPKS & radius (default: 100m)
         API->>Geo: hitungJarak(lat, lng, lat_lpks, lng_lpks)
         Geo-->>API: jarak_meter
-        alt jarak_meter <= 100
-            API->>DB: INSERT presensi { siswa_id, tanggal, jam, jarak, status: 'hadir' }
-            API-->>FE: { status: 'hadir', jarak_meter }
+        alt jarak_meter <= radius_meter
+            API->>DB: INSERT INTO presensi { siswa_id, tanggal, jam, lat, lng, jarak_meter, status: "Hadir" }
+            API-->>FE: 201 Created { status: "Hadir", jarak_meter }
             FE-->>S: ✅ Presensi berhasil! Jarak: X meter
-        else jarak_meter > 100
-            API-->>FE: { status: 'ditolak', jarak_meter }
+        else jarak_meter > radius_meter
+            API-->>FE: 400 Bad Request { status: "ditolak", jarak_meter, pesan: "Di luar radius" }
             FE-->>S: ❌ Terlalu jauh (X meter). Harus dalam radius 100m.
         end
     end
@@ -296,48 +345,104 @@ sequenceDiagram
 sequenceDiagram
     participant SA as Superadmin
     participant FE as Frontend
-    participant API as /api/ai/query
+    participant API as /api/v1/ai/query
     participant DB as Supabase DB
     participant AI as Gemini Flash API
 
     SA->>FE: Ketik pertanyaan: "Siapa siswa aktif yg capping < 80?"
-    FE->>API: POST /api/ai/query { pertanyaan }
-    API->>API: Klasifikasi intent pertanyaan (keyword matching)
-    API->>DB: Jalankan query SQL relevan (nilai, siswa, keuangan)
+    FE->>API: POST /api/v1/ai/query { pertanyaan }
+    API->>API: Klasifikasi intent pertanyaan & pilih structured template
+    API->>DB: Jalankan parameterized query (nilai_harian, siswa, keuangan)
     DB-->>API: Hasil query terstruktur (JSON rows)
-    API->>API: Format data ke string konteks ringkas
-    API->>AI: Prompt = [System Instruction] + [Konteks Data] + [Pertanyaan User]
+    API->>API: Format data ke string konteks ringkas (hemat token)
+    API->>AI: generateContent({ systemInstruction, prompt: konteks + pertanyaan })
     AI-->>API: Jawaban naratif bahasa Indonesia
-    API-->>FE: { jawaban: "Berikut siswa dengan nilai capping di bawah 80: ..." }
+    API-->>FE: { data: { jawaban: "Berikut siswa dengan capping < 80: ..." } }
     FE-->>SA: Tampilkan jawaban di chat UI
 ```
 
 ---
 
-### Alur 5 — Gate Check & Cetak Sertifikat
+### Alur 5 — Gate Check, Antrean Cetak & Export Percetakan
 
 ```mermaid
 sequenceDiagram
     participant SA as Superadmin
     participant FE as Frontend
-    participant API as /api/sertifikat/[id]
+    participant API as /api/v1/sertifikat/queue
     participant DB as Supabase DB
-    participant PDF as lib/pdf (jsPDF)
+    participant Excel as /api/v1/excel/export
 
-    SA->>FE: Buka halaman siswa, klik "Cetak Sertifikat"
-    FE->>API: GET /api/sertifikat/[siswa_id]
-    API->>DB: SELECT status_keuangan FROM keuangan WHERE siswa_id=X
-    API->>DB: SELECT nilai_ujian FROM ujian WHERE siswa_id=X
-    DB-->>API: { sisa_tagihan, nilai_ujian }
-    alt sisa_tagihan > 0 ATAU ada kriteria ujian < 80
-        API-->>FE: { error: 'Syarat belum terpenuhi', detail: [...] }
-        FE-->>SA: Tampilkan pesan syarat belum terpenuhi
-    else Semua syarat terpenuhi
-        API->>DB: SELECT data_siswa, data_program FROM siswa JOIN program
-        DB-->>API: Data lengkap siswa
-        API->>PDF: generateSertifikat(data_siswa, data_program, tanggal_lulus)
-        PDF-->>API: Buffer PDF
-        API-->>FE: PDF binary (Content-Type: application/pdf)
-        FE-->>SA: Browser download / preview sertifikat PDF
+    SA->>FE: Buka menu Ujian & Sertifikat
+    FE->>API: GET /api/v1/sertifikat/queue?status=antrean
+    API->>DB: SELECT sertifikat JOIN siswa WHERE status = 'antrean'
+    DB-->>API: Daftar antrean
+    FE-->>SA: Tampilkan Tab "Antrean Cetak" + badge counter
+    SA->>FE: Klik "Masukkan ke Antrean" untuk siswa lulus & lunas
+    FE->>API: POST /api/v1/sertifikat/queue { siswa_id }
+    API->>DB: Gate Check: Verifikasi sisa_tagihan = 0 DAN nilai ujian 5 kriteria >= 80
+    alt Syarat belum terpenuhi
+        API-->>FE: 400 Bad Request { error: "Belum memenuhi syarat kelulusan/pelunasan" }
+    else Syarat terpenuhi
+        API->>DB: INSERT INTO sertifikat { siswa_id, status: 'antrean', urutan_cetak, tgl_antrean }
+        API-->>FE: 201 Created { message: "Berhasil dimasukkan ke antrean" }
     end
+    SA->>FE: Klik "Ekspor Excel & Tandai Sudah Dicetak"
+    FE->>Excel: GET /api/v1/excel/export?modul=sertifikat&source=queue&mark_as_printed=true
+    Excel->>DB: UPDATE sertifikat SET status='dicetak', tgl_cetak=now() WHERE status='antrean'
+    Excel-->>FE: File .xlsx format percetakan fisik
+    FE-->>SA: Download otomatis file Excel + data dialihkan ke Tab "Riwayat Cetak"
+```
+
+---
+
+### Alur 6 — Ganti Password Mandiri & Dismiss Banner
+
+```mermaid
+sequenceDiagram
+    participant S as Siswa
+    participant FE as Frontend (Portal Siswa)
+    participant API as /api/v1/auth/change-password
+    participant DB as Supabase DB
+    participant Auth as Supabase Auth
+
+    FE->>FE: Cek `user.is_password_default` saat render layout
+    alt is_password_default = true
+        FE-->>S: Tampilkan banner kuning peringatan ganti password + tombol [Ganti Sandi] + tombol silang [X]
+    end
+    alt Siswa klik tombol silang [X]
+        FE->>FE: Set sessionStorage `dismiss_password_warning = true`
+        FE-->>S: Banner dihilangkan tanpa mengganggu sesi belajar
+    else Siswa klik [Ganti Sandi]
+        S->>FE: Isi new_password & confirm_password di modal
+        FE->>API: POST /api/v1/auth/change-password { new_password, confirm_password }
+        API->>Auth: admin.updateUserById(auth_id, { password: new_password })
+        API->>DB: UPDATE siswa SET is_password_default = false WHERE id = siswa_id
+        API-->>FE: 200 OK { message: "Kata sandi berhasil diperbarui" }
+        FE-->>S: Notifikasi toast sukses & banner peringatan hilang permanen
+    end
+```
+
+---
+
+### Alur 7 — Notifikasi Operasional Header (Auto-Refresh)
+
+```mermaid
+sequenceDiagram
+    participant U as User (Admin / Siswa)
+    participant FE as NotificationBell (Header)
+    participant API as /api/v1/notifications
+    participant DB as Supabase DB
+
+    FE->>API: GET /api/v1/notifications (setiap 60 detik / saat load)
+    alt Role = Superadmin
+        API->>DB: COUNT(*) antrean sertifikat + COUNT(*) siswa siap ujian
+        DB-->>API: { queueCount, siapUjianCount }
+        API-->>FE: { data: [...alerts], meta: { unread_count: totalAlerts } }
+    else Role = Siswa
+        API->>DB: SELECT is_password_default FROM siswa WHERE id = siswa_id
+        DB-->>API: is_password_default
+        API-->>FE: { data: [...alerts], meta: { unread_count: is_password_default ? 1 : 0 } }
+    end
+    FE-->>U: Render red badge unread count & popover dropdown saat lonceng diklik
 ```
