@@ -26,11 +26,10 @@ export async function GET(request: NextRequest) {
       .neq("alamat_lengkap", "[DATA DIHAPUS]");
 
     // Filter status aktif vs alumni vs out
-    const today = new Date().toISOString().split("T")[0];
     if (status === "aktif") {
-      query = query.or(`status_siswa.eq.aktif,and(status_siswa.is.null,tgl_keluar.is.null),and(status_siswa.is.null,tgl_keluar.gte.${today})`);
+      query = query.eq("status_siswa", "aktif");
     } else if (status === "alumni") {
-      query = query.or(`status_siswa.eq.alumni,and(status_siswa.is.null,tgl_keluar.not.is.null,tgl_keluar.lt.${today})`);
+      query = query.eq("status_siswa", "alumni");
     } else if (status === "out") {
       query = query.eq("status_siswa", "out");
     }
