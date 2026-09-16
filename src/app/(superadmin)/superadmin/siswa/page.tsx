@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Search, Download, Upload, FileText, Users, KeyRound,
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
-  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw
+  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw, ChevronDown
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -75,6 +75,8 @@ export default function SiswaPage() {
 
   // Import Modal
   const [importOpen, setImportOpen] = useState(false);
+  const [importModul, setImportModul] = useState<"siswa" | "arsip_alumni">("siswa");
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
@@ -274,7 +276,7 @@ export default function SiswaPage() {
     formData.append("file", importFile);
 
     try {
-      const res = await fetch("/api/v1/excel/import?modul=siswa", {
+      const res = await fetch(`/api/v1/excel/import?modul=${importModul}`, {
         method: "POST",
         body: formData,
       });
@@ -494,13 +496,43 @@ export default function SiswaPage() {
         </div>
         {/* Toolbar */}
         <div className="flex items-center gap-2 flex-wrap">
-          <a
-            href="/api/v1/excel/template?modul=siswa"
-            download
-            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] hover:bg-[#1F2937] text-xs font-medium text-[#D1D5DB] transition-colors"
-          >
-            <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Template
-          </a>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTemplateDropdownOpen(!templateDropdownOpen)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] hover:bg-[#1F2937] text-xs font-medium text-[#D1D5DB] transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5 text-[#38BDF8]" aria-hidden="true" />
+              <span>Template</span>
+              <ChevronDown className="h-3 w-3 text-[#9CA3AF]" />
+            </button>
+            {templateDropdownOpen && (
+              <div
+                className="absolute left-0 mt-1 w-56 rounded-lg bg-[#111827] border border-[#1F2937] shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-150"
+                onMouseLeave={() => setTemplateDropdownOpen(false)}
+              >
+                <a
+                  href="/api/v1/excel/template?modul=siswa"
+                  download
+                  onClick={() => setTemplateDropdownOpen(false)}
+                  className="block px-3 py-2 text-xs text-[#D1D5DB] hover:text-white hover:bg-[#1F2937] transition-colors"
+                >
+                  <span className="font-semibold block">Template Siswa Baru</span>
+                  <span className="text-[10px] text-[#9CA3AF]">Format data siswa reguler/aktif</span>
+                </a>
+                <div className="border-t border-[#1F2937] my-1" />
+                <a
+                  href="/api/v1/excel/template?modul=arsip_alumni"
+                  download
+                  onClick={() => setTemplateDropdownOpen(false)}
+                  className="block px-3 py-2 text-xs text-[#D1D5DB] hover:text-white hover:bg-[#1F2937] transition-colors"
+                >
+                  <span className="font-semibold block text-[#38BDF8]">Template Arsip Alumni (2015+)</span>
+                  <span className="text-[10px] text-[#9CA3AF]">Siswa + Pembayaran + Sertifikat</span>
+                </a>
+              </div>
+            )}
+          </div>
           <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportOpen(true)}>
             <Upload className="h-3.5 w-3.5" aria-hidden="true" /> Import Excel
           </Button>
@@ -746,21 +778,74 @@ export default function SiswaPage() {
       <Modal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        title="Import Data Siswa dari Excel"
-        size="sm"
+        title="Import Data Siswa / Arsip dari Excel"
+        size="md"
       >
         <form onSubmit={handleImport} className="flex flex-col gap-4">
           {!importing && !importResult && (
             <>
-              <p className="text-xs text-[#9CA3AF] leading-relaxed">
-                Unggah file spreadsheet (.xlsx) sesuai template format LPKS. Gunakan tombol &quot;Template&quot; di atas jika belum memiliki formatnya.
-              </p>
-              <input
-                type="file"
-                accept=".xlsx, .csv"
-                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
-                className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
-              />
+              {/* Pilihan Modul Import */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#D1D5DB]">Pilih Format Data Import:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setImportModul("siswa")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      importModul === "siswa"
+                        ? "border-[#DC2626] bg-[#DC2626]/10 text-white"
+                        : "border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-[#D1D5DB]"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs">Siswa Reguler</div>
+                    <div className="text-[10px] text-[#9CA3AF] mt-0.5">Siswa baru / aktif tahun berjalan</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setImportModul("arsip_alumni")}
+                    className={`p-2.5 rounded-lg border text-left transition-all ${
+                      importModul === "arsip_alumni"
+                        ? "border-[#38BDF8] bg-[#38BDF8]/10 text-white"
+                        : "border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-[#D1D5DB]"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs text-[#38BDF8]">Arsip Alumni (2015+)</div>
+                    <div className="text-[10px] text-[#9CA3AF] mt-0.5">Siswa + Lunas + Sertifikat</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Info Keterangan & Link Unduh Template */}
+              <div className="p-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] flex flex-col gap-2">
+                <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                  {importModul === "siswa" ? (
+                    "Unggah spreadsheet data siswa reguler. Sistem otomatis membuatkan nomor induk dan kredensial akun login."
+                  ) : (
+                    "Unggah spreadsheet arsip alumni lama. Sistem otomatis menetapkan status Alumni, mencatat pembayaran Lunas, dan mencatatkan nomor sertifikat yang telah terbit."
+                  )}
+                </p>
+                <a
+                  href={`/api/v1/excel/template?modul=${importModul}`}
+                  download
+                  className="inline-flex items-center gap-1.5 text-xs text-[#38BDF8] hover:underline font-medium"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>Unduh template Excel untuk {importModul === "siswa" ? "Siswa Reguler" : "Arsip Alumni"} (.xlsx)</span>
+                </a>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#D1D5DB] mb-1.5">
+                  Pilih File Spreadsheet:
+                </label>
+                <input
+                  type="file"
+                  accept=".xlsx, .csv"
+                  onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                  className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
+                />
+              </div>
             </>
           )}
 
@@ -852,7 +937,7 @@ export default function SiswaPage() {
                   Batal
                 </Button>
                 <Button type="submit" size="sm" disabled={!importFile}>
-                  Mulai Import
+                  Mulai Import {importModul === "arsip_alumni" ? "Arsip Alumni" : "Siswa"}
                 </Button>
               </>
             )}

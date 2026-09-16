@@ -478,6 +478,230 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (modul === "arsip_alumni") {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            let importedCount = 0;
+            let updatedCount = 0;
+            const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
+
+            const { data: allPrograms } = await supabase
+              .from("master_program")
+              .select("id, kode_program, nama, biaya");
+
+            for (let i = 0; i < rows.length; i++) {
+              const row = rows[i];
+              const nama = String(row["Nama"] || row["Nama Lengkap"] || row["nama"] || "").trim();
+              const manualNoInduk = String(row["No. Induk"] || row["No Induk"] || row["nomor_induk"] || "").trim();
+              const rawNik = String(row["NIK"] || row["nik"] || "").trim();
+              const rawProgram = String(row["Program"] || row["program"] || "").trim();
+              const tempatLahir = String(row["Tempat Lahir"] || row["tempat_lahir"] || "").trim();
+              const tglLahir = parseExcelDate(row["Tanggal Lahir"] || row["tgl_lahir"]);
+              const alamat = String(row["Alamat"] || row["alamat"] || "").trim();
+              const noHp = String(row["No. HP"] || row["No HP"] || row["no_hp"] || "").trim();
+              const pendidikan = String(row["Pend. Terakhir"] || row["Pendidikan Terakhir"] || row["pendidikan_terakhir"] || "").trim();
+              const tglMasuk = parseExcelDate(row["Tgl. Masuk"] || row["tgl_masuk"]) || "2015-01-01";
+              const tglLulus = parseExcelDate(row["Tgl. Lulus"] || row["Tanggal Lulus"] || row["tgl_keluar"]) || tglMasuk;
+              const rawBiaya = String(row["Biaya Pelatihan"] || row["Biaya"] || row["biaya"] || "0").replace(/\D/g, "");
+              const biaya = rawBiaya ? parseInt(rawBiaya, 10) : 0;
+              const noSertifikat = String(row["No. Sertifikat"] || row["No Sertifikat"] || row["no_sertifikat"] || "").trim();
+
+              // Lewati baris kosong
+              if (!nama && !manualNoInduk && !rawNik) continue;
+
+              if (!nama) {
+                errors.push({ row: i + 2, reason: "Nama siswa wajib diisi.", type: "warning" });
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: "progress",
+                  progress: Math.round(((i + 1) / rows.length) * 100),
+                  status: `Memproses baris ${i + 1} dari ${rows.length}...`,
+                }) + "\n"));
+                continue;
+              }
+
+              // Cari program yang sesuai
+              let matchedProg = allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0"));
+              if (!matchedProg && rawProgram) {
+                matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes(rawProgram.toLowerCase()));
+              }
+              if (!matchedProg && allPrograms && allPrograms.length > 0) {
+                matchedProg = allPrograms[0];
+              }
+              const programId = matchedProg?.id || null;
+
+              // Tentukan nomor induk
+              let finalNoInduk = manualNoInduk;
+              if (!finalNoInduk) {
+                finalNoInduk = `${matchedProg?.kode_program || "01"}.${String(i + 1).padStart(4, "0")}`;
+              }
+
+              // NIK validasi / fallback anonim untuk arsip lama tanpa NIK
+              let finalNik = rawNik.replace(/\D/g, "");
+              if (finalNik.length !== 16) {
+                finalNik = `ANON-${finalNoInduk.replace(/[^a-zA-Z0-9]/g, "")}-${String(i + 1).padStart(4, "0")}`;
+              }
+
+              // Format nomor urut
+              const parts = finalNoInduk.split(".");
+              const urutStr = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
+              const numUrut = parseInt(urutStr.replace(/\D/g, ""), 10);
+              const urutanNomor = isNaN(numUrut) ? null : numUrut;
+
+              // Generate email & username
+              const namaDepanClean = nama.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "alumni";
+              const cleanNoIndukForUser = finalNoInduk.replace(/\./g, "");
+              const email = `${namaDepanClean}.${cleanNoIndukForUser}@lpks.id`;
+              const username = `${namaDepanClean}@${cleanNoIndukForUser}`;
+
+              // 1. Cek apakah siswa sudah ada di sistem
+              let siswaId: string | null = null;
+              const { data: existingSiswa } = await supabase
+                .from("siswa")
+                .select("id, nomor_induk")
+                .eq("nomor_induk", finalNoInduk)
+                .maybeSingle();
+
+              if (existingSiswa) {
+                siswaId = existingSiswa.id;
+                await supabase
+                  .from("siswa")
+                  .update({
+                    status_siswa: "alumni",
+                    nama_lengkap: nama,
+                    tempat_lahir: tempatLahir || undefined,
+                    tgl_lahir: tglLahir || undefined,
+                    alamat_lengkap: alamat || undefined,
+                    no_hp: noHp || undefined,
+                    pendidikan_terakhir: pendidikan || undefined,
+                    tgl_masuk: tglMasuk,
+                    tgl_keluar: tglLulus,
+                    urutan_nomor: urutanNomor,
+                  })
+                  .eq("id", siswaId);
+                updatedCount++;
+              } else {
+                const { data: newS, error: sErr } = await supabase
+                  .from("siswa")
+                  .insert({
+                    program_id: programId,
+                    nomor_induk: finalNoInduk,
+                    urutan_nomor: urutanNomor,
+                    nama_lengkap: nama,
+                    nik: finalNik,
+                    username,
+                    email,
+                    tempat_lahir: tempatLahir || null,
+                    tgl_lahir: tglLahir || null,
+                    alamat_lengkap: alamat || null,
+                    no_hp: noHp || null,
+                    pendidikan_terakhir: pendidikan || null,
+                    tgl_masuk: tglMasuk,
+                    tgl_keluar: tglLulus,
+                    status_siswa: "alumni",
+                    is_password_default: true,
+                  })
+                  .select("id")
+                  .single();
+
+                if (sErr || !newS) {
+                  errors.push({ row: i + 2, reason: `Gagal menyimpan data siswa: ${sErr?.message || "Database error"}`, type: "error" });
+                  continue;
+                }
+                siswaId = newS.id;
+                importedCount++;
+              }
+
+              // 2. Transaksi Keuangan (Otomatis Lunas)
+              const nominalBayar = biaya > 0 ? biaya : Number(matchedProg?.biaya || 7500000);
+              const { data: existingTx } = await supabase
+                .from("transaksi_keuangan")
+                .select("id")
+                .eq("siswa_id", siswaId)
+                .maybeSingle();
+
+              if (!existingTx) {
+                await supabase.from("transaksi_keuangan").insert({
+                  siswa_id: siswaId,
+                  nominal: nominalBayar,
+                  tgl_bayar: tglLulus,
+                  metode: "Tunai",
+                  keterangan: "Pelunasan Pembayaran Arsip Alumni",
+                  penerima: "Superadmin (Import)",
+                });
+              }
+
+              // 3. Sertifikat (Otomatis Dicetak)
+              if (noSertifikat) {
+                const { data: existingCert } = await supabase
+                  .from("sertifikat")
+                  .select("id")
+                  .eq("siswa_id", siswaId)
+                  .maybeSingle();
+
+                if (!existingCert) {
+                  await supabase.from("sertifikat").insert({
+                    siswa_id: siswaId,
+                    no_sertifikat: noSertifikat,
+                    status: "dicetak",
+                    tgl_antrean: tglMasuk,
+                    tgl_cetak: tglLulus,
+                  });
+                } else {
+                  await supabase.from("sertifikat").update({
+                    no_sertifikat: noSertifikat,
+                    status: "dicetak",
+                    tgl_cetak: tglLulus,
+                  }).eq("id", existingCert.id);
+                }
+              }
+
+              const progress = Math.round(((i + 1) / rows.length) * 100);
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: "progress",
+                progress,
+                status: `Memproses arsip ${i + 1} dari ${rows.length} (${nama})...`,
+              }) + "\n"));
+            }
+
+            const statusParts: string[] = [];
+            if (importedCount > 0) statusParts.push(`${importedCount} arsip alumni baru disimpan`);
+            if (updatedCount > 0) statusParts.push(`${updatedCount} data alumni diperbarui`);
+            if (errors.length > 0) statusParts.push(`${errors.length} dilewati/gagal`);
+            const summaryMsg = `Impor Arsip Selesai: ${statusParts.join(", ") || "0 data diproses"}. Siswa alumni, status keuangan lunas, dan nomor sertifikat telah tercatat.`;
+
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: "done",
+              result: {
+                total_rows: rows.length,
+                imported_count: importedCount,
+                updated_count: updatedCount,
+                failed_count: errors.length,
+                errors,
+                message: summaryMsg,
+              },
+            }) + "\n"));
+            controller.close();
+          } catch (streamErr) {
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: "error",
+              message: streamErr instanceof Error ? streamErr.message : String(streamErr),
+            }) + "\n"));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "application/x-ndjson",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
     return errorResponse("NOT_IMPLEMENTED", `Impor untuk modul '${modul}' belum didukung.`, 400);
   } catch (err) {
     return errorResponse(

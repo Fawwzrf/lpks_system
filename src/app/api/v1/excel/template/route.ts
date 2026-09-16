@@ -85,8 +85,43 @@ export async function GET(request: NextRequest) {
         };
         break;
 
+      case "arsip_alumni":
+        headers = [
+          "No",
+          "No. Induk",
+          "Nama",
+          "NIK",
+          "Tempat Lahir",
+          "Tanggal Lahir",
+          "Alamat",
+          "No. HP",
+          "Pend. Terakhir",
+          "Program",
+          "Tgl. Masuk",
+          "Tgl. Lulus",
+          "Biaya Pelatihan",
+          "No. Sertifikat"
+        ];
+        sampleRow = {
+          "No": 1,
+          "No. Induk": "01.0012",
+          "Nama": "Askuri",
+          "NIK": "3301234567890002",
+          "Tempat Lahir": "Cilacap",
+          "Tanggal Lahir": "1996-08-10",
+          "Alamat": "Dusun Cikerang, Cilacap",
+          "No. HP": "081234567891",
+          "Pend. Terakhir": "SMA",
+          "Program": "01",
+          "Tgl. Masuk": "2018-01-15",
+          "Tgl. Lulus": "2018-03-20",
+          "Biaya Pelatihan": 7500000,
+          "No. Sertifikat": "05/LPK-S/XI/2018"
+        };
+        break;
+
       default:
-        return errorResponse("INVALID_MODUL", "Modul template tidak didukung. Pilihan: siswa, penilaian, keuangan, presensi.", 400);
+        return errorResponse("INVALID_MODUL", "Modul template tidak didukung. Pilihan: siswa, penilaian, keuangan, presensi, arsip_alumni.", 400);
     }
 
     const worksheet = XLSX.utils.json_to_sheet([sampleRow], { header: headers });
