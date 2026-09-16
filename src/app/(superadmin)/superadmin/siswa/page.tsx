@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search, Download, Upload, FileText, Users, KeyRound,
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
-  Edit, Trash2, AlertTriangle
+  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,7 @@ interface SiswaItem {
   pendidikan_terakhir?: string;
   tgl_masuk?: string;
   tgl_keluar?: string | null;
+  status_siswa?: "aktif" | "alumni" | "out";
   program?: { nama: string };
   is_password_default?: boolean;
 }
@@ -38,19 +39,27 @@ interface ProgramItem {
   nama: string;
 }
 
-type FilterStatus = "semua" | "aktif" | "alumni";
+type FilterStatus = "aktif" | "alumni" | "out" | "semua";
 
 export default function SiswaPage() {
   const router = useRouter();
   const [siswaList, setSiswaList] = useState<SiswaItem[]>([]);
   const [programs, setPrograms] = useState<ProgramItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterStatus>("semua");
+  const [filter, setFilter] = useState<FilterStatus>("aktif");
   const [programFilter, setProgramFilter] = useState<string>("semua");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
   const [total, setTotal] = useState(0);
+
+  // In-memory cache untuk performa 0ms / no loading
+  const cacheRef = useRef<Map<string, { data: SiswaItem[]; total: number }>>(new Map());
+
+  // Modal Tandai Out
+  const [markOutSiswa, setMarkOutSiswa] = useState<SiswaItem | null>(null);
+  const [outTglKeluar, setOutTglKeluar] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [outProcessing, setOutProcessing] = useState(false);
 
   // Modal Kelola Akun
   const [selectedSiswa, setSelectedSiswa] = useState<SiswaItem | null>(null);
@@ -87,8 +96,18 @@ export default function SiswaPage() {
     loadPrograms();
   }, []);
 
-  const loadSiswa = useCallback(async () => {
-    setLoading(true);
+  const loadSiswa = useCallback(async (bypassCache = false) => {
+    const cacheKey = `${filter}_${programFilter}_${search.trim()}_${page}_${limit}`;
+    const cached = cacheRef.current.get(cacheKey);
+
+    if (cached && !bypassCache) {
+      setSiswaList(cached.data);
+      setTotal(cached.total);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
     try {
       let url = `/api/v1/siswa?limit=${limit}&page=${page}`;
       if (filter !== "semua") {
@@ -103,8 +122,11 @@ export default function SiswaPage() {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setSiswaList(json.data || []);
-        setTotal(json.meta?.total || 0);
+        const data = json.data || [];
+        const totalCount = json.meta?.total || 0;
+        cacheRef.current.set(cacheKey, { data, total: totalCount });
+        setSiswaList(data);
+        setTotal(totalCount);
       }
     } catch (err) {
       console.error("Gagal memuat data siswa:", err);
@@ -121,6 +143,53 @@ export default function SiswaPage() {
   useEffect(() => {
     loadSiswa();
   }, [loadSiswa]);
+
+  async function handleConfirmMarkOut(targetStatus: "out" | "aktif") {
+    if (!markOutSiswa) return;
+    setOutProcessing(true);
+    try {
+      const payload: Record<string, unknown> = {
+        status_siswa: targetStatus,
+        tgl_keluar: targetStatus === "out" ? (outTglKeluar || new Date().toISOString().split("T")[0]) : null,
+      };
+      const res = await fetch(`/api/v1/siswa/${markOutSiswa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        cacheRef.current.clear();
+        await loadSiswa(true);
+        setMarkOutSiswa(null);
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Gagal mengubah status siswa.");
+      }
+    } catch {
+      alert("Kesalahan jaringan saat mengubah status siswa.");
+    } finally {
+      setOutProcessing(false);
+    }
+  }
+
+  async function handleDirectToggleStatus(siswa: SiswaItem, targetStatus: "out" | "aktif") {
+    try {
+      const res = await fetch(`/api/v1/siswa/${siswa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status_siswa: targetStatus,
+          tgl_keluar: targetStatus === "out" ? new Date().toISOString().split("T")[0] : null,
+        }),
+      });
+      if (res.ok) {
+        cacheRef.current.clear();
+        await loadSiswa(true);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   function openKelolaAkun(s: SiswaItem) {
     setSelectedSiswa(s);
@@ -164,7 +233,8 @@ export default function SiswaPage() {
       }
 
       setCredMsg({ type: "success", text: "Kredensial siswa berhasil diperbarui!" });
-      await loadSiswa();
+      cacheRef.current.clear();
+      await loadSiswa(true);
       setTimeout(() => setSelectedSiswa(null), 1500);
     } catch {
       setCredMsg({ type: "error", text: "Tidak dapat terhubung ke server." });
@@ -179,7 +249,8 @@ export default function SiswaPage() {
     try {
       const res = await fetch(`/api/v1/siswa/${deleteSiswa.id}`, { method: "DELETE" });
       if (res.ok) {
-        await loadSiswa();
+        cacheRef.current.clear();
+        await loadSiswa(true);
         setDeleteSiswa(null);
       } else {
         alert("Gagal menghapus siswa.");
@@ -248,6 +319,8 @@ export default function SiswaPage() {
       }
 
       setImporting(false);
+      cacheRef.current.clear();
+      await loadSiswa(true);
 
       if (finalResult) {
         setImportResult({
@@ -280,7 +353,33 @@ export default function SiswaPage() {
       key: "nama_lengkap",
       header: "Nama",
       render: (row: SiswaItem) => (
-        <span className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</span>
+            {row.status_siswa === "out" && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EF4444]/20 text-[#F87171] border border-[#EF4444]/40">
+                OUT
+              </span>
+            )}
+            {row.status_siswa === "alumni" && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20">
+                Alumni
+              </span>
+            )}
+          </div>
+          {row.status_siswa === "out" && (
+            <div>
+              <button
+                onClick={() => router.push(`/superadmin/keuangan?search=${encodeURIComponent(row.nomor_induk)}`)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-[#DC2626] hover:bg-[#B91C1C] text-white transition-colors shadow-sm"
+                title="Menuju ke Pembayaran Keuangan untuk penagihan sisa biaya"
+              >
+                <CreditCard className="h-3 w-3" />
+                <span>Lihat Pembayaran &rarr;</span>
+              </button>
+            </div>
+          )}
+        </div>
       ),
     },
     {
@@ -337,9 +436,29 @@ export default function SiswaPage() {
     {
       key: "aksi",
       header: "Aksi",
-      className: "w-36 text-right",
+      className: "w-40 text-right",
       render: (row: SiswaItem) => (
         <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          {row.status_siswa === "out" ? (
+            <button
+              onClick={() => handleDirectToggleStatus(row, "aktif")}
+              className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all"
+              title="Batalkan Status Out / Kembalikan ke Aktif"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setMarkOutSiswa(row);
+                setOutTglKeluar(new Date().toISOString().split("T")[0]);
+              }}
+              className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#F43F5E]/40 bg-[#0B0F17] hover:bg-[#F43F5E]/10 text-[#9CA3AF] hover:text-[#F43F5E] transition-all"
+              title="Tandai Siswa Keluar / Berhenti (Out)"
+            >
+              <UserMinus className="h-3.5 w-3.5" />
+            </button>
+          )}
           <button
             onClick={() => router.push(`/superadmin/siswa/edit/${row.id}`)}
             className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all"
@@ -398,13 +517,20 @@ export default function SiswaPage() {
       {/* Filter + Search Bar */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1">
-          {(["semua", "aktif", "alumni"] as FilterStatus[]).map((f) => (
+          {[
+            { key: "aktif", label: "Siswa Aktif" },
+            { key: "alumni", label: "Alumni" },
+            { key: "out", label: "Out (Keluar)" },
+            { key: "semua", label: "Semua" },
+          ].map((item) => (
             <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filter === f ? "bg-[#DC2626] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"}`}
+              key={item.key}
+              onClick={() => setFilter(item.key as FilterStatus)}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                filter === item.key ? "bg-[#DC2626] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
             >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
+              {item.label}
             </button>
           ))}
         </div>
@@ -432,7 +558,7 @@ export default function SiswaPage() {
         </div>
 
         <button
-          onClick={loadSiswa}
+          onClick={() => loadSiswa(true)}
           className="p-2 rounded-lg border border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-white transition-colors"
           title="Segarkan data"
         >
@@ -737,6 +863,54 @@ export default function SiswaPage() {
             )}
           </div>
         </form>
+      </Modal>
+
+      {/* Modal Tandai Siswa Out */}
+      <Modal
+        open={!!markOutSiswa}
+        onClose={() => setMarkOutSiswa(null)}
+        title="Tandai Siswa Keluar (Out)"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="p-3 rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 text-xs text-[#F43F5E]">
+            <p className="font-semibold">Perhatian:</p>
+            <p className="mt-1 leading-relaxed">
+              Siswa <strong>{markOutSiswa?.nama_lengkap}</strong> ({markOutSiswa?.nomor_induk}) akan ditandai keluar / berhenti di tengah masa pelatihan. Data tagihan pembayarannya akan otomatis muncul di menu Keuangan pada filter <strong>"Out (Belum Lunas)"</strong> untuk penagihan atau pelunasan.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[#D1D5DB] mb-1">
+              Tanggal Berhenti / Keluar
+            </label>
+            <input
+              type="date"
+              value={outTglKeluar}
+              onChange={(e) => setOutTglKeluar(e.target.value)}
+              className="h-9 w-full rounded-lg border border-[#1F2937] bg-[#111827] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMarkOutSiswa(null)}
+              disabled={outProcessing}
+            >
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5"
+              onClick={() => handleConfirmMarkOut("out")}
+              disabled={outProcessing}
+            >
+              {outProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />}
+              <span>Konfirmasi Siswa Out</span>
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

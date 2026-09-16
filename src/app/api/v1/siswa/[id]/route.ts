@@ -71,6 +71,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       "tgl_masuk",
       "tgl_keluar",
       "checklist_berkas",
+      "status_siswa",
     ];
 
     const updates: Record<string, unknown> = {

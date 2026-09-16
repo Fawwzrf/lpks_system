@@ -70,6 +70,7 @@ export default function EditSiswaPage({ params }: PageProps) {
   const [formValues, setFormValues] = useState<Record<string, string>>({});
   const [tanggalMasuk, setTanggalMasuk] = useState("");
   const [tanggalKeluar, setTanggalKeluar] = useState("");
+  const [statusSiswa, setStatusSiswa] = useState<"aktif" | "alumni" | "out">("aktif");
   const [programInfo, setProgramInfo] = useState<{ id: string; nama: string; kode: string; } | null>(null);
   const [noUrut, setNoUrut] = useState("");
   const [kodeProgram, setKodeProgram] = useState("");
@@ -124,6 +125,7 @@ export default function EditSiswaPage({ params }: PageProps) {
 
       setTanggalMasuk(siswa.tgl_masuk || "");
       setTanggalKeluar(siswa.tgl_keluar || "");
+      setStatusSiswa((siswa.status_siswa as "aktif" | "alumni" | "out") || "aktif");
       
       if (siswa.program) {
         setProgramInfo({
@@ -204,7 +206,8 @@ export default function EditSiswaPage({ params }: PageProps) {
       pendidikan_terakhir: rawData.pendidikan_terakhir || null,
       nisn: rawData.nisn || null,
       tgl_masuk: tanggalMasuk || null,
-      tgl_keluar: tanggalKeluar || null
+      tgl_keluar: tanggalKeluar || null,
+      status_siswa: statusSiswa
     };
 
     try {
@@ -504,6 +507,45 @@ export default function EditSiswaPage({ params }: PageProps) {
               onChange={(e) => setTanggalKeluar(e.target.value)}
               hint="Diisi otomatis saat kelulusan/dropout"
             />
+          </div>
+
+          {/* STATUS SISWA */}
+          <div className="flex items-center gap-4 mt-6 mb-4">
+            <span className="text-[10px] font-bold tracking-widest text-[#DC2626] uppercase">Status Siswa</span>
+            <div className="flex-1 h-px bg-[#1F2937]" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { key: "aktif", label: "Aktif", desc: "Sedang mengikuti masa pelatihan" },
+              { key: "alumni", label: "Alumni", desc: "Telah lulus pendidikan & sertifikasi" },
+              { key: "out", label: "Out (Keluar)", desc: "Keluar di tengah pendidikan (belum selesai)" },
+            ].map((st) => (
+              <label
+                key={st.key}
+                onClick={() => setStatusSiswa(st.key as "aktif" | "alumni" | "out")}
+                className={`flex flex-col p-3 rounded-xl border cursor-pointer transition-all ${
+                  statusSiswa === st.key
+                    ? st.key === "out"
+                      ? "border-[#EF4444] bg-[#EF4444]/10 text-white"
+                      : "border-[#DC2626] bg-[#DC2626]/10 text-white"
+                    : "border-[#1F2937] bg-[#111827] hover:border-[#374151] text-[#9CA3AF]"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#F9FAFB]">{st.label}</span>
+                  <input
+                    type="radio"
+                    name="status_siswa"
+                    value={st.key}
+                    checked={statusSiswa === st.key}
+                    onChange={() => setStatusSiswa(st.key as "aktif" | "alumni" | "out")}
+                    className="accent-[#DC2626]"
+                  />
+                </div>
+                <span className="text-[11px] text-[#6B7280] mt-1">{st.desc}</span>
+              </label>
+            ))}
           </div>
         </div>
 

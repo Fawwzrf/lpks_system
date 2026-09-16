@@ -25,12 +25,14 @@ export async function GET(request: NextRequest) {
       .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]");
 
-    // Filter status aktif vs alumni
+    // Filter status aktif vs alumni vs out
     const today = new Date().toISOString().split("T")[0];
     if (status === "aktif") {
-      query = query.or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`);
+      query = query.or(`status_siswa.eq.aktif,and(status_siswa.is.null,tgl_keluar.is.null),and(status_siswa.is.null,tgl_keluar.gte.${today})`);
     } else if (status === "alumni") {
-      query = query.not("tgl_keluar", "is", null).lt("tgl_keluar", today);
+      query = query.or(`status_siswa.eq.alumni,and(status_siswa.is.null,tgl_keluar.not.is.null,tgl_keluar.lt.${today})`);
+    } else if (status === "out") {
+      query = query.eq("status_siswa", "out");
     }
 
     if (programId) {
@@ -263,6 +265,7 @@ export async function POST(request: NextRequest) {
         nisn: nisn?.trim() || null,
         tgl_masuk: finalTglMasuk,
         tgl_keluar: finalTglKeluar,
+        status_siswa: body.status_siswa || "aktif",
         checklist_berkas: checklist_berkas || {},
         is_password_default: true,
       })

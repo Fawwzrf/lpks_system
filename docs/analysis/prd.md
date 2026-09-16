@@ -39,10 +39,11 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
 - Sistem HARUS menyediakan manajemen direktori seluruh siswa (CRUD Data Siswa lengkap).
   - **Edit Data:** Sesuai prinsip integritas `Nomor Induk` (yang juga menjadi `Username`), pengubahan **Program Pelatihan** untuk siswa yang sudah terdaftar DILARANG (di-*disable* pada UI Edit).
   - **Penghapusan (Soft Delete & Anonimisasi):** Menghapus siswa akan memicu anonimisasi data pribadi (NIK, No. HP, Alamat) dan mengubah status siswa menjadi Keluar/Alumni (`Tanggal Keluar` terisi), namun data statistik akademik (nilai, presensi) dipertahankan sesuai UU PDP.
-- Sistem HARUS memiliki kolom **Tanggal Keluar** untuk menandai status siswa:
-  - **Siswa Aktif:** `Tanggal Keluar` masih kosong / `null`.
-  - **Alumni / Selesai / Keluar:** `Tanggal Keluar` terisi (lengkap dengan tanggal kelulusan/selesai).
-- Sistem HARUS menyediakan fitur **Filter & Pencarian Cepat** berdasarkan Status (Aktif/Alumni), Program Pelatihan, dan Nomor Induk/Nama.
+- Sistem HARUS memiliki kolom **Tanggal Keluar** dan **Status Siswa** (`aktif`, `alumni`, `out`):
+  - **Siswa Aktif (Default Filter):** Siswa yang sedang menjalani masa pelatihan.
+  - **Alumni / Selesai:** Siswa yang telah menyelesaikan pelatihan dan lulus ujian/cetak sertifikat.
+  - **Out (Keluar):** Siswa yang keluar/berhenti di tengah jalan sebelum menyelesaikan pendidikan. Penandaan dilakukan secara manual di Data Siswa, menampilkan badge merah **OUT** dan tombol pintas yang mengarahkan langsung menuju ke menu Keuangan.
+- Sistem HARUS menyediakan fitur **Filter Cepat** (Default: *Siswa Aktif*, opsi lain: *Alumni*, *Out (Keluar)*, *Semua*) dan in-memory client cache untuk transisi data instan (0ms / no loading).
 - Sistem HARUS menyediakan fitur **Download Template Excel (.xlsx)** khusus format Data Siswa.
 - Sistem HARUS menyediakan fitur **Import Excel (.xlsx)** untuk pendaftaran/migrasi data siswa secara massal.
 - Sistem HARUS menyediakan fitur **Export Excel (.xlsx)** untuk seluruh direktori data siswa.
@@ -65,7 +66,12 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
 ### 4. Modul Catatan Keuangan (Financial Tracking)
 - Sistem HARUS mencatat transaksi pembayaran per siswa (No Induk, Nama, Program, Tanggal Bayar, Nominal, Metode).
 - Sistem HARUS mengidentifikasi dan menampilkan status pembayaran siswa secara jelas (**Lunas** vs **Cicil / Belum Lunas** beserta sisa tagihan).
-- Sistem HARUS memberikan penanda visual instan (badge/indikator) jika siswa sudah lunas.
+- Sistem HARUS menyediakan filter tab navigasi keuangan:
+  - **Belum Lunas** (*Default*): Menampilkan siswa aktif yang masih memiliki sisa tagihan.
+  - **Lunas**: Menampilkan siswa yang pembayarannya telah selesai 100%.
+  - **Out (Belum Lunas)**: Menampilkan siswa yang keluar di tengah pendidikan dan belum melunasi biaya pelatihan untuk penagihan lanjutan.
+  - **Semua**: Menampilkan seluruh data transaksi dan tagihan.
+- Sistem HARUS memberikan penanda visual instan (badge **OUT** merah dan status lunas/cicilan) serta mendukung navigasi pencarian instan via parameter URL.
 - Sistem HARUS mendukung Import/Export rekapan keuangan dalam format Excel (.xlsx).
 
 ### 5. Modul Penilaian Harian (Daily Practical Assessment)
@@ -92,6 +98,7 @@ Sistem juga berfungsi sebagai portfolio *showcase AI Engineer* dengan menghadirk
   - **Pratinjau Modal Detail:** Memeriksa kelengkapan identitas siswa, nilai ujian, serta penomoran resmi sertifikat dengan format bulan Romawi (`XX/LPKS-SH/ROMAN/TAHUN`).
   - **Ekspor Excel Percetakan:** Mengunduh file `.xlsx` format percetakan fisik, secara otomatis mengubah status antrean menjadi `dicetak` dan mencatat tanggal cetak, serta memindahkan siswa ke status Alumni.
   - **Riwayat Cetak & Re-Queue:** Menyimpan arsip sertifikat yang telah selesai dicetak, serta mengizinkan cetak ulang (re-queue) jika sertifikat fisik rusak/hilang.
+  - **Pencarian & Verifikasi Keabsahan Sertifikat:** Sistem HARUS menyediakan input pencarian nomor sertifikat di Tab Riwayat untuk memverifikasi keabsahan alumni resmi LPKS, lengkap dengan kartu verifikasi data kelulusan.
 - Sistem HARUS tetap menyediakan opsi cetak / export sertifikat berformat PDF instan berdasarkan template resmi yang ada.
 
 ### 7. Modul Pengaturan & Master Data Dinamis (System Configuration & Master Data)

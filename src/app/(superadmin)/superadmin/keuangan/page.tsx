@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Banknote,
   Percent,
+  LogOut,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +57,7 @@ interface SiswaKeuanganItem {
   is_lunas: boolean;
   persentase: number;
   status: "Lunas" | "Cicilan" | "Belum Bayar";
+  status_siswa?: "aktif" | "alumni" | "out";
   riwayat_transaksi: TransaksiItem[];
 }
 
@@ -66,15 +68,25 @@ interface ProgramItem {
   biaya: number;
 }
 
-type TabFilter = "semua" | "belum_lunas" | "lunas";
+type TabFilter = "belum_lunas" | "lunas" | "out" | "semua";
 type SkemaBayar = "lunas" | "cicilan";
 
 export default function KeuanganSuperadminPage() {
   const [items, setItems] = useState<SiswaKeuanganItem[]>([]);
   const [programs, setPrograms] = useState<ProgramItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<TabFilter>("semua");
+  const [search, setSearch] = useState(() => {
+    if (typeof window !== "undefined") {
+      return new URLSearchParams(window.location.search).get("search") || "";
+    }
+    return "";
+  });
+  const [activeTab, setActiveTab] = useState<TabFilter>(() => {
+    if (typeof window !== "undefined") {
+      if (new URLSearchParams(window.location.search).get("search")) return "semua";
+    }
+    return "belum_lunas";
+  });
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>("");
 
   // Modal Catat Pembayaran
@@ -272,7 +284,8 @@ export default function KeuanganSuperadminPage() {
     return items.filter((item) => {
       // Filter status
       if (activeTab === "lunas" && !item.is_lunas) return false;
-      if (activeTab === "belum_lunas" && item.is_lunas) return false;
+      if (activeTab === "belum_lunas" && (item.is_lunas || item.status_siswa === "out")) return false;
+      if (activeTab === "out" && !(item.status_siswa === "out" && !item.is_lunas)) return false;
 
       // Filter search
       if (search.trim()) {
@@ -291,6 +304,8 @@ export default function KeuanganSuperadminPage() {
   const stats = useMemo(() => {
     const totalSiswa = items.length;
     const lunasCount = items.filter((i) => i.is_lunas).length;
+    const outUnpaidCount = items.filter((i) => i.status_siswa === "out" && !i.is_lunas).length;
+    const aktifBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa !== "out").length;
     const belumLunasCount = totalSiswa - lunasCount;
     const totalTerkumpul = items.reduce((acc, i) => acc + i.total_terbayar, 0);
     const totalPiutang = items.reduce((acc, i) => acc + i.sisa_tagihan, 0);
@@ -298,6 +313,8 @@ export default function KeuanganSuperadminPage() {
     return {
       totalSiswa,
       lunasCount,
+      outUnpaidCount,
+      aktifBelumLunasCount,
       belumLunasCount,
       totalTerkumpul,
       totalPiutang,
@@ -319,7 +336,14 @@ export default function KeuanganSuperadminPage() {
       header: "Nama Siswa & Program",
       render: (r: SiswaKeuanganItem) => (
         <div>
-          <p className="text-xs font-semibold text-[#F9FAFB]">{r.nama_lengkap}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs font-semibold text-[#F9FAFB]">{r.nama_lengkap}</p>
+            {r.status_siswa === "out" && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-[#EF4444]/20 text-[#F87171] border border-[#EF4444]/40">
+                OUT
+              </span>
+            )}
+          </div>
           <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[#1F2937] text-[#9CA3AF] border border-[#374151]/50">
             {r.program?.nama || "Umum"}
           </span>
@@ -383,6 +407,22 @@ export default function KeuanganSuperadminPage() {
       header: "Status",
       className: "w-36 whitespace-nowrap",
       render: (r: SiswaKeuanganItem) => {
+        if (r.status_siswa === "out") {
+          return (
+            <div className="flex flex-col gap-1 items-start">
+              <Badge
+                variant="outline"
+                className="bg-[#EF4444]/20 text-[#F87171] border-[#EF4444]/40 gap-1.5 px-2.5 py-1 text-[11px] font-bold whitespace-nowrap shrink-0"
+              >
+                <LogOut className="h-3.5 w-3.5 shrink-0" />
+                <span>Out ({r.is_lunas ? "Lunas" : "Belum Lunas"})</span>
+              </Badge>
+              {r.total_terbayar > 0 && !r.is_lunas && (
+                <span className="text-[10px] text-[#F59E0B] font-semibold">Cicilan ({r.persentase}%)</span>
+              )}
+            </div>
+          );
+        }
         if (r.is_lunas) {
           return (
             <Badge
@@ -547,16 +587,6 @@ export default function KeuanganSuperadminPage() {
         {/* Status Tabs */}
         <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1">
           <button
-            onClick={() => setActiveTab("semua")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "semua"
-                ? "bg-[#DC2626] text-white"
-                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-            }`}
-          >
-            Semua ({items.length})
-          </button>
-          <button
             onClick={() => setActiveTab("belum_lunas")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
               activeTab === "belum_lunas"
@@ -564,7 +594,7 @@ export default function KeuanganSuperadminPage() {
                 : "text-[#9CA3AF] hover:text-[#D1D5DB]"
             }`}
           >
-            Belum Lunas ({stats.belumLunasCount})
+            Belum Lunas ({stats.aktifBelumLunasCount})
           </button>
           <button
             onClick={() => setActiveTab("lunas")}
@@ -575,6 +605,26 @@ export default function KeuanganSuperadminPage() {
             }`}
           >
             Lunas ({stats.lunasCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("out")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "out"
+                ? "bg-[#EF4444] text-white font-bold"
+                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+            }`}
+          >
+            Out (Belum Lunas) ({stats.outUnpaidCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("semua")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "semua"
+                ? "bg-[#DC2626] text-white"
+                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+            }`}
+          >
+            Semua ({items.length})
           </button>
         </div>
 

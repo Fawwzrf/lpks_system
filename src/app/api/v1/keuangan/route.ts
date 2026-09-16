@@ -18,10 +18,10 @@ export async function GET(request: NextRequest) {
       const today = new Date().toISOString().split("T")[0];
       let siswaQuery = supabase
         .from("siswa")
-        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program_id, program:master_program(id, kode_program, nama, biaya)")
+        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program_id, program:master_program(id, kode_program, nama, biaya)")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+        .or(`status_siswa.eq.aktif,status_siswa.eq.out,tgl_keluar.is.null,tgl_keluar.gte.${today}`)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
           id: s.id,
           nomor_induk: s.nomor_induk,
           nama_lengkap: s.nama_lengkap,
+          status_siswa: s.status_siswa || "aktif",
           tgl_masuk: s.tgl_masuk,
           tgl_keluar: s.tgl_keluar,
           program: program,

@@ -140,6 +140,7 @@ export default function UjianPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const [search, setSearch] = useState("");
+  const [riwayatSearch, setRiwayatSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"semua" | "siap_ujian" | "lulus" | "dalam_bimbingan">("semua");
 
   // Input Nilai Modal State
@@ -265,6 +266,29 @@ export default function UjianPage() {
         return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
       });
   }, [data, search, statusFilter]);
+
+  // Filter Riwayat Sertifikat untuk Pencarian & Verifikasi Keabsahan
+  const filteredHistoryData = useMemo(() => {
+    if (!riwayatSearch.trim()) return historyData;
+    const q = riwayatSearch.trim().toLowerCase();
+    return historyData.filter((item) => {
+      const matchNoSertif = item.no_sertifikat?.toLowerCase().includes(q);
+      const matchNama = item.siswa?.nama_lengkap?.toLowerCase().includes(q);
+      const matchNoInduk = item.siswa?.nomor_induk?.toLowerCase().includes(q);
+      const matchNik = item.siswa?.nik?.toLowerCase().includes(q);
+      return matchNoSertif || matchNama || matchNoInduk || matchNik;
+    });
+  }, [historyData, riwayatSearch]);
+
+  const verifiedMatch = useMemo(() => {
+    if (!riwayatSearch.trim()) return null;
+    const cleanQ = riwayatSearch.trim().toLowerCase().replace(/[\s\-_/.]/g, "");
+    if (cleanQ.length < 3) return null;
+    return historyData.find((item) => {
+      const cleanNo = (item.no_sertifikat || "").toLowerCase().replace(/[\s\-_/.]/g, "");
+      return cleanNo === cleanQ;
+    });
+  }, [historyData, riwayatSearch]);
 
   // Handler: Tambahkan ke Antrean Percetakan
   async function handleAddToQueue(siswaId: string) {
@@ -1040,6 +1064,66 @@ export default function UjianPage() {
             </div>
           </div>
 
+          {/* Search Input & Verifikasi Nomor Sertifikat Siswa LPKS */}
+          <div className="flex flex-col gap-3">
+            <div className="relative w-full max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280]" />
+              <input
+                type="text"
+                value={riwayatSearch}
+                onChange={(e) => setRiwayatSearch(e.target.value)}
+                placeholder="Cari nomor sertifikat untuk verifikasi resmi keabsahan alumni LPKS..."
+                className="w-full h-10 pl-9 pr-14 rounded-xl border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none focus:border-[#38BDF8] transition-all shadow-sm"
+              />
+              {riwayatSearch && (
+                <button
+                  onClick={() => setRiwayatSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#9CA3AF] hover:text-white px-2 py-0.5 rounded bg-[#1F2937]"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {/* Banner Hasil Verifikasi Keabsahan */}
+            {riwayatSearch.trim().length >= 3 && (
+              <div>
+                {verifiedMatch ? (
+                  <div className="p-4 rounded-xl border border-[#10B981]/40 bg-[#10B981]/15 flex items-start gap-3.5 shadow-sm animate-in fade-in duration-200">
+                    <div className="p-2 rounded-lg bg-[#10B981]/25 text-[#10B981] mt-0.5 shrink-0">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#10B981] text-black">
+                          Terverifikasi Resmi
+                        </span>
+                        <span className="text-xs text-[#10B981] font-medium">Siswa &amp; Sertifikat Sah Terdaftar di LPKS</span>
+                      </div>
+                      <h3 className="text-sm font-bold text-[#F9FAFB] mt-1.5">
+                        {verifiedMatch.siswa?.nama_lengkap} &mdash;{" "}
+                        <span className="font-mono text-[#38BDF8]">{verifiedMatch.no_sertifikat}</span>
+                      </h3>
+                      <p className="text-xs text-[#D1D5DB] mt-1 leading-relaxed">
+                        Nomor Induk: <strong className="text-[#DC2626] font-mono">{verifiedMatch.siswa?.nomor_induk}</strong> &bull; Program: <strong>{verifiedMatch.formatted?.program_name || verifiedMatch.siswa?.program?.nama}</strong> &bull; Tanggal Cetak: <strong>{verifiedMatch.tgl_cetak ? new Date(verifiedMatch.tgl_cetak).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : verifiedMatch.formatted?.date_of_issue || "—"}</strong>
+                      </p>
+                    </div>
+                  </div>
+                ) : filteredHistoryData.length === 0 ? (
+                  <div className="p-3.5 rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-[#F43F5E] shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-[#F43F5E]">Data Tidak Ditemukan</p>
+                      <p className="text-[11px] text-[#9CA3AF] mt-0.5">
+                        Nomor sertifikat atau kata kunci &quot;{riwayatSearch}&quot; tidak tercatat dalam arsip sertifikat resmi LPKS.
+                      </p>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+
           {loadingQueue ? (
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -1052,6 +1136,14 @@ export default function UjianPage() {
               <p className="text-sm font-semibold text-[#D1D5DB]">Belum Ada Riwayat Percetakan</p>
               <p className="text-xs text-[#6B7280] mt-1">
                 Data siswa yang diekspor dari Antrean Percetakan akan tersimpan di sini secara otomatis.
+              </p>
+            </div>
+          ) : filteredHistoryData.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center border border-[#1F2937] rounded-xl bg-[#111827]">
+              <Search className="h-10 w-10 text-[#6B7280] mb-2" aria-hidden="true" />
+              <p className="text-sm font-semibold text-[#D1D5DB]">Tidak Ada Hasil yang Cocok</p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                Tidak ada riwayat cetak sertifikat yang cocok dengan pencarian &quot;{riwayatSearch}&quot;.
               </p>
             </div>
           ) : (
@@ -1071,7 +1163,7 @@ export default function UjianPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#1F2937]">
-                    {historyData.map((item, idx) => (
+                    {filteredHistoryData.map((item, idx) => (
                       <tr key={item.id} className="hover:bg-[#1F2937]/30 transition-colors">
                         <td className="py-3 px-4 font-mono text-[#9CA3AF]">{idx + 1}</td>
                         <td className="py-3 px-4 font-mono text-[11px] text-[#38BDF8] whitespace-nowrap">
