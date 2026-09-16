@@ -2,10 +2,11 @@
 
 import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { KeyRound, CheckCircle2, Eye, EyeOff, AlertTriangle } from "lucide-react";
+import { KeyRound, CheckCircle2, Eye, EyeOff, AlertTriangle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Modal } from "@/components/ui/modal";
 
 function AkunForm() {
   const router = useRouter();
@@ -20,6 +21,19 @@ function AkunForm() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{ username?: string; nama?: string } | null>(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Gagal logout:", err);
+    } finally {
+      window.location.href = "/login";
+    }
+  }
 
   React.useEffect(() => {
     async function loadMe() {
@@ -205,6 +219,70 @@ function AkunForm() {
           </Button>
         </form>
       </div>
+
+      {/* Sesi Akun / Logout */}
+      <div className="rounded-xl border border-[#1F2937] bg-[#111827] p-5 flex flex-col gap-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-xl bg-[#F43F5E]/15 border border-[#F43F5E]/30 flex items-center justify-center shrink-0">
+            <LogOut className="h-4 w-4 text-[#F43F5E]" aria-hidden="true" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-[#F9FAFB]">Sesi Akun</p>
+            <p className="text-[11px] text-[#6B7280]">Keluar dari akun siswa pada perangkat ini.</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowLogoutModal(true)}
+          className="border-[#F43F5E]/30 text-[#F43F5E] hover:bg-[#F43F5E]/10 hover:border-[#F43F5E] w-full mt-1"
+        >
+          <LogOut className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
+          Keluar dari Akun
+        </Button>
+      </div>
+
+      {/* Modal Konfirmasi Logout */}
+      <Modal
+        open={showLogoutModal}
+        onClose={() => !loggingOut && setShowLogoutModal(false)}
+        title="Keluar dari Portal Siswa"
+        description="Apakah Anda yakin ingin keluar dari sesi akun siswa ini?"
+        size="sm"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-[#DC2626]/10 border border-[#DC2626]/20">
+            <div className="h-8 w-8 rounded-lg bg-[#DC2626]/20 flex items-center justify-center shrink-0">
+              <LogOut className="h-4 w-4 text-[#DC2626]" />
+            </div>
+            <div className="text-xs">
+              <p className="font-semibold text-[#F9FAFB]">{profile?.nama || "Siswa"}</p>
+              <p className="text-[#9CA3AF] text-[11px]">
+                {profile?.username ? `Username: ${profile.username}` : "Portal Siswa LPKS"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loggingOut}
+              onClick={() => setShowLogoutModal(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              disabled={loggingOut}
+              onClick={handleLogout}
+            >
+              {loggingOut ? "Mengeluarkan..." : "Ya, Keluar"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

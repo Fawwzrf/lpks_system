@@ -16,11 +16,17 @@ export async function POST(request: NextRequest) {
 
     // Tentukan email yang dipakai untuk login:
     // - Jika mengandung '@' DAN domain setelahnya bukan 'lpks.id', asumsikan email langsung (admin)
-    // - Jika tidak mengandung '@' atau username format "nama@2digit", konversi ke auth email
-    const isAdminEmail = identifier.includes("@") && !identifier.endsWith("@lpks.id") && identifier.split("@").length === 2 && identifier.split("@")[1].includes(".");
-    const loginEmail = isAdminEmail
-      ? identifier.trim()
-      : `${identifier.trim().toLowerCase().replace("@", "")}@lpks.id`;
+    // - Jika siswa, normalisasi handle (menghapus sufiks @lpks.id jika sudah ada, menghapus simbol @ separator)
+    const trimmed = identifier.trim().toLowerCase();
+    const isAdminEmail = trimmed.includes("@") && !trimmed.endsWith("@lpks.id") && trimmed.split("@").length === 2 && trimmed.split("@")[1].includes(".");
+    
+    let studentHandle = trimmed;
+    if (studentHandle.endsWith("@lpks.id")) {
+      studentHandle = studentHandle.slice(0, -"@lpks.id".length);
+    }
+    studentHandle = studentHandle.replace(/@/g, "");
+
+    const loginEmail = isAdminEmail ? identifier.trim() : `${studentHandle}@lpks.id`;
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail,
