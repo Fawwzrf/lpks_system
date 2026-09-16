@@ -613,23 +613,60 @@ export async function POST(request: NextRequest) {
                 importedCount++;
               }
 
-              // 2. Transaksi Keuangan (Otomatis Lunas)
-              const nominalBayar = biaya > 0 ? biaya : Number(matchedProg?.biaya || 7500000);
-              const { data: existingTx } = await supabase
+              // 2. Transaksi Keuangan (Mendukung Opsi Cicilan atau Lunas Beserta Tanggal Pembayaran)
+              const skema = String(row["Skema Pembayaran"] || row["Skema"] || row["status_pembayaran"] || "").trim().toLowerCase();
+              const isCicilan = skema.includes("cicil") || skema.includes("angsur");
+
+              // Pembayaran 1
+              const tglBayar1 = parseExcelDate(row["Tgl. Pembayaran 1"] || row["Tanggal Pembayaran 1"] || row["Tgl. Pembayaran"] || row["Tanggal Pembayaran"]) || (isCicilan ? tglMasuk : tglLulus);
+              const rawNominal1 = String(row["Nominal 1"] || row["Nominal Pembayaran 1"] || row["Nominal Bayar 1"] || "").replace(/\D/g, "");
+              const nominal1 = rawNominal1 ? parseInt(rawNominal1, 10) : (isCicilan ? Math.round(biaya / 2) : biaya);
+
+              // Pembayaran 2 (jika cicilan)
+              const tglBayar2 = parseExcelDate(row["Tgl. Pembayaran 2"] || row["Tanggal Pembayaran 2"] || row["Tgl. Pelunasan"]) || (isCicilan ? tglLulus : null);
+              const rawNominal2 = String(row["Nominal 2"] || row["Nominal Pembayaran 2"] || row["Nominal Bayar 2"] || "").replace(/\D/g, "");
+              const nominal2 = rawNominal2 ? parseInt(rawNominal2, 10) : (isCicilan && !rawNominal1 ? Math.max(0, biaya - nominal1) : (rawNominal2 ? parseInt(rawNominal2, 10) : 0));
+
+              const { data: existingTxList } = await supabase
                 .from("transaksi_keuangan")
                 .select("id")
-                .eq("siswa_id", siswaId)
-                .maybeSingle();
+                .eq("siswa_id", siswaId);
 
-              if (!existingTx) {
-                await supabase.from("transaksi_keuangan").insert({
-                  siswa_id: siswaId,
-                  nominal: nominalBayar,
-                  tgl_bayar: tglLulus,
-                  metode: "Tunai",
-                  keterangan: "Pelunasan Pembayaran Arsip Alumni",
-                  penerima: "Superadmin (Import)",
-                });
+              if (!existingTxList || existingTxList.length === 0) {
+                if (isCicilan) {
+                  // Catat Cicilan 1
+                  if (nominal1 > 0) {
+                    await supabase.from("transaksi_keuangan").insert({
+                      siswa_id: siswaId,
+                      nominal: nominal1,
+                      tgl_bayar: tglBayar1 || tglMasuk,
+                      metode: "Tunai",
+                      keterangan: "Pembayaran Angsuran 1 (DP Arsip Alumni)",
+                      penerima: "Superadmin (Import)",
+                    });
+                  }
+                  // Catat Cicilan 2 (jika ada)
+                  if (nominal2 > 0 && tglBayar2) {
+                    await supabase.from("transaksi_keuangan").insert({
+                      siswa_id: siswaId,
+                      nominal: nominal2,
+                      tgl_bayar: tglBayar2,
+                      metode: "Tunai",
+                      keterangan: "Pembayaran Angsuran 2 (Pelunasan Arsip Alumni)",
+                      penerima: "Superadmin (Import)",
+                    });
+                  }
+                } else {
+                  // Lunas sekaligus
+                  await supabase.from("transaksi_keuangan").insert({
+                    siswa_id: siswaId,
+                    nominal: nominal1 > 0 ? nominal1 : biaya,
+                    tgl_bayar: tglBayar1 || tglLulus,
+                    metode: "Tunai",
+                    keterangan: "Pembayaran Pelunasan (Lunas Arsip Alumni)",
+                    penerima: "Superadmin (Import)",
+                  });
+                }
               }
 
               // 3. Sertifikat (Otomatis Dicetak)

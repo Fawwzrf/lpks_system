@@ -13,17 +13,19 @@ export async function GET(request: NextRequest) {
     const siswaId = searchParams.get("siswa_id");
     const programId = searchParams.get("program_id");
 
-    // Mode tampilan rekap siswa aktif (seperti presensi)
+    // Mode tampilan rekap siswa aktif & alumni (seperti presensi)
     if (view === "students" || view === "all_students") {
-      const today = new Date().toISOString().split("T")[0];
+      const statusSiswaParam = searchParams.get("status_siswa");
       let siswaQuery = supabase
         .from("siswa")
         .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program_id, program:master_program(id, kode_program, nama, biaya)")
-        .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .or(`status_siswa.eq.aktif,status_siswa.eq.out,tgl_keluar.is.null,tgl_keluar.gte.${today}`)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
+
+      if (statusSiswaParam && statusSiswaParam !== "semua") {
+        siswaQuery = siswaQuery.eq("status_siswa", statusSiswaParam);
+      }
 
       if (programId) {
         siswaQuery = siswaQuery.eq("program_id", programId);
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
 
       const { data: siswaList, error: siswaError } = await siswaQuery;
       if (siswaError) {
-        return errorResponse("DATABASE_ERROR", "Gagal memuat data siswa aktif.", 500, siswaError.message);
+        return errorResponse("DATABASE_ERROR", "Gagal memuat data siswa.", 500, siswaError.message);
       }
 
       const siswaIds = (siswaList || []).map((s) => s.id);

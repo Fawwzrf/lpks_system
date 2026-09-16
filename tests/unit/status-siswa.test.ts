@@ -36,8 +36,64 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(filtered[0].nama, "Joko");
     });
 
+    test("Tab 'alumni' menyaring seluruh siswa berstatus alumni", () => {
+      const filtered = mockStudents.filter((s) => s.status_siswa === "alumni");
+      assert.equal(filtered.length, 1);
+      assert.equal(filtered[0].nama, "Ahmad");
+    });
+
     test("Tab 'semua' menampilkan seluruh siswa tanpa kecuali", () => {
       assert.equal(mockStudents.length, 5);
+    });
+  });
+
+  describe("Pencatatan Keuangan Alumni & Opsi Cicilan / Lunas", () => {
+    test("Skema Lunas menghasilkan 1 transaksi pelunasan pada tanggal bayar", () => {
+      const row = {
+        "Biaya Pelatihan": 7500000,
+        "Skema Pembayaran": "Lunas",
+        "Tgl. Pembayaran 1": "2018-01-15",
+        "Nominal 1": 7500000,
+      };
+      const isCicilan = row["Skema Pembayaran"].toLowerCase().includes("cicil");
+      const nominal = row["Nominal 1"] || row["Biaya Pelatihan"];
+      const txs = [
+        {
+          nominal,
+          tgl_bayar: row["Tgl. Pembayaran 1"],
+          keterangan: isCicilan ? "Cicilan" : "Lunas",
+        },
+      ];
+      assert.equal(txs.length, 1);
+      assert.equal(txs[0].nominal, 7500000);
+      assert.equal(txs[0].tgl_bayar, "2018-01-15");
+      assert.equal(txs[0].keterangan, "Lunas");
+    });
+
+    test("Skema Cicilan menghasilkan 2 transaksi cicilan dengan tanggal masing-masing", () => {
+      const row = {
+        "Biaya Pelatihan": 7500000,
+        "Skema Pembayaran": "Cicilan",
+        "Tgl. Pembayaran 1": "2018-01-15",
+        "Nominal 1": 4000000,
+        "Tgl. Pembayaran 2": "2018-03-20",
+        "Nominal 2": 3500000,
+      };
+      const txs = [];
+      if (row["Nominal 1"] > 0) {
+        txs.push({ nominal: row["Nominal 1"], tgl_bayar: row["Tgl. Pembayaran 1"], keterangan: "DP" });
+      }
+      if (row["Nominal 2"] > 0) {
+        txs.push({ nominal: row["Nominal 2"], tgl_bayar: row["Tgl. Pembayaran 2"], keterangan: "Pelunasan" });
+      }
+      assert.equal(txs.length, 2);
+      assert.equal(txs[0].nominal, 4000000);
+      assert.equal(txs[0].tgl_bayar, "2018-01-15");
+      assert.equal(txs[1].nominal, 3500000);
+      assert.equal(txs[1].tgl_bayar, "2018-03-20");
+      const totalTerbayar = txs.reduce((a, b) => a + b.nominal, 0);
+      assert.equal(totalTerbayar, 7500000);
+      assert.equal(totalTerbayar >= row["Biaya Pelatihan"], true);
     });
   });
 

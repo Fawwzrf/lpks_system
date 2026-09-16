@@ -100,6 +100,11 @@ export async function GET(request: NextRequest) {
           "Tgl. Masuk",
           "Tgl. Lulus",
           "Biaya Pelatihan",
+          "Skema Pembayaran",
+          "Tgl. Pembayaran 1",
+          "Nominal 1",
+          "Tgl. Pembayaran 2",
+          "Nominal 2",
           "No. Sertifikat"
         ];
         sampleRow = {
@@ -116,6 +121,11 @@ export async function GET(request: NextRequest) {
           "Tgl. Masuk": "2018-01-15",
           "Tgl. Lulus": "2018-03-20",
           "Biaya Pelatihan": 7500000,
+          "Skema Pembayaran": "Lunas", // Pilihan: "Lunas" atau "Cicilan"
+          "Tgl. Pembayaran 1": "2018-01-15",
+          "Nominal 1": 7500000,
+          "Tgl. Pembayaran 2": "",
+          "Nominal 2": "",
           "No. Sertifikat": "05/LPK-S/XI/2018"
         };
         break;

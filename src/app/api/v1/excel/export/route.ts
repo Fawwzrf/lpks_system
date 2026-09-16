@@ -60,46 +60,75 @@ export async function GET(request: NextRequest) {
       const type = request.nextUrl.searchParams.get("type");
 
       if (type === "rekap_siswa") {
-        // Default Rekap Status Pembayaran Siswa Aktif
-        const today = new Date().toISOString().split("T")[0];
-        const { data: siswaList } = await supabase
+        const filterStatus = request.nextUrl.searchParams.get("status_siswa"); // "aktif" | "alumni" | "semua" | "lunas" | "belum_lunas" | "out"
+        let siswaQuery = supabase
           .from("siswa")
-          .select("id, nomor_induk, nama_lengkap, program:master_program(nama, biaya)")
-          .not("nik", "like", "ANON-%")
+          .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program:master_program(id, kode_program, nama, biaya)")
           .neq("alamat_lengkap", "[DATA DIHAPUS]")
-          .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
           .order("urutan_nomor", { ascending: true, nullsFirst: false })
           .order("nomor_induk", { ascending: true });
+
+        if (filterStatus === "aktif") {
+          siswaQuery = siswaQuery.eq("status_siswa", "aktif");
+        } else if (filterStatus === "alumni") {
+          siswaQuery = siswaQuery.eq("status_siswa", "alumni");
+        } else if (filterStatus === "out") {
+          siswaQuery = siswaQuery.eq("status_siswa", "out");
+        }
+
+        const { data: siswaList } = await siswaQuery;
 
         const siswaIds = (siswaList || []).map((s) => s.id);
         const { data: txList } = await supabase
           .from("transaksi_keuangan")
-          .select("siswa_id, nominal")
-          .in("siswa_id", siswaIds.length > 0 ? siswaIds : ["00000000-0000-0000-0000-000000000000"]);
+          .select("siswa_id, nominal, tgl_bayar, metode, keterangan")
+          .in("siswa_id", siswaIds.length > 0 ? siswaIds : ["00000000-0000-0000-0000-000000000000"])
+          .order("tgl_bayar", { ascending: true });
 
-        const txTotalMap = new Map<string, number>();
+        const txMap = new Map<string, typeof txList>();
         txList?.forEach((tx) => {
-          txTotalMap.set(tx.siswa_id, (txTotalMap.get(tx.siswa_id) || 0) + Number(tx.nominal || 0));
+          if (!txMap.has(tx.siswa_id)) txMap.set(tx.siswa_id, []);
+          txMap.get(tx.siswa_id)!.push(tx);
         });
 
-        exportRows = (siswaList || []).map((s) => {
-          const prog = (s.program as unknown) as { nama: string; biaya: number } | null;
+        const mapped = (siswaList || []).map((s, idx) => {
+          const prog = (s.program as unknown) as { kode_program: string; nama: string; biaya: number } | null;
           const biaya = Number(prog?.biaya || 0);
-          const terbayar = txTotalMap.get(s.id) || 0;
+          const studentTxs = txMap.get(s.id) || [];
+          const terbayar = studentTxs.reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
           const sisa = Math.max(0, biaya - terbayar);
           const isLunas = biaya > 0 && terbayar >= biaya;
+          const statusBayar = isLunas ? "Lunas" : (terbayar > 0 ? "Cicilan" : "Belum Bayar");
+
+          // Rincian riwayat pembayaran (tanggal & nominal)
+          const rincianBayar = studentTxs.map(t => `${t.tgl_bayar}: Rp ${Number(t.nominal).toLocaleString("id-ID")} (${t.keterangan || t.metode || "Tunai"})`).join("; ");
+          const tglTerakhir = studentTxs.length > 0 ? studentTxs[studentTxs.length - 1].tgl_bayar : "-";
 
           return {
-            "Nomor Induk": s.nomor_induk,
-            "Nama Siswa": s.nama_lengkap,
-            Program: prog?.nama || "-",
+            "No": idx + 1,
+            "No. Induk": s.nomor_induk || "-",
+            "Nama Siswa": s.nama_lengkap || "-",
+            "Program": prog?.nama || "-",
+            "Status Siswa": (s.status_siswa || "aktif").toUpperCase(),
+            "Tgl. Masuk": s.tgl_masuk || "-",
+            "Tgl. Lulus / Keluar": s.tgl_keluar || "-",
             "Biaya Pelatihan (Rp)": biaya,
             "Total Terbayar (Rp)": terbayar,
             "Sisa Tagihan (Rp)": sisa,
-            "Persentase": biaya > 0 ? `${Math.min(100, Math.round((terbayar / biaya) * 100))}%` : "0%",
-            Status: isLunas ? "Lunas" : (terbayar > 0 ? "Cicilan" : "Belum Bayar"),
+            "Status Pembayaran": statusBayar,
+            "Tgl. Pembayaran Terakhir": tglTerakhir,
+            "Riwayat Transaksi Pembayaran": rincianBayar || "Belum ada transaksi",
           };
         });
+
+        // Filter post-processing jika filterStatus adalah lunas atau belum_lunas
+        if (filterStatus === "lunas") {
+          exportRows = mapped.filter(m => m["Status Pembayaran"] === "Lunas");
+        } else if (filterStatus === "belum_lunas") {
+          exportRows = mapped.filter(m => m["Status Pembayaran"] !== "Lunas" && m["Status Siswa"] !== "OUT");
+        } else {
+          exportRows = mapped;
+        }
       } else {
         // Format Rekap Kas Bulanan (sesuai buku kas fisik: No, Nama Siswa, Tanggal Pembayaran, Pembayaran Bulan Ini, Akumulasi Saldo, Jumlah Saldo Bulan Ini)
         const now = new Date();

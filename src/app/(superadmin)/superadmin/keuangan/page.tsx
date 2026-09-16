@@ -68,7 +68,7 @@ interface ProgramItem {
   biaya: number;
 }
 
-type TabFilter = "belum_lunas" | "lunas" | "out" | "semua";
+type TabFilter = "belum_lunas" | "lunas" | "alumni" | "out" | "semua";
 type SkemaBayar = "lunas" | "cicilan";
 
 export default function KeuanganSuperadminPage() {
@@ -111,6 +111,7 @@ export default function KeuanganSuperadminPage() {
   const [exportBulan, setExportBulan] = useState<number>(() => new Date().getMonth() + 1);
   const [exportTahun, setExportTahun] = useState<number>(() => new Date().getFullYear());
   const [exportType, setExportType] = useState<"bulanan" | "rekap_siswa">("bulanan");
+  const [exportStatusSiswa, setExportStatusSiswa] = useState<string>("semua");
 
   // Load programs for dropdown filter
   useEffect(() => {
@@ -284,8 +285,12 @@ export default function KeuanganSuperadminPage() {
     return items.filter((item) => {
       // Filter status
       if (activeTab === "lunas" && !item.is_lunas) return false;
-      if (activeTab === "belum_lunas" && (item.is_lunas || item.status_siswa === "out")) return false;
+      if (activeTab === "belum_lunas" && (item.is_lunas || item.status_siswa === "out" || item.status_siswa === "alumni")) return false;
+      if (activeTab === "alumni" && item.status_siswa !== "alumni") return false;
       if (activeTab === "out" && !(item.status_siswa === "out" && !item.is_lunas)) return false;
+
+      // Filter program
+      if (selectedProgramFilter && item.program?.id !== selectedProgramFilter) return false;
 
       // Filter search
       if (search.trim()) {
@@ -298,21 +303,23 @@ export default function KeuanganSuperadminPage() {
 
       return true;
     });
-  }, [items, activeTab, search]);
+  }, [items, activeTab, selectedProgramFilter, search]);
 
   // Ringkasan Statistik
   const stats = useMemo(() => {
     const totalSiswa = items.length;
     const lunasCount = items.filter((i) => i.is_lunas).length;
+    const alumniCount = items.filter((i) => i.status_siswa === "alumni").length;
     const outUnpaidCount = items.filter((i) => i.status_siswa === "out" && !i.is_lunas).length;
-    const aktifBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa !== "out").length;
-    const belumLunasCount = totalSiswa - lunasCount;
+    const aktifBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa !== "out" && i.status_siswa !== "alumni").length;
+    const belumLunasCount = items.filter((i) => !i.is_lunas).length;
     const totalTerkumpul = items.reduce((acc, i) => acc + i.total_terbayar, 0);
     const totalPiutang = items.reduce((acc, i) => acc + i.sisa_tagihan, 0);
 
     return {
       totalSiswa,
       lunasCount,
+      alumniCount,
       outUnpaidCount,
       aktifBelumLunasCount,
       belumLunasCount,
@@ -338,15 +345,32 @@ export default function KeuanganSuperadminPage() {
         <div>
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-semibold text-[#F9FAFB]">{r.nama_lengkap}</p>
+            {r.status_siswa === "alumni" && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40">
+                ALUMNI
+              </span>
+            )}
             {r.status_siswa === "out" && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded font-bold bg-[#EF4444]/20 text-[#F87171] border border-[#EF4444]/40">
+              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[#EF4444]/20 text-[#F87171] border border-[#EF4444]/40">
                 OUT
               </span>
             )}
           </div>
-          <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded bg-[#1F2937] text-[#9CA3AF] border border-[#374151]/50">
-            {r.program?.nama || "Umum"}
-          </span>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#1F2937] text-[#9CA3AF] border border-[#374151]/50">
+              {r.program?.nama || "Umum"}
+            </span>
+            {r.tgl_masuk && (
+              <span className="text-[10px] text-[#6B7280]">
+                Masuk: {r.tgl_masuk}
+              </span>
+            )}
+            {r.status_siswa === "alumni" && r.tgl_keluar && (
+              <span className="text-[10px] text-[#38BDF8]">
+                Lulus: {r.tgl_keluar}
+              </span>
+            )}
+          </div>
         </div>
       ),
     },
@@ -585,7 +609,7 @@ export default function KeuanganSuperadminPage() {
       {/* Filter & Search Bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Status Tabs */}
-        <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1">
+        <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1 flex-wrap">
           <button
             onClick={() => setActiveTab("belum_lunas")}
             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
@@ -605,6 +629,16 @@ export default function KeuanganSuperadminPage() {
             }`}
           >
             Lunas ({stats.lunasCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("alumni")}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+              activeTab === "alumni"
+                ? "bg-[#38BDF8] text-black font-bold"
+                : "text-[#38BDF8] hover:bg-[#38BDF8]/10"
+            }`}
+          >
+            Alumni ({stats.alumniCount})
           </button>
           <button
             onClick={() => setActiveTab("out")}
@@ -1151,6 +1185,35 @@ export default function KeuanganSuperadminPage() {
             </div>
           )}
 
+          {exportType === "rekap_siswa" && (
+            <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-[#D1D5DB]">Filter Cakupan Data</span>
+                <span className="text-[11px] text-[#9CA3AF]">Status &amp; Kategori</span>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-[#9CA3AF] mb-1.5 block">
+                  Pilih Data Siswa / Alumni yang Diekspor:
+                </label>
+                <select
+                  value={exportStatusSiswa}
+                  onChange={(e) => setExportStatusSiswa(e.target.value)}
+                  className="h-9 w-full rounded-lg border border-[#374151] bg-[#111827] px-3 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                >
+                  <option value="semua">Semua Data (Siswa Aktif, Alumni &amp; Out)</option>
+                  <option value="alumni">Hanya Siswa Alumni (2015+)</option>
+                  <option value="aktif">Hanya Siswa Aktif</option>
+                  <option value="lunas">Hanya Yang Sudah Lunas</option>
+                  <option value="belum_lunas">Hanya Yang Belum Lunas / Cicil</option>
+                  <option value="out">Hanya Siswa Out (Keluar)</option>
+                </select>
+              </div>
+              <p className="text-[11px] text-[#6B7280] leading-relaxed">
+                File Excel mencakup rincian lengkap: No, No. Induk, Nama Siswa, Program, Status Siswa, Tgl. Masuk, Tgl. Lulus, Biaya Pelatihan, Total Terbayar, Sisa Tagihan, Status Pembayaran (Lunas/Cicilan), Tanggal Pembayaran Terakhir, serta Rincian Transaksi Pembayaran.
+              </p>
+            </div>
+          )}
+
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1F2937]">
             <Button
               type="button"
@@ -1163,7 +1226,7 @@ export default function KeuanganSuperadminPage() {
               href={
                 exportType === "bulanan"
                   ? `/api/v1/excel/export?modul=keuangan&bulan=${exportBulan}&tahun=${exportTahun}`
-                  : `/api/v1/excel/export?modul=keuangan&type=rekap_siswa`
+                  : `/api/v1/excel/export?modul=keuangan&type=rekap_siswa&status_siswa=${exportStatusSiswa}`
               }
               download
               onClick={() => setModalExportOpen(false)}
