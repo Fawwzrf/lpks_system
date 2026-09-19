@@ -6,9 +6,31 @@ import {
   CheckCircle2, ChevronLeft, AlertTriangle, Loader2, Save
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const PENDIDIKAN_OPTIONS = [
+  "SD",
+  "SMP",
+  "SLTP",
+  "SMA",
+  "SLTA",
+  "SMK",
+  "MA",
+  "Paket A Setara SD",
+  "Paket B Setara SMP",
+  "Paket C Setara SMA",
+  "Ahli Teknika Tingkat V",
+  "D1",
+  "D2",
+  "D3",
+  "D4",
+  "S1",
+  "S2",
+  "S3",
+];
 
 type FieldErrors = Record<string, string>;
 
@@ -472,7 +494,23 @@ export default function EditSiswaPage({ params }: PageProps) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Pendidikan Terakhir" name="pendidikan_terakhir" placeholder="cth: SMA/SMK" data-next="nisn" value={formValues.pendidikan_terakhir ?? ""} onChange={(e) => handleFieldChange("pendidikan_terakhir", e.target.value)} />
+            <Select
+              label="Pendidikan Terakhir"
+              name="pendidikan_terakhir"
+              data-next="nisn"
+              value={formValues.pendidikan_terakhir ?? ""}
+              onChange={(e) => handleFieldChange("pendidikan_terakhir", e.target.value)}
+            >
+              <option value="">— Pilih —</option>
+              {formValues.pendidikan_terakhir && !PENDIDIKAN_OPTIONS.includes(formValues.pendidikan_terakhir) && (
+                <option value={formValues.pendidikan_terakhir}>{formValues.pendidikan_terakhir}</option>
+              )}
+              {PENDIDIKAN_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </Select>
             <Input label="NISN (Opsional)" name="nisn" placeholder="Nomor Induk Siswa Nasional" data-next="tgl_masuk" value={formValues.nisn ?? ""} onChange={(e) => handleFieldChange("nisn", e.target.value)} />
           </div>
 

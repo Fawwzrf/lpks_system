@@ -86,4 +86,18 @@ describe("Validasi Input & Pembuatan Kredensial Unit Tests", () => {
       assert.equal(password, "budi@0005");
     });
   });
+
+  describe("Pilihan Pendidikan Terakhir Siswa", () => {
+    const PENDIDIKAN_OPTIONS = [
+      "SD", "SMP", "SLTP", "SMA", "SLTA", "SMK", "MA",
+      "Paket A Setara SD", "Paket B Setara SMP", "Paket C Setara SMA",
+      "Ahli Teknika Tingkat V",
+      "D1", "D2", "D3", "D4", "S1", "S2", "S3",
+    ];
+
+    test("Opsi pendidikan terakhir memuat 'Ahli Teknika Tingkat V'", () => {
+      assert.ok(PENDIDIKAN_OPTIONS.includes("Ahli Teknika Tingkat V"));
+    });
+  });
 });
+

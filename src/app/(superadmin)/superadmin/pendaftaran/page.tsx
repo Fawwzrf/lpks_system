@@ -681,6 +681,7 @@ export default function PendaftaranPage() {
                 <option value="Paket A Setara SD">Paket A Setara SD</option>
                 <option value="Paket B Setara SMP">Paket B Setara SMP</option>
                 <option value="Paket C Setara SMA">Paket C Setara SMA</option>
+                <option value="Ahli Teknika Tingkat V">Ahli Teknika Tingkat V</option>
                 <option value="D1">D1</option>
                 <option value="D2">D2</option>
                 <option value="D3">D3</option>
