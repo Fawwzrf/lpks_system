@@ -18,11 +18,19 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const offset = (page - 1) * limit;
+    const todayStr = new Date().toISOString().split("T")[0];
+
+    // Self-healing: Siswa yang tgl_keluarnya sudah lewat otomatis berubah status dari 'aktif' menjadi 'alumni'
+    await supabase
+      .from("siswa")
+      .update({ status_siswa: "alumni" })
+      .eq("status_siswa", "aktif")
+      .not("tgl_keluar", "is", null)
+      .lte("tgl_keluar", todayStr);
 
     let query = supabase
       .from("siswa")
       .select("*, program:master_program(id, kode_program, nama, biaya)", { count: "exact" })
-      .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]");
 
     // Filter status aktif vs alumni vs out
@@ -264,7 +272,9 @@ export async function POST(request: NextRequest) {
         nisn: nisn?.trim() || null,
         tgl_masuk: finalTglMasuk,
         tgl_keluar: finalTglKeluar,
-        status_siswa: body.status_siswa || "aktif",
+        status_siswa: body.status_siswa && body.status_siswa !== "aktif"
+          ? body.status_siswa
+          : (finalTglKeluar && finalTglKeluar <= new Date().toISOString().split("T")[0] ? "alumni" : (body.status_siswa || "aktif")),
         checklist_berkas: checklist_berkas || {},
         is_password_default: true,
       })

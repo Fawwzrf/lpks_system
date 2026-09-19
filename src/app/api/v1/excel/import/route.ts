@@ -167,14 +167,33 @@ export async function POST(request: NextRequest) {
               // 2. Username sudah terdaftar
               // 3. NIK yang sama di program yang sama sudah terdaftar
               const [{ data: byNoInduk }, { data: byUsername }, { data: byNikSameProgram }] = await Promise.all([
-                supabase.from("siswa").select("id").eq("nomor_induk", noInduk).maybeSingle(),
-                supabase.from("siswa").select("id").eq("username", username).maybeSingle(),
-                programId ? supabase.from("siswa").select("id").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
+                supabase.from("siswa").select("id, status_siswa").eq("nomor_induk", noInduk).maybeSingle(),
+                supabase.from("siswa").select("id, status_siswa").eq("username", username).maybeSingle(),
+                programId ? supabase.from("siswa").select("id, status_siswa").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
               ]);
 
               const existingUser = byNoInduk || byNikSameProgram || byUsername;
 
+              // Tentukan status_siswa otomatis: jika tgl_keluar sudah lewat atau ada info status di Excel
+              const todayStr = new Date().toISOString().split("T")[0];
+              const rawStatus = String(row["Status"] || row["Status Siswa"] || row["status_siswa"] || "").trim().toLowerCase();
+              let statusSiswa: "aktif" | "alumni" | "out" = "aktif";
+              if (rawStatus.includes("out") || rawStatus.includes("keluar")) {
+                statusSiswa = "out";
+              } else if (rawStatus.includes("alumni") || rawStatus.includes("lulus")) {
+                statusSiswa = "alumni";
+              } else if (tglKeluarFinal && tglKeluarFinal <= todayStr) {
+                statusSiswa = "alumni";
+              } else {
+                statusSiswa = "aktif";
+              }
+
               if (existingUser) {
+                // Pertahankan status 'out' jika sebelumnya sudah ditandai 'out' secara manual dan kolom status di Excel kosong
+                if (existingUser.status_siswa === "out" && !rawStatus) {
+                  statusSiswa = "out";
+                }
+
                 // Perbarui biodata siswa yang sudah ada (misal perbaikan Nama Ibu, Alamat, dsb)
                 const updatePayload: Record<string, unknown> = {
                   nama_lengkap: namaLengkap,
@@ -189,6 +208,7 @@ export async function POST(request: NextRequest) {
                   nisn: String(row["NISN"] || "").trim() || null,
                   tgl_masuk: tglMasukFinal,
                   tgl_keluar: tglKeluarFinal,
+                  status_siswa: statusSiswa,
                   updated_at: new Date().toISOString(),
                 };
 
@@ -281,6 +301,7 @@ export async function POST(request: NextRequest) {
                     nisn:                 String(row["NISN"]          || "").trim() || null,
                     tgl_masuk:            tglMasukFinal,
                     tgl_keluar:           tglKeluarFinal,
+                    status_siswa:         statusSiswa,
                     checklist_berkas: { ijazah: true, ktp: true, kk: true, foto: true, suket_sehat: true },
                     is_password_default:  true,
                   });

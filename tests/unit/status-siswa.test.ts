@@ -130,4 +130,41 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(result, null);
     });
   });
+
+  describe("Penentuan Status Siswa Otomatis Berdasarkan Tanggal Keluar (Auto Alumni)", () => {
+    function deriveStatus(
+      rawStatusInput?: string | null,
+      tglKeluar?: string | null,
+      todayStr = "2026-09-19"
+    ): "aktif" | "alumni" | "out" {
+      const raw = String(rawStatusInput || "").trim().toLowerCase();
+      if (raw.includes("out") || raw.includes("keluar")) return "out";
+      if (raw.includes("alumni") || raw.includes("lulus")) return "alumni";
+      if (tglKeluar && tglKeluar <= todayStr) return "alumni";
+      return "aktif";
+    }
+
+    test("Data siswa lama tahun 2025 dengan tgl_keluar lampau otomatis berstatus 'alumni'", () => {
+      const yusmantoStatus = deriveStatus(null, "2025-01-31", "2026-09-19");
+      const irfanStatus = deriveStatus("", "2025-04-19", "2026-09-19");
+      assert.equal(yusmantoStatus, "alumni");
+      assert.equal(irfanStatus, "alumni");
+    });
+
+    test("Siswa baru dengan tgl_keluar masa depan tetap berstatus 'aktif'", () => {
+      const status = deriveStatus(null, "2026-12-31", "2026-09-19");
+      assert.equal(status, "aktif");
+    });
+
+    test("Siswa dengan catatan 'out' di Excel tetap berstatus 'out' meski tgl_keluar di masa lampau", () => {
+      const status = deriveStatus("Out / Mengundurkan Diri", "2025-01-15", "2026-09-19");
+      assert.equal(status, "out");
+    });
+
+    test("Siswa dengan status eksplisit 'alumni' selalu berstatus 'alumni'", () => {
+      const status = deriveStatus("Alumni", "2026-10-01", "2026-09-19");
+      assert.equal(status, "alumni");
+    });
+  });
 });
+

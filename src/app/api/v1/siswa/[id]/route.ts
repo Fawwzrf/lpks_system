@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // Ambil data siswa yang sedang diedit
     const { data: siswa, error: findError } = await supabase
       .from("siswa")
-      .select("id, nama_lengkap, nomor_induk, email")
+      .select("id, nama_lengkap, nomor_induk, email, status_siswa, tgl_keluar")
       .eq("id", id)
       .maybeSingle();
 
@@ -81,6 +81,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updates[field] = body[field];
+      }
+    }
+
+    // Jika status_siswa tidak dikirim secara spesifik dan status saat ini 'aktif', periksa apakah tgl_keluar sudah lewat
+    if (body.status_siswa === undefined && siswa.status_siswa === "aktif") {
+      const checkTglKeluar = (updates.tgl_keluar !== undefined ? updates.tgl_keluar : siswa.tgl_keluar) as string | null;
+      const todayStr = new Date().toISOString().split("T")[0];
+      if (checkTglKeluar && checkTglKeluar <= todayStr) {
+        updates.status_siswa = "alumni";
       }
     }
 
