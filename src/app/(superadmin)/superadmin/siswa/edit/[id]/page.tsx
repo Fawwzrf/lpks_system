@@ -206,8 +206,8 @@ export default function EditSiswaPage({ params }: PageProps) {
       return;
     }
 
-    const currentKode = kodeProgram || programInfo?.kode || "01";
-    const fullNomorInduk = `${currentKode}.${noUrut.trim()}`;
+    const currentKode = kodeProgram.trim();
+    const fullNomorInduk = currentKode ? `${currentKode}.${noUrut.trim()}` : noUrut.trim();
 
     setFieldErrors({});
     setSaving(true);
@@ -328,18 +328,33 @@ export default function EditSiswaPage({ params }: PageProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-[#D1D5DB]">
-                Nomor Induk Siswa * (No. Urut Dapat Diedit)
+                Nomor Induk Siswa * (Kode Program &amp; No. Urut Dapat Diedit)
               </label>
               <div className="flex items-center">
-                <span className="inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
-                  {kodeProgram || programInfo?.kode || "01"}.
+                <input
+                  type="text"
+                  name="kode_program"
+                  value={kodeProgram}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                    setKodeProgram(val);
+                    if (fieldErrors.nomor_induk) {
+                      setFieldErrors((prev) => { const n = { ...prev }; delete n.nomor_induk; return n; });
+                    }
+                  }}
+                  placeholder={programInfo?.kode || "01"}
+                  title="Kode Program (default sesuai program, dapat diedit)"
+                  className="w-20 sm:w-24 h-10 text-center rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981] placeholder-[#6B7280] focus:border-[#10B981] focus:outline-none transition-colors"
+                />
+                <span className="inline-flex items-center px-2 h-10 border-y border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
+                  .
                 </span>
                 <input
                   type="text"
                   name="no_urut"
                   value={noUrut}
                   onChange={(e) => {
-                    const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                    const val = e.target.value.replace(/[^0-9A-Za-z-—]/g, "");
                     setNoUrut(val);
                     if (fieldErrors.nomor_induk) {
                       setFieldErrors((prev) => { const n = { ...prev }; delete n.nomor_induk; return n; });
@@ -356,7 +371,7 @@ export default function EditSiswaPage({ params }: PageProps) {
                 <p className="text-[11px] text-[#F43F5E] mt-0.5">{fieldErrors.nomor_induk}</p>
               ) : (
                 <p className="text-[10px] text-[#6B7280] mt-0.5">
-                  Nomor Induk aktif: <span className="font-mono text-[#10B981]">{kodeProgram || programInfo?.kode || "01"}.{noUrut || "____"}</span>
+                  Nomor Induk aktif: <span className="font-mono text-[#10B981]">{kodeProgram.trim() ? `${kodeProgram.trim()}.` : ""}{noUrut || "____"}</span>
                 </p>
               )}
             </div>

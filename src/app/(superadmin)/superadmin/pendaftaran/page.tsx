@@ -254,8 +254,8 @@ export default function PendaftaranPage() {
       document.querySelector('[name="no_urut"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    const currentKode = kodeProgram || selectedProgram?.kode_program || "01";
-    const fullNomorInduk = `${currentKode}.${noUrut.trim()}`;
+    const currentKode = kodeProgram.trim();
+    const fullNomorInduk = currentKode ? `${currentKode}.${noUrut.trim()}` : noUrut.trim();
 
     setNomorIndukError("");
     setFieldErrors({});
@@ -730,7 +730,7 @@ export default function PendaftaranPage() {
                     <span className="text-xs font-semibold text-[#F9FAFB] flex items-center gap-1.5">
                       Nomor Induk:{" "}
                       <span className="font-mono font-bold text-[#10B981] text-sm">
-                        {kodeProgram || selectedProgram.kode_program}.{noUrut || "____"}
+                        {kodeProgram.trim() ? `${kodeProgram.trim()}.` : ""}{noUrut || "____"}
                       </span>
                     </span>
                     <span className="text-[11px] text-[#6B7280]">
@@ -740,18 +740,32 @@ export default function PendaftaranPage() {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-[#D1D5DB]">
-                      Nomor Urut Siswa * (Terisi Otomatis, Dapat Diedit Manual)
+                      Nomor Induk Siswa * (Kode Program &amp; Nomor Urut Dapat Diedit)
                     </label>
                     <div className="flex items-center">
-                      <span className="inline-flex items-center px-3 h-10 rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
-                        {kodeProgram || selectedProgram.kode_program}.
+                      <input
+                        type="text"
+                        name="kode_program"
+                        value={kodeProgram}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                          setKodeProgram(val);
+                          setNomorIndukError("");
+                          persistDraft({ kodeProgram: val });
+                        }}
+                        placeholder={selectedProgram.kode_program || "01"}
+                        title="Kode Program (default otomatis sesuai program terpilih, dapat diedit)"
+                        className="w-20 sm:w-24 h-10 text-center rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981] placeholder-[#6B7280] focus:border-[#10B981] focus:outline-none transition-colors"
+                      />
+                      <span className="inline-flex items-center px-2 h-10 border-y border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
+                        .
                       </span>
                       <input
                         type="text"
                         name="no_urut"
                         value={noUrut}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9A-Za-z-]/g, "");
+                          const val = e.target.value.replace(/[^0-9A-Za-z-—]/g, "");
                           setNoUrut(val);
                           setNomorIndukError("");
                           persistDraft({ noUrut: val });
@@ -767,7 +781,7 @@ export default function PendaftaranPage() {
                       <p className="text-[11px] text-[#F43F5E] mt-0.5">{nomorIndukError}</p>
                     ) : (
                       <p className="text-[10px] text-[#6B7280] mt-0.5">
-                        Nilai default dibuat otomatis dari urutan program. Anda dapat mengedit nomor urut jika ingin menggunakan slot nomor tertentu.
+                        Nilai default kode program dan nomor urut dibuat otomatis sesuai program terpilih. Anda dapat mengedit kode program jika format data lama berbeda.
                       </p>
                     )}
                   </div>
