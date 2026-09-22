@@ -119,6 +119,13 @@ export default function KeuanganSuperadminPage() {
   const [editErrorMsg, setEditErrorMsg] = useState<string | null>(null);
   const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
 
+  // Modal Konfirmasi Hapus Transaksi
+  const [modalConfirmDeleteOpen, setModalConfirmDeleteOpen] = useState(false);
+  const [txToDelete, setTxToDelete] = useState<TransaksiItem | null>(null);
+  const [txDeleteSiswaContext, setTxDeleteSiswaContext] = useState<SiswaKeuanganItem | null>(null);
+  const [isDeletingTx, setIsDeletingTx] = useState(false);
+  const [deleteTxErrorMsg, setDeleteTxErrorMsg] = useState<string | null>(null);
+
   // Modal Ekspor Rekap Keuangan Bulanan
   const [modalExportOpen, setModalExportOpen] = useState(false);
   const [exportBulan, setExportBulan] = useState<number>(() => new Date().getMonth() + 1);
@@ -240,33 +247,76 @@ export default function KeuanganSuperadminPage() {
     }
   }
 
-  // Handler Hapus Transaksi Pembayaran
-  async function handleDeleteTx(txId: string) {
-    if (!confirm("Apakah Anda yakin ingin menghapus transaksi pembayaran ini? Akumulasi saldo pembayaran siswa akan dihitung ulang secara otomatis.")) {
-      return;
+  // Handler tombol Enter pada form: pindah ke input/kolom berikutnya alih-alih langsung simpan
+  function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key === "Enter") {
+      const target = e.target as HTMLElement;
+      // Jangan cegah jika sedang di textarea atau tombol submit ditekan langsung
+      if (
+        target.tagName === "TEXTAREA" ||
+        (target.tagName === "BUTTON" && (target as HTMLButtonElement).type === "submit")
+      ) {
+        return;
+      }
+      e.preventDefault();
+
+      // Cari elemen input/select berikutnya dalam form yang aktif dan tidak disabled
+      const form = e.currentTarget;
+      const focusableElements = Array.from(
+        form.querySelectorAll<HTMLElement>(
+          'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button[type="submit"]:not([disabled])'
+        )
+      );
+
+      const currentIndex = focusableElements.indexOf(target);
+      if (currentIndex > -1 && currentIndex + 1 < focusableElements.length) {
+        focusableElements[currentIndex + 1].focus();
+      }
     }
+  }
+
+  // Handler Buka Dialog Konfirmasi Hapus Transaksi
+  function handleOpenDeleteTxConfirm(tx: TransaksiItem, siswaContext?: SiswaKeuanganItem | null) {
+    setTxToDelete(tx);
+    setTxDeleteSiswaContext(siswaContext || historySiswa || selectedSiswa || null);
+    setDeleteTxErrorMsg(null);
+    setModalConfirmDeleteOpen(true);
+  }
+
+  // Eksekusi Hapus Transaksi Pembayaran dengan Indikator Loading
+  async function handleExecuteDeleteTx() {
+    if (!txToDelete) return;
+
+    setIsDeletingTx(true);
+    setDeleteTxErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/v1/keuangan/${txId}`, {
+      const res = await fetch(`/api/v1/keuangan/${txToDelete.id}`, {
         method: "DELETE",
       });
 
-      if (res.ok) {
-        const freshData = await loadData();
-        if (historySiswa) {
-          const fresh = freshData.find((s) => s.id === historySiswa.id);
-          if (fresh) setHistorySiswa(fresh);
-        }
-        if (selectedSiswa) {
-          const freshSel = freshData.find((s) => s.id === selectedSiswa.id);
-          if (freshSel) setSelectedSiswa(freshSel);
-        }
-      } else {
+      if (!res.ok) {
         const err = await res.json();
-        alert(err.error?.message || "Gagal menghapus transaksi.");
+        setDeleteTxErrorMsg(err.error?.message || "Gagal menghapus transaksi pembayaran.");
+        return;
       }
+
+      const freshData = await loadData();
+      const targetSiswaId = txDeleteSiswaContext?.id || historySiswa?.id || selectedSiswa?.id;
+      if (targetSiswaId) {
+        const fresh = freshData.find((s) => s.id === targetSiswaId);
+        if (fresh) {
+          if (historySiswa && historySiswa.id === targetSiswaId) setHistorySiswa(fresh);
+          if (selectedSiswa && selectedSiswa.id === targetSiswaId) setSelectedSiswa(fresh);
+        }
+      }
+
+      setModalConfirmDeleteOpen(false);
+      setTxToDelete(null);
     } catch {
-      alert("Terjadi gangguan koneksi saat menghapus transaksi.");
+      setDeleteTxErrorMsg("Terjadi gangguan koneksi saat menghapus transaksi.");
+    } finally {
+      setIsDeletingTx(false);
     }
   }
 
@@ -828,7 +878,7 @@ export default function KeuanganSuperadminPage() {
         description="Pilih skema pembayaran langsung lunas atau cicilan (DP 50% di awal)."
       >
         {selectedSiswa && (
-          <form onSubmit={handleSubmitPayment} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmitPayment} onKeyDown={handleFormKeyDown} className="flex flex-col gap-4">
             {/* Box Info Ringkasan Siswa */}
             <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-3.5">
               <div className="flex items-start justify-between gap-2">
@@ -987,15 +1037,19 @@ export default function KeuanganSuperadminPage() {
             <div>
               <Input
                 label="Nominal Pembayaran (Rp) *"
-                type="number"
-                min={1000}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 required
+                disabled={saving}
                 value={nominal}
                 onChange={(e) => {
-                  setNominal(e.target.value);
+                  const val = e.target.value.replace(/\D/g, "");
+                  setNominal(val);
                   if (skema === "cicilan") setQuickCicilanOption("custom");
                 }}
                 placeholder="Masukkan nominal angka..."
+                className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
               {nominal && !isNaN(Number(nominal)) && Number(nominal) > 0 && (
                 <div className="flex items-center justify-between mt-1 text-[11px]">
@@ -1017,6 +1071,7 @@ export default function KeuanganSuperadminPage() {
                 label="Tanggal Bayar *"
                 type="date"
                 required
+                disabled={saving}
                 value={tglBayar}
                 onChange={(e) => setTglBayar(e.target.value)}
               />
@@ -1024,6 +1079,7 @@ export default function KeuanganSuperadminPage() {
               {/* Metode Bayar */}
               <Select
                 label="Metode Pembayaran *"
+                disabled={saving}
                 value={metode}
                 onChange={(e) => setMetode(e.target.value)}
               >
@@ -1036,6 +1092,7 @@ export default function KeuanganSuperadminPage() {
             {/* Keterangan */}
             <Input
               label="Keterangan Transaksi"
+              disabled={saving}
               value={keterangan}
               onChange={(e) => setKeterangan(e.target.value)}
               placeholder="Contoh: Pembayaran DP 50% / Pelunasan Pelatihan"
@@ -1060,7 +1117,7 @@ export default function KeuanganSuperadminPage() {
                         <span className="text-[#F9FAFB] font-semibold">{formatRupiah(tx.nominal)}</span>
                         <span className="text-[#6B7280] ml-2">({tx.metode})</span>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <span className="text-[#9CA3AF] font-mono">{formatDateIndo(tx.tgl_bayar)}</span>
                         <button
                           type="button"
@@ -1069,6 +1126,14 @@ export default function KeuanganSuperadminPage() {
                           title="Edit Transaksi (Koreksi Typo)"
                         >
                           <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDeleteTxConfirm(tx, selectedSiswa)}
+                          className="p-1 rounded hover:bg-[#1F2937] text-[#9CA3AF] hover:text-[#F43F5E] transition-colors"
+                          title="Hapus Transaksi"
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     </div>
@@ -1208,7 +1273,7 @@ export default function KeuanganSuperadminPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeleteTx(tx.id)}
+                          onClick={() => handleOpenDeleteTxConfirm(tx, historySiswa)}
                           className="p-1.5 rounded-lg border border-[#374151] bg-[#1F2937] text-[#9CA3AF] hover:text-[#F43F5E] hover:border-[#F43F5E]/40 transition-colors"
                           title="Hapus Transaksi"
                         >
@@ -1233,7 +1298,7 @@ export default function KeuanganSuperadminPage() {
       {/* MODAL EDIT TRANSAKSI PEMBAYARAN */}
       <Modal
         open={modalEditTxOpen}
-        onClose={() => setModalEditTxOpen(false)}
+        onClose={() => !editSaving && setModalEditTxOpen(false)}
         title="Edit Riwayat Pembayaran"
         description={
           historySiswa
@@ -1241,7 +1306,7 @@ export default function KeuanganSuperadminPage() {
             : "Koreksi data riwayat pembayaran siswa"
         }
       >
-        <form onSubmit={handleSaveEditTx} className="flex flex-col gap-4">
+        <form onSubmit={handleSaveEditTx} onKeyDown={handleFormKeyDown} className="flex flex-col gap-4">
           {/* Nominal */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-[#9CA3AF]">
@@ -1252,14 +1317,15 @@ export default function KeuanganSuperadminPage() {
                 Rp
               </span>
               <input
-                type="number"
-                min="1000"
-                step="1000"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 required
+                disabled={editSaving}
                 value={editNominal}
-                onChange={(e) => setEditNominal(e.target.value)}
+                onChange={(e) => setEditNominal(e.target.value.replace(/\D/g, ""))}
                 placeholder="0"
-                className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50"
               />
             </div>
             {editNominal && !isNaN(parseFloat(editNominal)) && (
@@ -1278,9 +1344,10 @@ export default function KeuanganSuperadminPage() {
               <input
                 type="date"
                 required
+                disabled={editSaving}
                 value={editTglBayar}
                 onChange={(e) => setEditTglBayar(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors disabled:opacity-50"
               />
             </div>
 
@@ -1289,9 +1356,10 @@ export default function KeuanganSuperadminPage() {
                 Metode Pembayaran *
               </label>
               <select
+                disabled={editSaving}
                 value={editMetode}
                 onChange={(e) => setEditMetode(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors disabled:opacity-50"
               >
                 <option value="Tunai">Tunai / Cash</option>
                 <option value="Transfer Bank">Transfer Bank</option>
@@ -1304,6 +1372,7 @@ export default function KeuanganSuperadminPage() {
           {/* Keterangan */}
           <Input
             label="Keterangan / Catatan Transaksi"
+            disabled={editSaving}
             value={editKeterangan}
             onChange={(e) => setEditKeterangan(e.target.value)}
             placeholder="Contoh: Pembayaran DP 50% / Pelunasan Pelatihan"
@@ -1335,7 +1404,7 @@ export default function KeuanganSuperadminPage() {
             <Button
               type="submit"
               disabled={editSaving}
-              className="bg-[#10B981] hover:bg-[#059669] text-white gap-1.5"
+              className="bg-[#10B981] hover:bg-[#059669] text-white gap-1.5 min-w-[160px]"
             >
               {editSaving ? (
                 <>
@@ -1343,11 +1412,103 @@ export default function KeuanganSuperadminPage() {
                   <span>Menyimpan...</span>
                 </>
               ) : (
-                <span>Simpan Perubahan</span>
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Simpan Perubahan</span>
+                </>
               )}
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL KONFIRMASI HAPUS TRANSAKSI */}
+      <Modal
+        open={modalConfirmDeleteOpen}
+        onClose={() => {
+          if (!isDeletingTx) {
+            setModalConfirmDeleteOpen(false);
+            setTxToDelete(null);
+          }
+        }}
+        size="sm"
+        title="Hapus Riwayat Pembayaran"
+        description="Konfirmasi penghapusan data transaksi pembayaran"
+      >
+        {txToDelete && (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3.5 flex flex-col gap-2.5">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#F43F5E]">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>Transaksi yang akan dihapus:</span>
+              </div>
+              <div className="rounded-lg bg-[#0B0F17] border border-[#1F2937] p-3 text-xs flex flex-col gap-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#9CA3AF]">Nominal:</span>
+                  <span className="font-bold text-sm font-mono text-[#10B981]">
+                    {formatRupiah(txToDelete.nominal)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#9CA3AF]">Tanggal Bayar:</span>
+                  <span className="text-[#D1D5DB] font-mono">{formatDateIndo(txToDelete.tgl_bayar)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[#9CA3AF]">Metode:</span>
+                  <span className="text-[#D1D5DB]">{txToDelete.metode}</span>
+                </div>
+                {txToDelete.keterangan && (
+                  <div className="flex justify-between items-start pt-1.5 border-t border-[#1F2937]">
+                    <span className="text-[#9CA3AF]">Keterangan:</span>
+                    <span className="text-[#D1D5DB] text-right max-w-[180px] truncate">{txToDelete.keterangan}</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
+                ⚠️ Tindakan ini permanen. Total terbayar dan sisa tagihan siswa akan dihitung ulang secara otomatis.
+              </p>
+            </div>
+
+            {deleteTxErrorMsg && (
+              <div className="rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/20 p-2.5 text-xs text-[#F43F5E] flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{deleteTxErrorMsg}</span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[#1F2937]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setModalConfirmDeleteOpen(false);
+                  setTxToDelete(null);
+                }}
+                disabled={isDeletingTx}
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={handleExecuteDeleteTx}
+                disabled={isDeletingTx}
+                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5 min-w-[150px]"
+              >
+                {isDeletingTx ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Ya, Hapus Transaksi</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
       {/* MODAL EKSPOR REKAP KEUANGAN */}
       <Modal
