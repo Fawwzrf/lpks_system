@@ -30,6 +30,74 @@ function parseExcelDate(val: unknown): string | null {
   return null;
 }
 
+/**
+ * Ekstraksi baris sheet secara cerdas:
+ * - Mendeteksi letak baris header yang sesungguhnya (mendukung template dengan header grup bertingkat)
+ * - Melewati baris petunjuk / hint row otomatis (misal: "Otomatis", "Cth: 01.0927", "Nama lengkap")
+ * - Melewati baris kosong dan menyematkan nomor baris Excel asli (_excelRowNumber)
+ */
+function extractSheetRows(sheet: XLSX.WorkSheet): { rows: (Record<string, unknown> & { _excelRowNumber?: number })[]; headerRowIdx: number } {
+  const matrix: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  if (!matrix || matrix.length === 0) return { rows: [], headerRowIdx: -1 };
+
+  let headerRowIdx = -1;
+  const headerKeywords = [
+    "no. induk", "no induk", "nomor_induk", "nama", "nama lengkap",
+    "nik", "program", "kriteria", "tgl_bayar", "tgl. pembayaran",
+    "nominal", "biaya pelatihan", "status"
+  ];
+
+  for (let r = 0; r < Math.min(matrix.length, 10); r++) {
+    const rowVals = (matrix[r] || []).map(v => String(v ?? "").trim().toLowerCase());
+    const isHeader = rowVals.some(v => headerKeywords.includes(v));
+    if (isHeader) {
+      headerRowIdx = r;
+      break;
+    }
+  }
+
+  if (headerRowIdx === -1) headerRowIdx = 0;
+
+  const headers = (matrix[headerRowIdx] || []).map(h => String(h ?? "").trim());
+  const rows: (Record<string, unknown> & { _excelRowNumber?: number })[] = [];
+
+  for (let r = headerRowIdx + 1; r < matrix.length; r++) {
+    const rawRow = matrix[r] || [];
+    const rowObj: Record<string, unknown> = {};
+    headers.forEach((h, colIdx) => {
+      if (h) {
+        rowObj[h] = rawRow[colIdx] !== undefined ? rawRow[colIdx] : "";
+      }
+    });
+
+    // Deteksi jika baris ini merupakan baris petunjuk / hint
+    const valNama = String(rowObj["Nama"] || "").trim().toLowerCase();
+    const valNoInduk = String(rowObj["No. Induk"] || "").trim().toLowerCase();
+    const valNo = String(rowObj["No"] || "").trim().toLowerCase();
+    const valNik = String(rowObj["NIK"] || "").trim().toLowerCase();
+    const valBiaya = String(rowObj["Biaya Pelatihan"] || "").trim().toLowerCase();
+
+    if (
+      valNama === "nama lengkap" ||
+      valNoInduk.startsWith("cth:") ||
+      valNo === "otomatis" ||
+      valNik.includes("16 digit") ||
+      valBiaya.includes("cth:") ||
+      valBiaya.includes("nominal (atau")
+    ) {
+      continue;
+    }
+
+    const hasValues = Object.values(rowObj).some(v => String(v ?? "").trim() !== "");
+    if (!hasValues) continue;
+
+    rowObj._excelRowNumber = r + 1;
+    rows.push(rowObj);
+  }
+
+  return { rows, headerRowIdx };
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();
@@ -51,7 +119,7 @@ export async function POST(request: NextRequest) {
       return errorResponse("EMPTY_FILE", "File spreadsheet tidak memiliki sheet aktif.", 400);
     }
 
-    const rows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+    const { rows, headerRowIdx } = extractSheetRows(workbook.Sheets[sheetName]);
 
     if (!rows || rows.length === 0) {
       return errorResponse("EMPTY_DATA", "Sheet tidak memuat baris data untuk diimpor.", 400);
@@ -507,13 +575,15 @@ export async function POST(request: NextRequest) {
             let importedCount = 0;
             let updatedCount = 0;
             const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
+            const supabaseAdmin = createAdminClient();
 
-            const { data: allPrograms } = await supabase
+            const { data: allPrograms } = await supabaseAdmin
               .from("master_program")
               .select("id, kode_program, nama, biaya");
 
             for (let i = 0; i < rows.length; i++) {
               const row = rows[i];
+              const excelRow = (row._excelRowNumber as number) || (i + 2);
               const nama = String(row["Nama"] || row["Nama Lengkap"] || row["nama"] || "").trim();
               const manualNoInduk = String(row["No. Induk"] || row["No Induk"] || row["nomor_induk"] || "").trim();
               const rawNik = String(row["NIK"] || row["nik"] || "").trim();
@@ -538,7 +608,6 @@ export async function POST(request: NextRequest) {
 
               // Biaya: deteksi "(sertifikat)" → hanya data keuangan & sertifikat, tanpa nilai
               const rawBiayaStr = String(row["Biaya Pelatihan"] || row["Biaya"] || row["biaya"] || "0");
-              const isSertifikatOnly = rawBiayaStr.toLowerCase().includes("sertifikat");
               const biaya = parseInt(rawBiayaStr.replace(/\D/g, ""), 10) || 0;
 
               const noSertifikat = String(row["No. Sertifikat"] || row["No Sertifikat"] || row["no_sertifikat"] || "").trim();
@@ -548,7 +617,7 @@ export async function POST(request: NextRequest) {
               if (!nama && !manualNoInduk && !rawNik) continue;
 
               if (!nama) {
-                errors.push({ row: i + 2, reason: "Nama siswa wajib diisi.", type: "warning" });
+                errors.push({ row: excelRow, reason: "Nama siswa wajib diisi.", type: "warning" });
                 controller.enqueue(encoder.encode(JSON.stringify({
                   type: "progress",
                   progress: Math.round(((i + 1) / rows.length) * 100),
@@ -557,14 +626,38 @@ export async function POST(request: NextRequest) {
                 continue;
               }
 
-              // Cari program: cocokkan nama terlebih dahulu (bukan kode), lalu fallback kode
-              // Untuk Banper: nama program mungkin berisi " (Banper)" — strip dulu untuk lookup
-              const programNameClean = rawProgram.replace(/\s*\(Banper\)\s*/i, "").trim();
+              // Cari program: cocokkan nama terlebih dahulu (bukan kode), lalu fallback kode & prefix
+              const cleanProg = rawProgram.replace(/\s*\(Banper\)\s*/i, "").trim();
+              const kodePrefix = manualNoInduk.split(".")[0].trim().padStart(2, "0");
+
               let matchedProg =
                 allPrograms?.find(p => p.nama.toLowerCase() === rawProgram.toLowerCase()) ??
-                allPrograms?.find(p => p.nama.toLowerCase() === programNameClean.toLowerCase()) ??
-                allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0")) ??
-                allPrograms?.find(p => p.nama.toLowerCase().includes(programNameClean.toLowerCase()));
+                allPrograms?.find(p => p.nama.toLowerCase() === cleanProg.toLowerCase());
+
+              if (!matchedProg && cleanProg) {
+                const lowerClean = cleanProg.toLowerCase();
+                if (lowerClean.includes("kombinasi")) {
+                  matchedProg = allPrograms?.find(p => p.kode_program === "03");
+                } else if (lowerClean.includes("fcaw") || lowerClean.includes("gmaw")) {
+                  matchedProg = allPrograms?.find(p => p.kode_program === "04" || p.nama.toLowerCase().includes("fcaw"));
+                } else if (lowerClean.includes("gtaw")) {
+                  matchedProg = allPrograms?.find(p => p.kode_program === "02" || p.nama.toLowerCase().includes("gtaw"));
+                } else if (lowerClean.includes("4g")) {
+                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("4g"));
+                } else if (lowerClean.includes("6g")) {
+                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("6g"));
+                } else if (lowerClean.includes("3g")) {
+                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("3g"));
+                }
+              }
+
+              // Fallback berdasarkan kode program atau prefix nomor induk
+              if (!matchedProg) {
+                matchedProg =
+                  allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0")) ??
+                  allPrograms?.find(p => p.kode_program === kodePrefix);
+              }
+
               if (!matchedProg && allPrograms && allPrograms.length > 0) {
                 matchedProg = allPrograms[0];
               }
@@ -578,8 +671,8 @@ export async function POST(request: NextRequest) {
 
               // NIK validasi / fallback anonim untuk arsip lama tanpa NIK
               let finalNik = rawNik.replace(/\D/g, "");
-              if (finalNik.length !== 16) {
-                finalNik = `ANON-${finalNoInduk.replace(/[^a-zA-Z0-9]/g, "")}-${String(i + 1).padStart(4, "0")}`;
+              if (!finalNik) {
+                finalNik = `ANON-${finalNoInduk.replace(/[^a-zA-Z0-9]/g, "")}-${String(excelRow).padStart(4, "0")}`;
               }
 
               // Format nomor urut
@@ -588,20 +681,26 @@ export async function POST(request: NextRequest) {
               const numUrut = parseInt(urutStr.replace(/\D/g, ""), 10);
               const urutanNomor = isNaN(numUrut) ? null : numUrut;
 
-              // Email: dari kolom Excel, atau generate
+              // Email & username awal
               const namaDepanClean = nama.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "alumni";
               const cleanNoIndukForUser = finalNoInduk.replace(/\./g, "");
-              const emailFinal = emailKolom || `${namaDepanClean}.${cleanNoIndukForUser}@lpks.id`;
-              const username = `${namaDepanClean}@${cleanNoIndukForUser}`;
+              let emailFinal = emailKolom || `${namaDepanClean}.${cleanNoIndukForUser}@lpks.id`;
+              let username = `${namaDepanClean}@${cleanNoIndukForUser}`;
+
+              // Tentukan status_siswa:
+              // Jika kolom Ket berisi "Out", set ke "out". Selain itu default "alumni".
+              let statusSiswa: "aktif" | "alumni" | "out" = "alumni";
+              if (ketStr.toLowerCase().includes("out")) {
+                statusSiswa = "out";
+              }
 
               // 1. Cek apakah siswa sudah ada di sistem
               // Banper: boleh ada no_induk sama jika program berbeda.
-              // Cek berdasarkan (nomor_induk + program_id) terlebih dahulu.
               let siswaId: string | null = null;
               const { data: existingExact } = programId
-                ? await supabase
+                ? await supabaseAdmin
                     .from("siswa")
-                    .select("id")
+                    .select("id, status_siswa")
                     .eq("nomor_induk", finalNoInduk)
                     .eq("program_id", programId)
                     .maybeSingle()
@@ -610,10 +709,10 @@ export async function POST(request: NextRequest) {
               if (existingExact) {
                 // Siswa dengan kombinasi no_induk + program sudah ada → update
                 siswaId = existingExact.id;
-                await supabase
+                await supabaseAdmin
                   .from("siswa")
                   .update({
-                    status_siswa: "alumni",
+                    status_siswa: statusSiswa,
                     nama_lengkap: nama,
                     tempat_lahir: tempatLahir || undefined,
                     tgl_lahir: tglLahir || undefined,
@@ -623,12 +722,39 @@ export async function POST(request: NextRequest) {
                     tgl_masuk: tglMasuk,
                     tgl_keluar: tglLulus,
                     urutan_nomor: urutanNomor,
+                    biaya_pelatihan: biaya > 0 ? biaya : undefined,
                   })
                   .eq("id", siswaId);
                 updatedCount++;
               } else {
-                // Tidak ada kombinasi exact → insert baru (termasuk kasus Banper)
-                const { data: newS, error: sErr } = await supabase
+                // Siswa baru (atau siswa yang sama mengambil program kedua / Banper)
+                // Cegah konflik jika email atau username sudah dipakai record lain
+                const { data: emailConflict } = await supabaseAdmin
+                  .from("siswa")
+                  .select("id")
+                  .eq("email", emailFinal)
+                  .maybeSingle();
+
+                if (emailConflict) {
+                  if (emailFinal.includes("@")) {
+                    const [uPart, dPart] = emailFinal.split("@");
+                    emailFinal = `${uPart}+${matchedProg?.kode_program || "b"}@${dPart}`;
+                  } else {
+                    emailFinal = `${emailFinal}_${matchedProg?.kode_program || "b"}`;
+                  }
+                }
+
+                const { data: userConflict } = await supabaseAdmin
+                  .from("siswa")
+                  .select("id")
+                  .eq("username", username)
+                  .maybeSingle();
+
+                if (userConflict) {
+                  username = `${username}_${matchedProg?.kode_program || "b"}`;
+                }
+
+                const { data: newS, error: sErr } = await supabaseAdmin
                   .from("siswa")
                   .insert({
                     program_id: programId,
@@ -636,7 +762,7 @@ export async function POST(request: NextRequest) {
                     urutan_nomor: urutanNomor,
                     nama_lengkap: nama,
                     nik: finalNik,
-                    username: username + (existingExact ? "_b" : ""),
+                    username,
                     email: emailFinal,
                     tempat_lahir: tempatLahir || null,
                     tgl_lahir: tglLahir || null,
@@ -645,14 +771,15 @@ export async function POST(request: NextRequest) {
                     pendidikan_terakhir: pendidikan || null,
                     tgl_masuk: tglMasuk,
                     tgl_keluar: tglLulus,
-                    status_siswa: "alumni",
+                    status_siswa: statusSiswa,
+                    biaya_pelatihan: biaya > 0 ? biaya : null,
                     is_password_default: true,
                   })
                   .select("id")
                   .single();
 
                 if (sErr || !newS) {
-                  errors.push({ row: i + 2, reason: `Gagal menyimpan data siswa: ${sErr?.message || "Database error"}`, type: "error" });
+                  errors.push({ row: excelRow, reason: `Gagal menyimpan data siswa: ${sErr?.message || "Database error"}`, type: "error" });
                   continue;
                 }
                 siswaId = newS.id;
@@ -663,7 +790,7 @@ export async function POST(request: NextRequest) {
               const skema = String(row["Skema Pembayaran"] || row["Skema"] || row["status_pembayaran"] || "").trim().toLowerCase();
               const isCicilan = skema.includes("cicil") || skema.includes("angsur");
 
-              const { data: existingTxList } = await supabase
+              const { data: existingTxList } = await supabaseAdmin
                 .from("transaksi_keuangan")
                 .select("id")
                 .eq("siswa_id", siswaId);
@@ -685,7 +812,7 @@ export async function POST(request: NextRequest) {
                     const ket = slots.length === 1
                       ? (isCicilan ? "Pembayaran Angsuran 1 (Arsip Alumni)" : "Pembayaran Pelunasan (Arsip Alumni)")
                       : `Pembayaran Angsuran ${s.angsuranKe} (Arsip Alumni)`;
-                    await supabase.from("transaksi_keuangan").insert({
+                    await supabaseAdmin.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
                       nominal: s.nominal,
                       tgl_bayar: s.tgl,
@@ -698,7 +825,7 @@ export async function POST(request: NextRequest) {
                   // Fallback: no slots filled → auto-generate from skema
                   const tglBayar1 = isCicilan ? tglMasuk : tglLulus;
                   const nominal1 = isCicilan ? Math.round(biaya / 2) : biaya;
-                  await supabase.from("transaksi_keuangan").insert({
+                  await supabaseAdmin.from("transaksi_keuangan").insert({
                     siswa_id: siswaId,
                     nominal: nominal1,
                     tgl_bayar: tglBayar1,
@@ -707,7 +834,7 @@ export async function POST(request: NextRequest) {
                     penerima: "Superadmin (Import)",
                   });
                   if (isCicilan && biaya - nominal1 > 0) {
-                    await supabase.from("transaksi_keuangan").insert({
+                    await supabaseAdmin.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
                       nominal: biaya - nominal1,
                       tgl_bayar: tglLulus,
@@ -718,37 +845,25 @@ export async function POST(request: NextRequest) {
                   }
                 }
 
-                // Update biaya_pelatihan di tabel siswa
+                // Update biaya_pelatihan di tabel siswa jika ada
                 if (biaya > 0) {
-                  await supabase
+                  await supabaseAdmin
                     .from("siswa")
                     .update({ biaya_pelatihan: biaya })
                     .eq("id", siswaId);
                 }
-
-                // Tandai status keuangan dari kolom Ket
-                if (ketStr.toLowerCase().includes("out")) {
-                  await supabase.from("siswa").update({ catatan: "Out (dari arsip)" }).eq("id", siswaId);
-                } else if (ketStr.toLowerCase().includes("belum")) {
-                  await supabase.from("siswa").update({ catatan: "Belum Lunas (dari arsip)" }).eq("id", siswaId);
-                }
-              }
-
-              // Flag sertifikat-only (tanpa nilai pelatihan)
-              if (isSertifikatOnly) {
-                await supabase.from("siswa").update({ catatan: (await supabase.from("siswa").select("catatan").eq("id", siswaId).maybeSingle())?.data?.catatan ? undefined : "Sertifikat saja" }).eq("id", siswaId);
               }
 
               // 3. Sertifikat (Otomatis Dicetak)
               if (noSertifikat) {
-                const { data: existingCert } = await supabase
+                const { data: existingCert } = await supabaseAdmin
                   .from("sertifikat")
                   .select("id")
                   .eq("siswa_id", siswaId)
                   .maybeSingle();
 
                 if (!existingCert) {
-                  await supabase.from("sertifikat").insert({
+                  await supabaseAdmin.from("sertifikat").insert({
                     siswa_id: siswaId,
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
@@ -756,7 +871,7 @@ export async function POST(request: NextRequest) {
                     tgl_cetak: tglLulus,
                   });
                 } else {
-                  await supabase.from("sertifikat").update({
+                  await supabaseAdmin.from("sertifikat").update({
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
                     tgl_cetak: tglLulus,
