@@ -650,43 +650,41 @@ export default function KeuanganSuperadminPage() {
     {
       key: "aksi",
       header: "Aksi",
-      className: "w-44 text-right",
+      className: "w-52 text-right",
       render: (r: SiswaKeuanganItem) => (
         <div className="flex items-center justify-end gap-1.5">
-          {r.is_lunas ? (
-            <button
-              onClick={() => {
-                setHistorySiswa(r);
-                setModalHistoryOpen(true);
-              }}
-              className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981] hover:bg-[#10B981]/20 transition-all"
-              title="Lihat Riwayat Transaksi"
-            >
-              <Receipt className="h-3.5 w-3.5" />
-              <span>Riwayat</span>
-            </button>
-          ) : (
+          {/* Tombol Riwayat selalu tampil untuk semua status siswa */}
+          <button
+            onClick={() => {
+              setHistorySiswa(r);
+              setModalHistoryOpen(true);
+            }}
+            className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border transition-all shrink-0 ${
+              r.is_lunas
+                ? "border-[#10B981]/30 bg-[#10B981]/10 text-[#10B981] hover:bg-[#10B981]/20 font-medium"
+                : "border-[#1F2937] bg-[#111827] text-[#D1D5DB] hover:bg-[#1F2937] hover:text-white"
+            }`}
+            title={`Lihat Riwayat Transaksi (${r.riwayat_transaksi.length} transaksi)`}
+          >
+            <Receipt className="h-3.5 w-3.5 shrink-0" />
+            <span>Riwayat</span>
+            {r.riwayat_transaksi.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#1F2937] text-[#9CA3AF] font-mono">
+                {r.riwayat_transaksi.length}
+              </span>
+            )}
+          </button>
+
+          {/* Tombol Catat Bayar jika belum lunas */}
+          {!r.is_lunas && (
             <Button
               size="sm"
-              className="h-7 px-2.5 text-xs gap-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white"
+              className="h-7 px-2.5 text-xs gap-1.5 bg-[#DC2626] hover:bg-[#B91C1C] text-white shrink-0"
               onClick={() => handleOpenPaymentModal(r)}
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Catat Bayar</span>
             </Button>
-          )}
-
-          {r.riwayat_transaksi.length > 0 && !r.is_lunas && (
-            <button
-              onClick={() => {
-                setHistorySiswa(r);
-                setModalHistoryOpen(true);
-              }}
-              className="p-1.5 rounded-lg border border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-white transition-colors"
-              title={`Lihat Riwayat (${r.riwayat_transaksi.length} transaksi)`}
-            >
-              <Receipt className="h-3.5 w-3.5" />
-            </button>
           )}
         </div>
       ),
