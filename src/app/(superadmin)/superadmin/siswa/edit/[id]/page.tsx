@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { handleEnterToNextField } from "@/lib/form-utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatRupiah } from "@/lib/utils";
 
 const PENDIDIKAN_OPTIONS = [
   "SD",
@@ -331,10 +332,11 @@ export default function EditSiswaPage({ params }: PageProps) {
             <div className="flex-1 h-px bg-[#1F2937]" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            {/* 1. Nomor Induk Siswa */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#D1D5DB]">
-                Nomor Induk Siswa * (Kode Program &amp; No. Urut Dapat Diedit)
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Nomor Induk Siswa <span className="text-[#F43F5E]">*</span>
               </label>
               <div className="flex items-center">
                 <input
@@ -350,7 +352,7 @@ export default function EditSiswaPage({ params }: PageProps) {
                   }}
                   placeholder={programInfo?.kode || "01"}
                   title="Kode Program (default sesuai program, dapat diedit)"
-                  className="w-20 sm:w-24 h-10 text-center rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981] placeholder-[#6B7280] focus:border-[#10B981] focus:outline-none transition-colors"
+                  className="w-16 sm:w-20 h-10 text-center rounded-l-lg border border-r-0 border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981] placeholder-[#6B7280] focus:border-[#10B981] focus:outline-none transition-colors"
                 />
                 <span className="inline-flex items-center px-2 h-10 border-y border-[#374151] bg-[#1F2937] text-xs font-mono font-bold text-[#10B981]">
                   .
@@ -366,8 +368,8 @@ export default function EditSiswaPage({ params }: PageProps) {
                       setFieldErrors((prev) => { const n = { ...prev }; delete n.nomor_induk; return n; });
                     }
                   }}
-                  placeholder="cth: 1053 atau 0001"
-                  className={`flex-1 h-10 rounded-r-lg border bg-[#111827] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
+                  placeholder="cth: 914 atau 0001"
+                  className={`flex-1 h-10 rounded-r-lg border bg-[#0B0F17] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
                     fieldErrors.nomor_induk ? "border-[#F43F5E] focus:border-[#F43F5E]" : "border-[#374151] focus:border-[#10B981]"
                   }`}
                   required
@@ -376,54 +378,79 @@ export default function EditSiswaPage({ params }: PageProps) {
               {fieldErrors.nomor_induk ? (
                 <p className="text-[11px] text-[#F43F5E] mt-0.5">{fieldErrors.nomor_induk}</p>
               ) : (
-                <p className="text-[10px] text-[#6B7280] mt-0.5">
-                  Nomor Induk aktif: <span className="font-mono text-[#10B981]">{kodeProgram.trim() ? `${kodeProgram.trim()}.` : ""}{noUrut || "____"}</span>
+                <p className="text-[11px] text-[#6B7280] mt-0.5">
+                  Nomor aktif: <strong className="font-mono text-[#10B981]">{kodeProgram.trim() ? `${kodeProgram.trim()}.` : ""}{noUrut || "____"}</strong> (dapat diedit)
                 </p>
               )}
             </div>
-            <Input label="Program Pelatihan" value={programInfo ? `${programInfo.kode} - ${programInfo.nama}` : ""} readOnly className="bg-[#1F2937]/30 text-[#9CA3AF]" />
-          </div>
-          <p className="text-[10px] text-[#6B7280] mt-1.5">Program Pelatihan terikat permanen. Nomor urut siswa dapat disesuaikan jika diperlukan.</p>
 
-          {/* Biaya Pelatihan Siswa */}
-          <div className="mt-3 pt-3 border-t border-[#1F2937]">
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-medium text-[#D1D5DB]">
-                Biaya Pelatihan Siswa (Rp)
+            {/* 2. Program Pelatihan */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Program Pelatihan
               </label>
-              {programInfo && (
-                <span className="text-[10px] text-[#6B7280]">
-                  Biaya Standar: <strong className="text-[#F9FAFB]">Rp {Number(programInfo.biaya).toLocaleString("id-ID")}</strong>
-                </span>
-              )}
-            </div>
-            <div className="relative max-w-sm">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
-                Rp
-              </span>
               <input
                 type="text"
-                inputMode="numeric"
-                name="biaya_pelatihan"
-                value={biayaPelatihan}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, "");
-                  setBiayaPelatihan(val);
-                }}
-                placeholder={programInfo ? String(programInfo.biaya) : "0"}
-                className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#111827] text-xs font-mono font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                readOnly
+                value={programInfo ? `${programInfo.kode} - ${programInfo.nama}` : ""}
+                className="h-10 w-full rounded-lg border border-[#374151]/60 bg-[#1F2937]/30 px-3 text-xs font-medium text-[#9CA3AF] cursor-not-allowed select-none focus:outline-none"
               />
+              <p className="text-[11px] text-[#6B7280] mt-0.5">
+                Program pelatihan terikat permanen
+              </p>
             </div>
-            {biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? (
-              <p className="text-[10px] text-[#10B981] mt-1">
-                Total tagihan siswa: <strong>Rp {parseFloat(biayaPelatihan).toLocaleString("id-ID")}</strong>
-                {programInfo && parseFloat(biayaPelatihan) !== Number(programInfo.biaya) && " (Tarif Khusus / Berbeda dari Standar)"}
+
+            {/* 3. Biaya Pelatihan Siswa */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Biaya Pelatihan Siswa (Rp)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
+                  Rp
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  name="biaya_pelatihan"
+                  value={biayaPelatihan}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setBiayaPelatihan(val);
+                  }}
+                  placeholder={programInfo ? String(programInfo.biaya) : "0"}
+                  className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs font-mono font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+                />
+              </div>
+              {biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? (
+                <p className="text-[11px] text-[#10B981] mt-0.5">
+                  Tagihan siswa: <strong className="text-white">{formatRupiah(parseFloat(biayaPelatihan))}</strong>
+                  {programInfo && parseFloat(biayaPelatihan) !== Number(programInfo.biaya) && (
+                    <span className="ml-1 text-[#F59E0B] font-medium">(Tarif Khusus)</span>
+                  )}
+                </p>
+              ) : (
+                <p className="text-[11px] text-[#6B7280] mt-0.5">
+                  Kosongkan untuk mengikuti tarif standar program
+                </p>
+              )}
+            </div>
+
+            {/* 4. Tarif Standar Program (Referensi) */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Tarif Standar Program
+              </label>
+              <div className="h-10 px-3 rounded-lg border border-[#374151]/60 bg-[#1F2937]/30 flex items-center justify-between text-xs text-[#9CA3AF]">
+                <span>Biaya Master Program:</span>
+                <span className="font-mono font-bold text-[#F9FAFB]">
+                  {programInfo ? formatRupiah(programInfo.biaya) : "—"}
+                </span>
+              </div>
+              <p className="text-[11px] text-[#6B7280] mt-0.5">
+                Tarif acuan resmi saat program didaftarkan
               </p>
-            ) : (
-              <p className="text-[10px] text-[#6B7280] mt-1">
-                Kosongkan untuk mengikuti tarif standar program.
-              </p>
-            )}
+            </div>
           </div>
 
           {/* DATA PRIBADI */}

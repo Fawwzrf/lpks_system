@@ -747,7 +747,7 @@ export default function PendaftaranPage() {
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-[#D1D5DB]">
-                      Nomor Induk Siswa * (Kode Program &amp; Nomor Urut Dapat Diedit)
+                      Nomor Induk Siswa <span className="text-[#F43F5E]">*</span>
                     </label>
                     <div className="flex items-center">
                       <input
