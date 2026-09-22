@@ -575,9 +575,8 @@ export async function POST(request: NextRequest) {
             let importedCount = 0;
             let updatedCount = 0;
             const errors: { row: number; reason: string; type: "warning" | "error" }[] = [];
-            const supabaseAdmin = createAdminClient();
 
-            const { data: allPrograms } = await supabaseAdmin
+            const { data: allPrograms } = await supabase
               .from("master_program")
               .select("id, kode_program, nama, biaya");
 
@@ -698,7 +697,7 @@ export async function POST(request: NextRequest) {
               // Banper: boleh ada no_induk sama jika program berbeda.
               let siswaId: string | null = null;
               const { data: existingExact } = programId
-                ? await supabaseAdmin
+                ? await supabase
                     .from("siswa")
                     .select("id, status_siswa")
                     .eq("nomor_induk", finalNoInduk)
@@ -709,7 +708,7 @@ export async function POST(request: NextRequest) {
               if (existingExact) {
                 // Siswa dengan kombinasi no_induk + program sudah ada → update
                 siswaId = existingExact.id;
-                await supabaseAdmin
+                await supabase
                   .from("siswa")
                   .update({
                     status_siswa: statusSiswa,
@@ -729,7 +728,7 @@ export async function POST(request: NextRequest) {
               } else {
                 // Siswa baru (atau siswa yang sama mengambil program kedua / Banper)
                 // Cegah konflik jika email atau username sudah dipakai record lain
-                const { data: emailConflict } = await supabaseAdmin
+                const { data: emailConflict } = await supabase
                   .from("siswa")
                   .select("id")
                   .eq("email", emailFinal)
@@ -744,7 +743,7 @@ export async function POST(request: NextRequest) {
                   }
                 }
 
-                const { data: userConflict } = await supabaseAdmin
+                const { data: userConflict } = await supabase
                   .from("siswa")
                   .select("id")
                   .eq("username", username)
@@ -754,7 +753,7 @@ export async function POST(request: NextRequest) {
                   username = `${username}_${matchedProg?.kode_program || "b"}`;
                 }
 
-                const { data: newS, error: sErr } = await supabaseAdmin
+                const { data: newS, error: sErr } = await supabase
                   .from("siswa")
                   .insert({
                     program_id: programId,
@@ -790,7 +789,7 @@ export async function POST(request: NextRequest) {
               const skema = String(row["Skema Pembayaran"] || row["Skema"] || row["status_pembayaran"] || "").trim().toLowerCase();
               const isCicilan = skema.includes("cicil") || skema.includes("angsur");
 
-              const { data: existingTxList } = await supabaseAdmin
+              const { data: existingTxList } = await supabase
                 .from("transaksi_keuangan")
                 .select("id")
                 .eq("siswa_id", siswaId);
@@ -812,7 +811,7 @@ export async function POST(request: NextRequest) {
                     const ket = slots.length === 1
                       ? (isCicilan ? "Pembayaran Angsuran 1 (Arsip Alumni)" : "Pembayaran Pelunasan (Arsip Alumni)")
                       : `Pembayaran Angsuran ${s.angsuranKe} (Arsip Alumni)`;
-                    await supabaseAdmin.from("transaksi_keuangan").insert({
+                    await supabase.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
                       nominal: s.nominal,
                       tgl_bayar: s.tgl,
@@ -825,7 +824,7 @@ export async function POST(request: NextRequest) {
                   // Fallback: no slots filled → auto-generate from skema
                   const tglBayar1 = isCicilan ? tglMasuk : tglLulus;
                   const nominal1 = isCicilan ? Math.round(biaya / 2) : biaya;
-                  await supabaseAdmin.from("transaksi_keuangan").insert({
+                  await supabase.from("transaksi_keuangan").insert({
                     siswa_id: siswaId,
                     nominal: nominal1,
                     tgl_bayar: tglBayar1,
@@ -834,7 +833,7 @@ export async function POST(request: NextRequest) {
                     penerima: "Superadmin (Import)",
                   });
                   if (isCicilan && biaya - nominal1 > 0) {
-                    await supabaseAdmin.from("transaksi_keuangan").insert({
+                    await supabase.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
                       nominal: biaya - nominal1,
                       tgl_bayar: tglLulus,
@@ -847,7 +846,7 @@ export async function POST(request: NextRequest) {
 
                 // Update biaya_pelatihan di tabel siswa jika ada
                 if (biaya > 0) {
-                  await supabaseAdmin
+                  await supabase
                     .from("siswa")
                     .update({ biaya_pelatihan: biaya })
                     .eq("id", siswaId);
@@ -856,14 +855,14 @@ export async function POST(request: NextRequest) {
 
               // 3. Sertifikat (Otomatis Dicetak)
               if (noSertifikat) {
-                const { data: existingCert } = await supabaseAdmin
+                const { data: existingCert } = await supabase
                   .from("sertifikat")
                   .select("id")
                   .eq("siswa_id", siswaId)
                   .maybeSingle();
 
                 if (!existingCert) {
-                  await supabaseAdmin.from("sertifikat").insert({
+                  await supabase.from("sertifikat").insert({
                     siswa_id: siswaId,
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
@@ -871,7 +870,7 @@ export async function POST(request: NextRequest) {
                     tgl_cetak: tglLulus,
                   });
                 } else {
-                  await supabaseAdmin.from("sertifikat").update({
+                  await supabase.from("sertifikat").update({
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
                     tgl_cetak: tglLulus,
