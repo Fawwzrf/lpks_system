@@ -25,6 +25,9 @@ import {
   UserCheck,
   ArrowRight,
   Pencil,
+  ChevronDown,
+  Check,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -178,6 +181,39 @@ export default function UjianPage() {
   const [alumniCertSuccess, setAlumniCertSuccess] = useState<string | null>(null);
   const [alumniSearchQuery, setAlumniSearchQuery] = useState("");
   const [allStudentsList, setAllStudentsList] = useState<{ id: string; nama_lengkap: string; nomor_induk: string; program?: { nama: string } }[]>([]);
+  const [alumniDropdownOpen, setAlumniDropdownOpen] = useState(false);
+  const alumniDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Tutup dropdown combobox saat klik di luar elemen
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (alumniDropdownRef.current && !alumniDropdownRef.current.contains(event.target as Node)) {
+        setAlumniDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const selectedStudent = useMemo(() => {
+    return allStudentsList.find((s) => s.id === alumniCertSiswaId) || null;
+  }, [allStudentsList, alumniCertSiswaId]);
+
+  const filteredStudents = useMemo(() => {
+    if (!alumniSearchQuery.trim()) return allStudentsList;
+    if (selectedStudent && alumniSearchQuery === `${selectedStudent.nama_lengkap} (${selectedStudent.nomor_induk || "Tanpa No. Induk"})`) {
+      return allStudentsList;
+    }
+    const q = alumniSearchQuery.toLowerCase();
+    return allStudentsList.filter(
+      (s) =>
+        s.nama_lengkap.toLowerCase().includes(q) ||
+        (s.nomor_induk && s.nomor_induk.toLowerCase().includes(q)) ||
+        (s.program?.nama && s.program.nama.toLowerCase().includes(q))
+    );
+  }, [allStudentsList, alumniSearchQuery, selectedStudent]);
 
   // Form fields
   const [scores, setScores] = useState({
@@ -441,6 +477,7 @@ export default function UjianPage() {
     setAlumniCertError(null);
     setAlumniCertSuccess(null);
     setAlumniSearchQuery("");
+    setAlumniDropdownOpen(false);
 
     if (item) {
       // Mode Edit
@@ -1831,42 +1868,121 @@ export default function UjianPage() {
             </div>
           )}
 
-          {/* Pemilihan Siswa jika mode Tambah Baru */}
+          {/* Pemilihan Siswa jika mode Tambah Baru (Unified Searchable Dropdown / Combobox) */}
           {!alumniCertTarget ? (
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[#D1D5DB]">
-                Pilih Siswa / Alumni <span className="text-[#F43F5E]">*</span>
+            <div className="space-y-1.5" ref={alumniDropdownRef}>
+              <label className="text-xs font-semibold text-[#D1D5DB] flex items-center justify-between">
+                <span>Pilih Siswa / Alumni <span className="text-[#F43F5E]">*</span></span>
+                {selectedStudent && (
+                  <span className="text-[10px] text-[#10B981] font-normal flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Terpilih: {selectedStudent.nama_lengkap}
+                  </span>
+                )}
               </label>
-              <div className="space-y-2">
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#6B7280] pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Ketik nama atau nomor induk untuk menyaring..."
+                  placeholder="Ketik nama atau nomor induk untuk memilih siswa..."
                   value={alumniSearchQuery}
-                  onChange={(e) => setAlumniSearchQuery(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none focus:border-[#38BDF8]"
+                  onFocus={() => setAlumniDropdownOpen(true)}
+                  onChange={(e) => {
+                    setAlumniSearchQuery(e.target.value);
+                    setAlumniDropdownOpen(true);
+                    if (alumniCertSiswaId) {
+                      setAlumniCertSiswaId("");
+                    }
+                  }}
+                  className={`w-full h-10 pl-9 pr-16 rounded-lg border bg-[#111827] text-xs placeholder-[#6B7280] focus:outline-none transition-colors ${
+                    alumniCertSiswaId
+                      ? "border-[#38BDF8] text-[#38BDF8] font-medium"
+                      : "border-[#1F2937] text-[#F9FAFB] focus:border-[#38BDF8]"
+                  }`}
                 />
-                <select
-                  value={alumniCertSiswaId}
-                  onChange={(e) => setAlumniCertSiswaId(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#38BDF8]"
-                  required
-                >
-                  <option value="">-- Pilih Siswa Alumni --</option>
-                  {allStudentsList
-                    .filter((s) => {
-                      if (!alumniSearchQuery.trim()) return true;
-                      const q = alumniSearchQuery.toLowerCase();
-                      return (
-                        s.nama_lengkap.toLowerCase().includes(q) ||
-                        (s.nomor_induk && s.nomor_induk.toLowerCase().includes(q))
-                      );
-                    })
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.nama_lengkap} ({s.nomor_induk || "Tanpa No. Induk"}) {s.program ? `- ${s.program.nama}` : ""}
-                      </option>
-                    ))}
-                </select>
+
+                {/* Action icons on the right */}
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                  {alumniSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAlumniSearchQuery("");
+                        setAlumniCertSiswaId("");
+                        setAlumniDropdownOpen(true);
+                      }}
+                      className="p-1 rounded text-[#9CA3AF] hover:text-white hover:bg-[#1F2937] transition-colors"
+                      title="Hapus pilihan"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setAlumniDropdownOpen((prev) => !prev)}
+                    className="p-1 rounded text-[#9CA3AF] hover:text-white hover:bg-[#1F2937] transition-colors"
+                    title="Buka pilihan dropdown"
+                  >
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        alumniDropdownOpen ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* Dropdown Popover Menu */}
+                {alumniDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-[#1F2937] bg-[#0B0F17] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                    <div className="bg-[#111827] px-3 py-1.5 text-[10px] text-[#9CA3AF] uppercase font-semibold tracking-wider flex justify-between items-center border-b border-[#1F2937]">
+                      <span>Daftar Siswa ({filteredStudents.length})</span>
+                      <span className="text-[9px] text-[#6B7280]">Ketik untuk menyaring</span>
+                    </div>
+
+                    <div className="max-h-56 overflow-y-auto divide-y divide-[#1F2937]/50">
+                      {filteredStudents.length === 0 ? (
+                        <div className="py-6 px-4 text-center text-xs text-[#9CA3AF]">
+                          Tidak ada siswa yang cocok dengan &quot;{alumniSearchQuery}&quot;
+                        </div>
+                      ) : (
+                        filteredStudents.map((s) => {
+                          const isSelected = s.id === alumniCertSiswaId;
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => {
+                                setAlumniCertSiswaId(s.id);
+                                setAlumniSearchQuery(
+                                  `${s.nama_lengkap} (${s.nomor_induk || "Tanpa No. Induk"})`
+                                );
+                                setAlumniDropdownOpen(false);
+                              }}
+                              className={`w-full text-left px-3.5 py-2.5 flex items-center justify-between transition-colors ${
+                                isSelected
+                                  ? "bg-[#38BDF8]/15 text-[#38BDF8]"
+                                  : "hover:bg-[#1F2937]/70 text-[#F9FAFB]"
+                              }`}
+                            >
+                              <div className="truncate pr-2">
+                                <div className={`text-xs font-semibold ${isSelected ? "text-[#38BDF8]" : "text-[#F9FAFB]"}`}>
+                                  {s.nama_lengkap}
+                                </div>
+                                <div className="text-[11px] text-[#9CA3AF] flex items-center gap-1.5 mt-0.5">
+                                  <span className="font-mono text-[#DC2626] font-medium">
+                                    {s.nomor_induk || "Tanpa No. Induk"}
+                                  </span>
+                                  {s.program && <span>&bull; {s.program.nama}</span>}
+                                </div>
+                              </div>
+                              {isSelected && <Check className="h-4 w-4 text-[#38BDF8] shrink-0" />}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
