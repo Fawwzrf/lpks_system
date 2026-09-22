@@ -98,6 +98,7 @@ export default function EditSiswaPage({ params }: PageProps) {
   const [noUrut, setNoUrut] = useState("");
   const [kodeProgram, setKodeProgram] = useState("");
   const [biayaPelatihan, setBiayaPelatihan] = useState("");
+  const [noSertifikat, setNoSertifikat] = useState("");
 
   const loadSiswa = useCallback(async () => {
     try {
@@ -117,6 +118,14 @@ export default function EditSiswaPage({ params }: PageProps) {
           ? String(siswa.biaya_pelatihan)
           : (siswa.program?.biaya ? String(siswa.program.biaya) : "")
       );
+
+      // Muat nomor sertifikat jika ada
+      if (siswa.sertifikat) {
+        const certObj = Array.isArray(siswa.sertifikat) ? siswa.sertifikat[0] : siswa.sertifikat;
+        setNoSertifikat(certObj?.no_sertifikat || "");
+      } else {
+        setNoSertifikat("");
+      }
 
       // Pecah alamat
       const addr = siswa.alamat_lengkap || "";
@@ -237,6 +246,7 @@ export default function EditSiswaPage({ params }: PageProps) {
       tgl_keluar: tanggalKeluar || null,
       status_siswa: statusSiswa,
       biaya_pelatihan: biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? parseFloat(biayaPelatihan) : null,
+      no_sertifikat: noSertifikat.trim(),
     };
 
     try {
@@ -674,6 +684,36 @@ export default function EditSiswaPage({ params }: PageProps) {
               </label>
             ))}
           </div>
+
+          {statusSiswa === "alumni" && (
+            <div className="mt-4 p-4 rounded-xl border border-[#38BDF8]/30 bg-[#38BDF8]/5 flex flex-col gap-2.5 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-[#38BDF8]">
+                  Arsip Sertifikat Fisik Alumni
+                </span>
+                <span className="text-[10px] text-[#9CA3AF]">
+                  Divalidasi pada pencarian sertifikat
+                </span>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-[#D1D5DB]">
+                  Nomor Sertifikat
+                </label>
+                <input
+                  type="text"
+                  value={noSertifikat}
+                  onChange={(e) => setNoSertifikat(e.target.value)}
+                  placeholder="cth: 05/LPK-S/XI/2018 atau LPKS/2025/WLD/001"
+                  className="w-full h-10 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs font-mono font-bold text-[#38BDF8] placeholder-[#6B7280] focus:border-[#38BDF8] focus:outline-none transition-colors"
+                />
+                <p className="text-[11px] text-[#6B7280]">
+                  {noSertifikat.trim()
+                    ? "Siswa tercatat sah sebagai alumni pemegang sertifikat fisik. Nomor ini langsung dapat dicari & divalidasi keabsahannya."
+                    : "Kosongkan jika siswa belum memiliki nomor sertifikat fisik."}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-end pt-2">

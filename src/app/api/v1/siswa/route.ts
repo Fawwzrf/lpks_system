@@ -309,6 +309,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Jika siswa lama/alumni didaftarkan dengan nomor sertifikat fisik
+    if (body.no_sertifikat && String(body.no_sertifikat).trim()) {
+      await supabase.from("sertifikat").insert({
+        siswa_id: newSiswa.id,
+        no_sertifikat: String(body.no_sertifikat).trim(),
+        status: "dicetak",
+        tgl_antrean: finalTglMasuk,
+        tgl_cetak: finalTglKeluar || new Date().toISOString(),
+      });
+    }
+
     return successResponse(
       {
         ...newSiswa,

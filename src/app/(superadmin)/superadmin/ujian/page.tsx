@@ -24,6 +24,7 @@ import {
   Calendar,
   UserCheck,
   ArrowRight,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -165,6 +166,18 @@ export default function UjianPage() {
     message: string;
     errors?: { row: number; reason: string; type?: "warning" | "error" }[];
   } | null>(null);
+
+  // Modal Catat / Edit Nomor Sertifikat Alumni (Arsip Fisik)
+  const [modalAlumniCertOpen, setModalAlumniCertOpen] = useState(false);
+  const [alumniCertTarget, setAlumniCertTarget] = useState<QueueItem | null>(null);
+  const [alumniCertSiswaId, setAlumniCertSiswaId] = useState("");
+  const [alumniCertNo, setAlumniCertNo] = useState("");
+  const [alumniCertTgl, setAlumniCertTgl] = useState("");
+  const [alumniCertSaving, setAlumniCertSaving] = useState(false);
+  const [alumniCertError, setAlumniCertError] = useState<string | null>(null);
+  const [alumniCertSuccess, setAlumniCertSuccess] = useState<string | null>(null);
+  const [alumniSearchQuery, setAlumniSearchQuery] = useState("");
+  const [allStudentsList, setAllStudentsList] = useState<{ id: string; nama_lengkap: string; nomor_induk: string; program?: { nama: string } }[]>([]);
 
   // Form fields
   const [scores, setScores] = useState({
@@ -420,6 +433,85 @@ export default function UjianPage() {
       setErrorMsg(err instanceof Error ? err.message : "Gagal menghapus siswa dari antrean.");
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  // Handler: Buka Modal Catat / Edit Sertifikat Alumni
+  async function handleOpenCatatSertifikatModal(item?: QueueItem) {
+    setAlumniCertError(null);
+    setAlumniCertSuccess(null);
+    setAlumniSearchQuery("");
+
+    if (item) {
+      // Mode Edit
+      setAlumniCertTarget(item);
+      setAlumniCertSiswaId(item.siswa_id);
+      setAlumniCertNo(item.no_sertifikat || "");
+      setAlumniCertTgl(item.tgl_cetak ? item.tgl_cetak.split("T")[0] : new Date().toISOString().split("T")[0]);
+    } else {
+      // Mode Tambah Baru
+      setAlumniCertTarget(null);
+      setAlumniCertSiswaId("");
+      setAlumniCertNo("");
+      setAlumniCertTgl(new Date().toISOString().split("T")[0]);
+
+      // Ambil daftar seluruh siswa jika belum ada
+      if (allStudentsList.length === 0) {
+        try {
+          const res = await fetch("/api/v1/siswa?limit=100");
+          if (res.ok) {
+            const json = await res.json();
+            setAllStudentsList(json.data || []);
+          }
+        } catch (e) {
+          console.error("Gagal memuat daftar siswa:", e);
+        }
+      }
+    }
+    setModalAlumniCertOpen(true);
+  }
+
+  // Handler: Simpan Pencatatan Nomor Sertifikat Alumni (tanpa nilai ujian)
+  async function handleSaveAlumniCert(e: React.FormEvent) {
+    e.preventDefault();
+    if (!alumniCertSiswaId) {
+      setAlumniCertError("Pilih siswa alumni terlebih dahulu.");
+      return;
+    }
+    if (!alumniCertNo.trim()) {
+      setAlumniCertError("Nomor sertifikat wajib diisi.");
+      return;
+    }
+
+    setAlumniCertSaving(true);
+    setAlumniCertError(null);
+    setAlumniCertSuccess(null);
+
+    try {
+      const res = await fetch("/api/v1/sertifikat/alumni", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          siswa_id: alumniCertSiswaId,
+          no_sertifikat: alumniCertNo.trim(),
+          tgl_cetak: alumniCertTgl || new Date().toISOString().split("T")[0],
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setAlumniCertError(json.error?.message || "Gagal mencatat nomor sertifikat.");
+        return;
+      }
+
+      setAlumniCertSuccess("Nomor sertifikat alumni berhasil dicatat.");
+      await fetchQueueAndHistory();
+      setTimeout(() => {
+        setModalAlumniCertOpen(false);
+      }, 700);
+    } catch {
+      setAlumniCertError("Terjadi gangguan koneksi saat menyimpan sertifikat alumni.");
+    } finally {
+      setAlumniCertSaving(false);
     }
   }
 
@@ -1169,6 +1261,14 @@ export default function UjianPage() {
                 <Upload className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>Import Arsip Alumni</span>
               </Button>
+              <Button
+                size="sm"
+                onClick={() => handleOpenCatatSertifikatModal()}
+                className="gap-1.5 text-xs bg-[#38BDF8] hover:bg-[#0284C7] text-black font-semibold shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Catat Sertifikat Alumni</span>
+              </Button>
             </div>
           </div>
 
@@ -1311,6 +1411,16 @@ export default function UjianPage() {
                             <Button
                               size="sm"
                               variant="outline"
+                              className="h-7 px-2.5 text-xs gap-1 border-[#1F2937] hover:border-[#38BDF8]/50 text-[#D1D5DB] hover:text-[#38BDF8]"
+                              onClick={() => handleOpenCatatSertifikatModal(item)}
+                              title="Edit nomor sertifikat atau tanggal terbit arsip"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              <span>Edit</span>
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
                               className="h-7 px-2.5 text-xs gap-1 border-[#10B981]/40 text-[#10B981] hover:bg-[#10B981]/10"
                               disabled={actionLoadingId === item.siswa_id}
                               onClick={() => handleAddToQueue(item.siswa_id)}
@@ -1386,8 +1496,8 @@ export default function UjianPage() {
                 </div>
               </div>
 
-              {/* Rekap Nilai Ujian */}
-              {reviewTarget.ujian && (
+              {/* Rekap Nilai Ujian atau Arsip Fisik */}
+              {reviewTarget.ujian ? (
                 <div className="mt-2 pt-2 border-t border-[#1F2937]">
                   <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider mb-1.5">
                     Hasil Ujian Internal (Standar ≥ 80)
@@ -1416,6 +1526,20 @@ export default function UjianPage() {
                     <div>
                       <p className="text-[9px] text-[#6B7280]">Gerinda</p>
                       <p className="text-xs font-bold text-[#10B981]">{reviewTarget.ujian.gerinda}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 pt-2 border-t border-[#1F2937]">
+                  <div className="p-3 rounded-lg bg-[#38BDF8]/10 border border-[#38BDF8]/20 flex items-start gap-2.5">
+                    <CheckCircle2 className="h-4 w-4 text-[#38BDF8] shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-semibold text-[#38BDF8]">
+                        Data Arsip Sertifikat Fisik Terverifikasi
+                      </p>
+                      <p className="text-[11px] text-[#9CA3AF] mt-0.5 leading-relaxed">
+                        Sertifikat fisik telah diterbitkan sah untuk alumni ini. Lembar penilaian manual dan arsip berkas fisik tersimpan pada buku arsip administrasi lembaga.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1672,6 +1796,149 @@ export default function UjianPage() {
                 Tutup
               </Button>
             )}
+          </div>
+        </form>
+      </Modal>
+
+      {/* ========================================================================= */}
+      {/* MODAL CATAT / EDIT NOMOR SERTIFIKAT ALUMNI (ARSIP FISIK) */}
+      {/* ========================================================================= */}
+      <Modal
+        open={modalAlumniCertOpen}
+        onClose={() => !alumniCertSaving && setModalAlumniCertOpen(false)}
+        title={
+          alumniCertTarget
+            ? `Edit Sertifikat Alumni — ${alumniCertTarget.siswa.nama_lengkap}`
+            : "Catat Nomor Sertifikat Alumni (Arsip Fisik)"
+        }
+        description={
+          alumniCertTarget
+            ? "Perbarui nomor sertifikat resmi atau tanggal penerbitan arsip fisik."
+            : "Catat nomor sertifikat resmi untuk siswa alumni terdahulu yang sudah memegang sertifikat fisik tanpa nilai ujian di sistem."
+        }
+      >
+        <form onSubmit={handleSaveAlumniCert} className="space-y-4">
+          {alumniCertError && (
+            <div className="p-3 rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/30 text-xs text-[#F43F5E]">
+              {alumniCertError}
+            </div>
+          )}
+
+          {alumniCertSuccess && (
+            <div className="p-3 rounded-lg bg-[#10B981]/10 border border-[#10B981]/30 text-xs text-[#10B981] flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{alumniCertSuccess}</span>
+            </div>
+          )}
+
+          {/* Pemilihan Siswa jika mode Tambah Baru */}
+          {!alumniCertTarget ? (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[#D1D5DB]">
+                Pilih Siswa / Alumni <span className="text-[#F43F5E]">*</span>
+              </label>
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  placeholder="Ketik nama atau nomor induk untuk menyaring..."
+                  value={alumniSearchQuery}
+                  onChange={(e) => setAlumniSearchQuery(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none focus:border-[#38BDF8]"
+                />
+                <select
+                  value={alumniCertSiswaId}
+                  onChange={(e) => setAlumniCertSiswaId(e.target.value)}
+                  className="w-full h-10 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#38BDF8]"
+                  required
+                >
+                  <option value="">-- Pilih Siswa Alumni --</option>
+                  {allStudentsList
+                    .filter((s) => {
+                      if (!alumniSearchQuery.trim()) return true;
+                      const q = alumniSearchQuery.toLowerCase();
+                      return (
+                        s.nama_lengkap.toLowerCase().includes(q) ||
+                        (s.nomor_induk && s.nomor_induk.toLowerCase().includes(q))
+                      );
+                    })
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.nama_lengkap} ({s.nomor_induk || "Tanpa No. Induk"}) {s.program ? `- ${s.program.nama}` : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 rounded-lg bg-[#111827] border border-[#1F2937] space-y-1">
+              <p className="text-[10px] uppercase font-bold text-[#6B7280] tracking-wider">
+                Data Alumni
+              </p>
+              <p className="text-sm font-bold text-[#F9FAFB]">
+                {alumniCertTarget.siswa.nama_lengkap}
+              </p>
+              <p className="text-xs text-[#9CA3AF]">
+                No. Induk: <span className="font-mono text-[#DC2626] font-semibold">{alumniCertTarget.siswa.nomor_induk}</span> &bull; Program: {alumniCertTarget.formatted?.program_name || alumniCertTarget.siswa.program?.nama || "—"}
+              </p>
+            </div>
+          )}
+
+          {/* Nomor Sertifikat */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#D1D5DB]">
+              Nomor Sertifikat Resmi <span className="text-[#F43F5E]">*</span>
+            </label>
+            <input
+              type="text"
+              value={alumniCertNo}
+              onChange={(e) => setAlumniCertNo(e.target.value)}
+              placeholder="cth: 05/LPK-S/XI/2018 atau LPKS/2025/WLD/001"
+              required
+              className="w-full h-10 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs font-mono font-bold text-[#38BDF8] placeholder-[#6B7280] focus:outline-none focus:border-[#38BDF8]"
+            />
+            <p className="text-[11px] text-[#6B7280]">
+              Format nomor dapat disesuaikan dengan sertifikat fisik yang sudah dipegang alumni.
+            </p>
+          </div>
+
+          {/* Tanggal Penerbitan / Cetak */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[#D1D5DB]">
+              Tanggal Terbit / Cetak
+            </label>
+            <input
+              type="date"
+              value={alumniCertTgl}
+              onChange={(e) => setAlumniCertTgl(e.target.value)}
+              className="w-full h-10 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#38BDF8]"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={alumniCertSaving}
+              onClick={() => setModalAlumniCertOpen(false)}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={alumniCertSaving}
+              className="bg-[#38BDF8] hover:bg-[#0ea5e9] text-black font-semibold gap-1.5"
+            >
+              {alumniCertSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <span>Simpan Sertifikat</span>
+              )}
+            </Button>
           </div>
         </form>
       </Modal>

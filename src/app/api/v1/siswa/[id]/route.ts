@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     const supabase = await createClient();
     const { data: siswa, error } = await supabase
       .from("siswa")
-      .select("*, program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari)")
+      .select("*, program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari), sertifikat:sertifikat(id, no_sertifikat, status, tgl_cetak)")
       .eq("id", id)
       .single();
 
@@ -179,6 +179,27 @@ export async function PUT(request: NextRequest, { params }: Params) {
         }
       }
       return errorResponse("DATABASE_ERROR", "Gagal memperbarui data siswa.", 500, error.message);
+    }
+
+    // Update atau catat nomor sertifikat alumni jika dikirim
+    if (body.no_sertifikat !== undefined) {
+      const cleanNoSertif = typeof body.no_sertifikat === "string" ? body.no_sertifikat.trim() : "";
+      if (cleanNoSertif) {
+        await supabase
+          .from("sertifikat")
+          .upsert(
+            {
+              siswa_id: id,
+              no_sertifikat: cleanNoSertif,
+              status: "dicetak",
+              tgl_cetak: (body.tgl_cetak_sertifikat || updates.tgl_keluar || siswa.tgl_keluar || new Date().toISOString()) as string,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "siswa_id" }
+          );
+      } else {
+        await supabase.from("sertifikat").delete().eq("siswa_id", id);
+      }
     }
 
     return successResponse(data);

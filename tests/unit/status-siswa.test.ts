@@ -289,6 +289,84 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(result.persentase, 100);
     });
   });
+
+  describe("Pencatatan & Verifikasi Sertifikat Fisik Alumni Tanpa Nilai Ujian (Arsip Fisik)", () => {
+    interface AlumniCertificateRecord {
+      siswa_id: string;
+      nama: string;
+      nomor_induk: string;
+      status_siswa: "aktif" | "alumni";
+      no_sertifikat: string;
+      ujian: { teori: number; root: number } | null;
+      tgl_cetak: string;
+    }
+
+    const mockCertificates: AlumniCertificateRecord[] = [
+      {
+        siswa_id: "s-1",
+        nama: "Andi Saputra",
+        nomor_induk: "01.0001",
+        status_siswa: "alumni",
+        no_sertifikat: "05/LPK-S/XI/2018",
+        ujian: null, // Tanpa nilai ujian di sistem
+        tgl_cetak: "2018-11-20",
+      },
+      {
+        siswa_id: "s-2",
+        nama: "Budi Santoso",
+        nomor_induk: "01.0002",
+        status_siswa: "alumni",
+        no_sertifikat: "LPKS/2026/WLD/001",
+        ujian: { teori: 85, root: 90 },
+        tgl_cetak: "2026-03-01",
+      },
+    ];
+
+    function verifyCertificateWithFallback(queryNo: string) {
+      const cleanQ = queryNo.trim().toLowerCase().replace(/[\s\-_/.]/g, "");
+      const match = mockCertificates.find((c) => {
+        const cleanNo = c.no_sertifikat.toLowerCase().replace(/[\s\-_/.]/g, "");
+        return cleanNo === cleanQ;
+      });
+
+      if (!match) return null;
+
+      return {
+        terverifikasi: true,
+        siswa: {
+          id: match.siswa_id,
+          nama: match.nama,
+          nomor_induk: match.nomor_induk,
+        },
+        no_sertifikat: match.no_sertifikat,
+        hasSystemExamScores: match.ujian !== null,
+        archiveNote: match.ujian === null ? "Data Arsip Sertifikat Fisik Terverifikasi" : null,
+      };
+    }
+
+    test("Sertifikat alumni tanpa nilai ujian berhasil divalidasi keabsahannya", () => {
+      const verified = verifyCertificateWithFallback("05-LPK-S-XI-2018");
+      assert.ok(verified);
+      assert.equal(verified?.terverifikasi, true);
+      assert.equal(verified?.siswa.nama, "Andi Saputra");
+      assert.equal(verified?.hasSystemExamScores, false);
+      assert.equal(verified?.archiveNote, "Data Arsip Sertifikat Fisik Terverifikasi");
+    });
+
+    test("Sertifikat siswa dengan nilai ujian lengkap tetap menampilkan nilai sistem", () => {
+      const verified = verifyCertificateWithFallback("LPKS/2026/WLD/001");
+      assert.ok(verified);
+      assert.equal(verified?.terverifikasi, true);
+      assert.equal(verified?.siswa.nama, "Budi Santoso");
+      assert.equal(verified?.hasSystemExamScores, true);
+      assert.equal(verified?.archiveNote, null);
+    });
+
+    test("Pencarian nomor sertifikat yang tidak terdaftar menghasilkan null", () => {
+      const verified = verifyCertificateWithFallback("RANDOM/999/INVALID");
+      assert.equal(verified, null);
+    });
+  });
 });
 
 
