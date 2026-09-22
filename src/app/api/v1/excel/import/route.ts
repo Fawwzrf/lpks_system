@@ -523,11 +523,26 @@ export async function POST(request: NextRequest) {
               const alamat = String(row["Alamat"] || row["alamat"] || "").trim();
               const noHp = String(row["No. HP"] || row["No HP"] || row["no_hp"] || "").trim();
               const pendidikan = String(row["Pend. Terakhir"] || row["Pendidikan Terakhir"] || row["pendidikan_terakhir"] || "").trim();
+              const emailKolom = String(row["Email"] || row["email"] || "").trim();
               const tglMasuk = parseExcelDate(row["Tgl. Masuk"] || row["tgl_masuk"]) || "2015-01-01";
-              const tglLulus = parseExcelDate(row["Tgl. Lulus"] || row["Tanggal Lulus"] || row["tgl_keluar"]) || tglMasuk;
-              const rawBiaya = String(row["Biaya Pelatihan"] || row["Biaya"] || row["biaya"] || "0").replace(/\D/g, "");
-              const biaya = rawBiaya ? parseInt(rawBiaya, 10) : 0;
+
+              // Durasi → tgl_keluar (baru); fallback ke kolom Tgl. Lulus lama
+              const durasiHari = parseInt(String(row["Durasi (hari)"] || row["Durasi"] || row["durasi"] || "0").replace(/\D/g, ""), 10);
+              const tglLulus = durasiHari > 0
+                ? (() => {
+                    const d = new Date(tglMasuk);
+                    d.setDate(d.getDate() + durasiHari);
+                    return d.toISOString().split("T")[0];
+                  })()
+                : (parseExcelDate(row["Tgl. Lulus"] || row["Tanggal Lulus"] || row["tgl_keluar"]) || tglMasuk);
+
+              // Biaya: deteksi "(sertifikat)" → hanya data keuangan & sertifikat, tanpa nilai
+              const rawBiayaStr = String(row["Biaya Pelatihan"] || row["Biaya"] || row["biaya"] || "0");
+              const isSertifikatOnly = rawBiayaStr.toLowerCase().includes("sertifikat");
+              const biaya = parseInt(rawBiayaStr.replace(/\D/g, ""), 10) || 0;
+
               const noSertifikat = String(row["No. Sertifikat"] || row["No Sertifikat"] || row["no_sertifikat"] || "").trim();
+              const ketStr = String(row["Ket"] || row["ket"] || "Lunas").trim();
 
               // Lewati baris kosong
               if (!nama && !manualNoInduk && !rawNik) continue;
@@ -542,11 +557,14 @@ export async function POST(request: NextRequest) {
                 continue;
               }
 
-              // Cari program yang sesuai
-              let matchedProg = allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0"));
-              if (!matchedProg && rawProgram) {
-                matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes(rawProgram.toLowerCase()));
-              }
+              // Cari program: cocokkan nama terlebih dahulu (bukan kode), lalu fallback kode
+              // Untuk Banper: nama program mungkin berisi " (Banper)" — strip dulu untuk lookup
+              const programNameClean = rawProgram.replace(/\s*\(Banper\)\s*/i, "").trim();
+              let matchedProg =
+                allPrograms?.find(p => p.nama.toLowerCase() === rawProgram.toLowerCase()) ??
+                allPrograms?.find(p => p.nama.toLowerCase() === programNameClean.toLowerCase()) ??
+                allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0")) ??
+                allPrograms?.find(p => p.nama.toLowerCase().includes(programNameClean.toLowerCase()));
               if (!matchedProg && allPrograms && allPrograms.length > 0) {
                 matchedProg = allPrograms[0];
               }
@@ -570,22 +588,28 @@ export async function POST(request: NextRequest) {
               const numUrut = parseInt(urutStr.replace(/\D/g, ""), 10);
               const urutanNomor = isNaN(numUrut) ? null : numUrut;
 
-              // Generate email & username
+              // Email: dari kolom Excel, atau generate
               const namaDepanClean = nama.split(" ")[0].toLowerCase().replace(/[^a-z0-9]/g, "") || "alumni";
               const cleanNoIndukForUser = finalNoInduk.replace(/\./g, "");
-              const email = `${namaDepanClean}.${cleanNoIndukForUser}@lpks.id`;
+              const emailFinal = emailKolom || `${namaDepanClean}.${cleanNoIndukForUser}@lpks.id`;
               const username = `${namaDepanClean}@${cleanNoIndukForUser}`;
 
               // 1. Cek apakah siswa sudah ada di sistem
+              // Banper: boleh ada no_induk sama jika program berbeda.
+              // Cek berdasarkan (nomor_induk + program_id) terlebih dahulu.
               let siswaId: string | null = null;
-              const { data: existingSiswa } = await supabase
-                .from("siswa")
-                .select("id, nomor_induk")
-                .eq("nomor_induk", finalNoInduk)
-                .maybeSingle();
+              const { data: existingExact } = programId
+                ? await supabase
+                    .from("siswa")
+                    .select("id")
+                    .eq("nomor_induk", finalNoInduk)
+                    .eq("program_id", programId)
+                    .maybeSingle()
+                : { data: null };
 
-              if (existingSiswa) {
-                siswaId = existingSiswa.id;
+              if (existingExact) {
+                // Siswa dengan kombinasi no_induk + program sudah ada → update
+                siswaId = existingExact.id;
                 await supabase
                   .from("siswa")
                   .update({
@@ -603,6 +627,7 @@ export async function POST(request: NextRequest) {
                   .eq("id", siswaId);
                 updatedCount++;
               } else {
+                // Tidak ada kombinasi exact → insert baru (termasuk kasus Banper)
                 const { data: newS, error: sErr } = await supabase
                   .from("siswa")
                   .insert({
@@ -611,8 +636,8 @@ export async function POST(request: NextRequest) {
                     urutan_nomor: urutanNomor,
                     nama_lengkap: nama,
                     nik: finalNik,
-                    username,
-                    email,
+                    username: username + (existingExact ? "_b" : ""),
+                    email: emailFinal,
                     tempat_lahir: tempatLahir || null,
                     tgl_lahir: tglLahir || null,
                     alamat_lengkap: alamat || null,
@@ -634,19 +659,9 @@ export async function POST(request: NextRequest) {
                 importedCount++;
               }
 
-              // 2. Transaksi Keuangan (Mendukung Opsi Cicilan atau Lunas Beserta Tanggal Pembayaran)
+              // 2. Transaksi Keuangan: 6 slot pembayaran
               const skema = String(row["Skema Pembayaran"] || row["Skema"] || row["status_pembayaran"] || "").trim().toLowerCase();
               const isCicilan = skema.includes("cicil") || skema.includes("angsur");
-
-              // Pembayaran 1
-              const tglBayar1 = parseExcelDate(row["Tgl. Pembayaran 1"] || row["Tanggal Pembayaran 1"] || row["Tgl. Pembayaran"] || row["Tanggal Pembayaran"]) || (isCicilan ? tglMasuk : tglLulus);
-              const rawNominal1 = String(row["Nominal 1"] || row["Nominal Pembayaran 1"] || row["Nominal Bayar 1"] || "").replace(/\D/g, "");
-              const nominal1 = rawNominal1 ? parseInt(rawNominal1, 10) : (isCicilan ? Math.round(biaya / 2) : biaya);
-
-              // Pembayaran 2 (jika cicilan)
-              const tglBayar2 = parseExcelDate(row["Tgl. Pembayaran 2"] || row["Tanggal Pembayaran 2"] || row["Tgl. Pelunasan"]) || (isCicilan ? tglLulus : null);
-              const rawNominal2 = String(row["Nominal 2"] || row["Nominal Pembayaran 2"] || row["Nominal Bayar 2"] || "").replace(/\D/g, "");
-              const nominal2 = rawNominal2 ? parseInt(rawNominal2, 10) : (isCicilan && !rawNominal1 ? Math.max(0, biaya - nominal1) : (rawNominal2 ? parseInt(rawNominal2, 10) : 0));
 
               const { data: existingTxList } = await supabase
                 .from("transaksi_keuangan")
@@ -654,40 +669,74 @@ export async function POST(request: NextRequest) {
                 .eq("siswa_id", siswaId);
 
               if (!existingTxList || existingTxList.length === 0) {
-                if (isCicilan) {
-                  // Catat Cicilan 1
-                  if (nominal1 > 0) {
+                // Collect all non-empty payment slots
+                const slots: { tgl: string; nominal: number; angsuranKe: number }[] = [];
+                for (let slot = 1; slot <= 6; slot++) {
+                  const rawTgl = row[`Tgl. Pembayaran ${slot}`] || row[`Tanggal Pembayaran ${slot}`];
+                  const rawNom = String(row[`Nominal ${slot}`] || row[`Nominal Pembayaran ${slot}`] || "").replace(/\D/g, "");
+                  const tgl = parseExcelDate(rawTgl);
+                  const nom = rawNom ? parseInt(rawNom, 10) : 0;
+                  if (tgl && nom > 0) slots.push({ tgl, nominal: nom, angsuranKe: slot });
+                }
+
+                if (slots.length > 0) {
+                  // Insert each captured slot
+                  for (const s of slots) {
+                    const ket = slots.length === 1
+                      ? (isCicilan ? "Pembayaran Angsuran 1 (Arsip Alumni)" : "Pembayaran Pelunasan (Arsip Alumni)")
+                      : `Pembayaran Angsuran ${s.angsuranKe} (Arsip Alumni)`;
                     await supabase.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
-                      nominal: nominal1,
-                      tgl_bayar: tglBayar1 || tglMasuk,
+                      nominal: s.nominal,
+                      tgl_bayar: s.tgl,
                       metode: "Tunai",
-                      keterangan: "Pembayaran Angsuran 1 (DP Arsip Alumni)",
+                      keterangan: ket,
                       penerima: "Superadmin (Import)",
                     });
                   }
-                  // Catat Cicilan 2 (jika ada)
-                  if (nominal2 > 0 && tglBayar2) {
+                } else if (biaya > 0) {
+                  // Fallback: no slots filled → auto-generate from skema
+                  const tglBayar1 = isCicilan ? tglMasuk : tglLulus;
+                  const nominal1 = isCicilan ? Math.round(biaya / 2) : biaya;
+                  await supabase.from("transaksi_keuangan").insert({
+                    siswa_id: siswaId,
+                    nominal: nominal1,
+                    tgl_bayar: tglBayar1,
+                    metode: "Tunai",
+                    keterangan: isCicilan ? "Pembayaran Angsuran 1 (Arsip Alumni)" : "Pembayaran Pelunasan (Arsip Alumni)",
+                    penerima: "Superadmin (Import)",
+                  });
+                  if (isCicilan && biaya - nominal1 > 0) {
                     await supabase.from("transaksi_keuangan").insert({
                       siswa_id: siswaId,
-                      nominal: nominal2,
-                      tgl_bayar: tglBayar2,
+                      nominal: biaya - nominal1,
+                      tgl_bayar: tglLulus,
                       metode: "Tunai",
                       keterangan: "Pembayaran Angsuran 2 (Pelunasan Arsip Alumni)",
                       penerima: "Superadmin (Import)",
                     });
                   }
-                } else {
-                  // Lunas sekaligus
-                  await supabase.from("transaksi_keuangan").insert({
-                    siswa_id: siswaId,
-                    nominal: nominal1 > 0 ? nominal1 : biaya,
-                    tgl_bayar: tglBayar1 || tglLulus,
-                    metode: "Tunai",
-                    keterangan: "Pembayaran Pelunasan (Lunas Arsip Alumni)",
-                    penerima: "Superadmin (Import)",
-                  });
                 }
+
+                // Update biaya_pelatihan di tabel siswa
+                if (biaya > 0) {
+                  await supabase
+                    .from("siswa")
+                    .update({ biaya_pelatihan: biaya })
+                    .eq("id", siswaId);
+                }
+
+                // Tandai status keuangan dari kolom Ket
+                if (ketStr.toLowerCase().includes("out")) {
+                  await supabase.from("siswa").update({ catatan: "Out (dari arsip)" }).eq("id", siswaId);
+                } else if (ketStr.toLowerCase().includes("belum")) {
+                  await supabase.from("siswa").update({ catatan: "Belum Lunas (dari arsip)" }).eq("id", siswaId);
+                }
+              }
+
+              // Flag sertifikat-only (tanpa nilai pelatihan)
+              if (isSertifikatOnly) {
+                await supabase.from("siswa").update({ catatan: (await supabase.from("siswa").select("catatan").eq("id", siswaId).maybeSingle())?.data?.catatan ? undefined : "Sertifikat saja" }).eq("id", siswaId);
               }
 
               // 3. Sertifikat (Otomatis Dicetak)
