@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
     const programId = searchParams.get("program_id");
     const search = searchParams.get("search");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
-    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
+    const rawLimit = searchParams.get("limit");
+    const isAll = rawLimit === "all" || rawLimit === "-1";
+    const limit = isAll ? 5000 : Math.min(2000, Math.max(1, parseInt(rawLimit || "20", 10)));
     const offset = (page - 1) * limit;
     const todayStr = new Date().toISOString().split("T")[0];
 

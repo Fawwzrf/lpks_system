@@ -201,6 +201,42 @@ export default function UjianPage() {
     return allStudentsList.find((s) => s.id === alumniCertSiswaId) || null;
   }, [allStudentsList, alumniCertSiswaId]);
 
+  const [searchingStudents, setSearchingStudents] = useState(false);
+
+  // Debounced server-side search jika user mengetik nama/no induk
+  useEffect(() => {
+    if (!modalAlumniCertOpen) return;
+    const query = alumniSearchQuery.trim();
+    if (query.length < 2) return;
+    if (selectedStudent && alumniSearchQuery === `${selectedStudent.nama_lengkap} (${selectedStudent.nomor_induk || "Tanpa No. Induk"})`) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSearchingStudents(true);
+      try {
+        const res = await fetch(`/api/v1/siswa?search=${encodeURIComponent(query)}&limit=100`);
+        if (res.ok) {
+          const json = await res.json();
+          const results = json.data || [];
+          if (results.length > 0) {
+            setAllStudentsList((prev) => {
+              const existingIds = new Set(prev.map((s) => s.id));
+              const newItems = results.filter((r: { id: string }) => !existingIds.has(r.id));
+              return newItems.length > 0 ? [...prev, ...newItems] : prev;
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Gagal mencari siswa:", err);
+      } finally {
+        setSearchingStudents(false);
+      }
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [alumniSearchQuery, modalAlumniCertOpen, selectedStudent]);
+
   const filteredStudents = useMemo(() => {
     if (!alumniSearchQuery.trim()) return allStudentsList;
     if (selectedStudent && alumniSearchQuery === `${selectedStudent.nama_lengkap} (${selectedStudent.nomor_induk || "Tanpa No. Induk"})`) {
@@ -492,17 +528,15 @@ export default function UjianPage() {
       setAlumniCertNo("");
       setAlumniCertTgl(new Date().toISOString().split("T")[0]);
 
-      // Ambil daftar seluruh siswa jika belum ada
-      if (allStudentsList.length === 0) {
-        try {
-          const res = await fetch("/api/v1/siswa?limit=100");
-          if (res.ok) {
-            const json = await res.json();
-            setAllStudentsList(json.data || []);
-          }
-        } catch (e) {
-          console.error("Gagal memuat daftar siswa:", e);
+      // Ambil daftar seluruh siswa secara lengkap (tanpa terpotong pagination)
+      try {
+        const res = await fetch("/api/v1/siswa?limit=all");
+        if (res.ok) {
+          const json = await res.json();
+          setAllStudentsList(json.data || []);
         }
+      } catch (e) {
+        console.error("Gagal memuat daftar siswa:", e);
       }
     }
     setModalAlumniCertOpen(true);
@@ -1936,13 +1970,23 @@ export default function UjianPage() {
                   <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-[#1F2937] bg-[#0B0F17] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                     <div className="bg-[#111827] px-3 py-1.5 text-[10px] text-[#9CA3AF] uppercase font-semibold tracking-wider flex justify-between items-center border-b border-[#1F2937]">
                       <span>Daftar Siswa ({filteredStudents.length})</span>
-                      <span className="text-[9px] text-[#6B7280]">Ketik untuk menyaring</span>
+                      <span className="text-[9px] text-[#6B7280] flex items-center gap-1.5">
+                        {searchingStudents && <Loader2 className="h-3 w-3 animate-spin text-[#38BDF8]" />}
+                        <span>Ketik untuk menyaring</span>
+                      </span>
                     </div>
 
                     <div className="max-h-56 overflow-y-auto divide-y divide-[#1F2937]/50">
                       {filteredStudents.length === 0 ? (
                         <div className="py-6 px-4 text-center text-xs text-[#9CA3AF]">
-                          Tidak ada siswa yang cocok dengan &quot;{alumniSearchQuery}&quot;
+                          {searchingStudents ? (
+                            <div className="flex items-center justify-center gap-2 text-[#38BDF8]">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Mencari di seluruh database...</span>
+                            </div>
+                          ) : (
+                            <span>Tidak ada siswa yang cocok dengan &quot;{alumniSearchQuery}&quot;</span>
+                          )}
                         </div>
                       ) : (
                         filteredStudents.map((s) => {
