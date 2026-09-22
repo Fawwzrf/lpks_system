@@ -625,40 +625,38 @@ export async function POST(request: NextRequest) {
                 continue;
               }
 
-              // Cari program: cocokkan nama terlebih dahulu (bukan kode), lalu fallback kode & prefix
-              const cleanProg = rawProgram.replace(/\s*\(Banper\)\s*/i, "").trim();
+              // ── Ambil program PERSIS dari nama di Excel (BUKAN dari kode program) ─────────
+              // Ini menjaga integritas format lama vs baru (cth: Kombinasi vs GTAW + SMAW 6G)
+              // dan membedakan program reguler vs Banper (cth: SMAW 6G vs SMAW 6G (Banper))
               const kodePrefix = manualNoInduk.split(".")[0].trim().padStart(2, "0");
 
-              let matchedProg =
-                allPrograms?.find(p => p.nama.toLowerCase() === rawProgram.toLowerCase()) ??
-                allPrograms?.find(p => p.nama.toLowerCase() === cleanProg.toLowerCase());
+              // 1. Cari exact match nama program (case-insensitive)
+              let matchedProg = allPrograms?.find(
+                p => p.nama.trim().toLowerCase() === rawProgram.trim().toLowerCase()
+              );
 
-              if (!matchedProg && cleanProg) {
-                const lowerClean = cleanProg.toLowerCase();
-                if (lowerClean.includes("kombinasi")) {
-                  matchedProg = allPrograms?.find(p => p.kode_program === "03");
-                } else if (lowerClean.includes("fcaw") || lowerClean.includes("gmaw")) {
-                  matchedProg = allPrograms?.find(p => p.kode_program === "04" || p.nama.toLowerCase().includes("fcaw"));
-                } else if (lowerClean.includes("gtaw")) {
-                  matchedProg = allPrograms?.find(p => p.kode_program === "02" || p.nama.toLowerCase().includes("gtaw"));
-                } else if (lowerClean.includes("4g")) {
-                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("4g"));
-                } else if (lowerClean.includes("6g")) {
-                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("6g"));
-                } else if (lowerClean.includes("3g")) {
-                  matchedProg = allPrograms?.find(p => p.nama.toLowerCase().includes("3g"));
+              // 2. Jika belum ada di master_program, daftarkan otomatis nama program ini
+              if (!matchedProg && rawProgram.trim()) {
+                const { data: newProg } = await supabase
+                  .from("master_program")
+                  .insert({
+                    nama: rawProgram.trim(),
+                    kode_program: kodePrefix || "01",
+                    biaya: biaya || 0,
+                    estimasi_durasi_hari: durasiHari || 50,
+                  })
+                  .select("id, kode_program, nama, biaya")
+                  .single();
+
+                if (newProg) {
+                  matchedProg = newProg;
+                  allPrograms?.push(newProg);
                 }
               }
 
-              // Fallback berdasarkan kode program atau prefix nomor induk
-              if (!matchedProg) {
-                matchedProg =
-                  allPrograms?.find(p => p.kode_program === rawProgram || p.kode_program === rawProgram.padStart(2, "0")) ??
-                  allPrograms?.find(p => p.kode_program === kodePrefix);
-              }
-
+              // 3. Fallback jika kolom Program kosong
               if (!matchedProg && allPrograms && allPrograms.length > 0) {
-                matchedProg = allPrograms[0];
+                matchedProg = allPrograms.find(p => p.kode_program === kodePrefix) || allPrograms[0];
               }
               const programId = matchedProg?.id || null;
 
@@ -693,24 +691,52 @@ export async function POST(request: NextRequest) {
                 statusSiswa = "out";
               }
 
-              // 1. Cek apakah siswa sudah ada di sistem
-              // Banper: boleh ada no_induk sama jika program berbeda.
+              // 1. Cek apakah siswa sudah ada di sistem untuk program ini
               let siswaId: string | null = null;
-              const { data: existingExact } = programId
-                ? await supabase
-                    .from("siswa")
-                    .select("id, status_siswa")
-                    .eq("nomor_induk", finalNoInduk)
-                    .eq("program_id", programId)
-                    .maybeSingle()
-                : { data: null };
+              let existingExactRecord: { id: string; status_siswa: string } | null = null;
 
-              if (existingExact) {
+              if (programId) {
+                const { data: exact } = await supabase
+                  .from("siswa")
+                  .select("id, status_siswa")
+                  .eq("nomor_induk", finalNoInduk)
+                  .eq("program_id", programId)
+                  .maybeSingle();
+
+                if (exact) {
+                  existingExactRecord = exact;
+                } else {
+                  // Cek apakah ada record yang sebelumnya pernah diimpor dengan nama program padanan
+                  // (misal tersimpan "GTAW + SMAW 6G" padahal di Excel arsip adalah "Kombinasi")
+                  const { data: candidates } = await supabase
+                    .from("siswa")
+                    .select("id, status_siswa, program:master_program(nama)")
+                    .eq("nomor_induk", finalNoInduk);
+
+                  if (candidates && candidates.length > 0) {
+                    const padanan = candidates.find(c => {
+                      const cName = ((c.program as unknown as { nama: string })?.nama || "").toLowerCase();
+                      const targetName = rawProgram.toLowerCase();
+                      return (
+                        (targetName === "kombinasi" && cName.includes("gtaw + smaw")) ||
+                        (targetName === "gtaw" && cName === "gtaw 6g") ||
+                        (targetName === "fcaw/ gmaw 3g" && cName.includes("fcaw + gmaw"))
+                      );
+                    });
+                    if (padanan) {
+                      existingExactRecord = { id: padanan.id, status_siswa: padanan.status_siswa };
+                    }
+                  }
+                }
+              }
+
+              if (existingExactRecord) {
                 // Siswa dengan kombinasi no_induk + program sudah ada → update
-                siswaId = existingExact.id;
+                siswaId = existingExactRecord.id;
                 await supabase
                   .from("siswa")
                   .update({
+                    program_id: programId,
                     status_siswa: statusSiswa,
                     nama_lengkap: nama,
                     tempat_lahir: tempatLahir || undefined,
