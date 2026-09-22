@@ -19,6 +19,8 @@ import {
   Banknote,
   Percent,
   LogOut,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,6 +108,17 @@ export default function KeuanganSuperadminPage() {
   const [modalHistoryOpen, setModalHistoryOpen] = useState(false);
   const [historySiswa, setHistorySiswa] = useState<SiswaKeuanganItem | null>(null);
 
+  // Modal Edit Transaksi (Koreksi Typo)
+  const [modalEditTxOpen, setModalEditTxOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState<TransaksiItem | null>(null);
+  const [editNominal, setEditNominal] = useState<string>("");
+  const [editTglBayar, setEditTglBayar] = useState<string>("");
+  const [editMetode, setEditMetode] = useState<string>("Tunai");
+  const [editKeterangan, setEditKeterangan] = useState<string>("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErrorMsg, setEditErrorMsg] = useState<string | null>(null);
+  const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
+
   // Modal Ekspor Rekap Keuangan Bulanan
   const [modalExportOpen, setModalExportOpen] = useState(false);
   const [exportBulan, setExportBulan] = useState<number>(() => new Date().getMonth() + 1);
@@ -130,7 +143,7 @@ export default function KeuanganSuperadminPage() {
   }, []);
 
   // Load data siswa aktif beserta rekap keuangan
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (): Promise<SiswaKeuanganItem[]> => {
     setLoading(true);
     try {
       let url = "/api/v1/keuangan?view=students";
@@ -140,18 +153,122 @@ export default function KeuanganSuperadminPage() {
       const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setItems(json.data || []);
+        const data: SiswaKeuanganItem[] = json.data || [];
+        setItems(data);
+        return data;
       }
     } catch (err) {
       console.error("Gagal memuat data keuangan:", err);
     } finally {
       setLoading(false);
     }
+    return [];
   }, [selectedProgramFilter]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Handler Buka Modal Edit Transaksi
+  function handleOpenEditTxModal(tx: TransaksiItem, siswaContext?: SiswaKeuanganItem) {
+    if (siswaContext && !historySiswa) {
+      setHistorySiswa(siswaContext);
+    }
+    setEditingTx(tx);
+    setEditNominal(String(tx.nominal));
+    setEditTglBayar(tx.tgl_bayar || new Date().toISOString().split("T")[0]);
+    setEditMetode(tx.metode || "Tunai");
+    setEditKeterangan(tx.keterangan || "");
+    setEditErrorMsg(null);
+    setEditSuccessMsg(null);
+    setModalEditTxOpen(true);
+  }
+
+  // Handler Simpan Perubahan Edit Transaksi
+  async function handleSaveEditTx(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingTx) return;
+
+    const num = parseFloat(editNominal);
+    if (isNaN(num) || num <= 0) {
+      setEditErrorMsg("Nominal pembayaran harus lebih besar dari Rp 0.");
+      return;
+    }
+
+    setEditSaving(true);
+    setEditErrorMsg(null);
+    setEditSuccessMsg(null);
+
+    try {
+      const res = await fetch(`/api/v1/keuangan/${editingTx.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nominal: num,
+          tgl_bayar: editTglBayar,
+          metode: editMetode,
+          keterangan: editKeterangan,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setEditErrorMsg(data.error?.message || "Gagal memperbarui transaksi pembayaran.");
+        return;
+      }
+
+      setEditSuccessMsg("Transaksi pembayaran berhasil diperbarui!");
+      const freshData = await loadData();
+
+      // Sinkronisasi data di modal yang sedang aktif
+      if (historySiswa) {
+        const fresh = freshData.find((s) => s.id === historySiswa.id);
+        if (fresh) setHistorySiswa(fresh);
+      }
+      if (selectedSiswa) {
+        const freshSel = freshData.find((s) => s.id === selectedSiswa.id);
+        if (freshSel) setSelectedSiswa(freshSel);
+      }
+
+      setTimeout(() => {
+        setModalEditTxOpen(false);
+      }, 700);
+    } catch {
+      setEditErrorMsg("Terjadi kesalahan koneksi ke server.");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  // Handler Hapus Transaksi Pembayaran
+  async function handleDeleteTx(txId: string) {
+    if (!confirm("Apakah Anda yakin ingin menghapus transaksi pembayaran ini? Akumulasi saldo pembayaran siswa akan dihitung ulang secara otomatis.")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/keuangan/${txId}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        const freshData = await loadData();
+        if (historySiswa) {
+          const fresh = freshData.find((s) => s.id === historySiswa.id);
+          if (fresh) setHistorySiswa(fresh);
+        }
+        if (selectedSiswa) {
+          const freshSel = freshData.find((s) => s.id === selectedSiswa.id);
+          if (freshSel) setSelectedSiswa(freshSel);
+        }
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Gagal menghapus transaksi.");
+      }
+    } catch {
+      alert("Terjadi gangguan koneksi saat menghapus transaksi.");
+    }
+  }
 
   // Handler Buka Modal Pembayaran untuk Siswa Terpilih
   function handleOpenPaymentModal(siswa: SiswaKeuanganItem) {
@@ -943,7 +1060,17 @@ export default function KeuanganSuperadminPage() {
                         <span className="text-[#F9FAFB] font-semibold">{formatRupiah(tx.nominal)}</span>
                         <span className="text-[#6B7280] ml-2">({tx.metode})</span>
                       </div>
-                      <span className="text-[#9CA3AF] font-mono">{formatDateIndo(tx.tgl_bayar)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#9CA3AF] font-mono">{formatDateIndo(tx.tgl_bayar)}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditTxModal(tx, selectedSiswa)}
+                          className="p-1 rounded hover:bg-[#1F2937] text-[#9CA3AF] hover:text-[#10B981] transition-colors"
+                          title="Edit Transaksi (Koreksi Typo)"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1061,13 +1188,33 @@ export default function KeuanganSuperadminPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-mono text-xs text-[#D1D5DB]">
-                        {formatDateIndo(tx.tgl_bayar)}
-                      </p>
-                      <p className="text-[10px] text-[#6B7280]">
-                        Petugas: {tx.penerima || "Superadmin"}
-                      </p>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="font-mono text-xs text-[#D1D5DB]">
+                          {formatDateIndo(tx.tgl_bayar)}
+                        </p>
+                        <p className="text-[10px] text-[#6B7280]">
+                          Petugas: {tx.penerima || "Superadmin"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 border-l border-[#1F2937] pl-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditTxModal(tx, historySiswa)}
+                          className="p-1.5 rounded-lg border border-[#374151] bg-[#1F2937] text-[#9CA3AF] hover:text-[#10B981] hover:border-[#10B981]/40 transition-colors"
+                          title="Edit Pembayaran (Koreksi Typo)"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTx(tx.id)}
+                          className="p-1.5 rounded-lg border border-[#374151] bg-[#1F2937] text-[#9CA3AF] hover:text-[#F43F5E] hover:border-[#F43F5E]/40 transition-colors"
+                          title="Hapus Transaksi"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1081,6 +1228,126 @@ export default function KeuanganSuperadminPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* MODAL EDIT TRANSAKSI PEMBAYARAN */}
+      <Modal
+        open={modalEditTxOpen}
+        onClose={() => setModalEditTxOpen(false)}
+        title="Edit Riwayat Pembayaran"
+        description={
+          historySiswa
+            ? `Koreksi data pembayaran untuk ${historySiswa.nama_lengkap} (${historySiswa.nomor_induk})`
+            : "Koreksi data riwayat pembayaran siswa"
+        }
+      >
+        <form onSubmit={handleSaveEditTx} className="flex flex-col gap-4">
+          {/* Nominal */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-[#9CA3AF]">
+              Nominal Pembayaran (Rp) *
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
+                Rp
+              </span>
+              <input
+                type="number"
+                min="1000"
+                step="1000"
+                required
+                value={editNominal}
+                onChange={(e) => setEditNominal(e.target.value)}
+                placeholder="0"
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+              />
+            </div>
+            {editNominal && !isNaN(parseFloat(editNominal)) && (
+              <p className="text-[11px] text-[#10B981] font-medium">
+                Terbaca: {formatRupiah(parseFloat(editNominal))}
+              </p>
+            )}
+          </div>
+
+          {/* Tanggal & Metode */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Tanggal Pembayaran *
+              </label>
+              <input
+                type="date"
+                required
+                value={editTglBayar}
+                onChange={(e) => setEditTglBayar(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-[#9CA3AF]">
+                Metode Pembayaran *
+              </label>
+              <select
+                value={editMetode}
+                onChange={(e) => setEditMetode(e.target.value)}
+                className="w-full h-9 px-3 rounded-lg border border-[#374151] bg-[#0B0F17] text-xs text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors"
+              >
+                <option value="Tunai">Tunai / Cash</option>
+                <option value="Transfer Bank">Transfer Bank</option>
+                <option value="QRIS">QRIS</option>
+                <option value="Lainnya">Lainnya</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Keterangan */}
+          <Input
+            label="Keterangan / Catatan Transaksi"
+            value={editKeterangan}
+            onChange={(e) => setEditKeterangan(e.target.value)}
+            placeholder="Contoh: Pembayaran DP 50% / Pelunasan Pelatihan"
+          />
+
+          {editErrorMsg && (
+            <div className="rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/20 p-2.5 text-xs text-[#F43F5E] flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{editErrorMsg}</span>
+            </div>
+          )}
+
+          {editSuccessMsg && (
+            <div className="rounded-lg bg-[#10B981]/10 border border-[#10B981]/20 p-2.5 text-xs text-[#10B981] flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              <span>{editSuccessMsg}</span>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setModalEditTxOpen(false)}
+              disabled={editSaving}
+            >
+              Batal
+            </Button>
+            <Button
+              type="submit"
+              disabled={editSaving}
+              className="bg-[#10B981] hover:bg-[#059669] text-white gap-1.5"
+            >
+              {editSaving ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Menyimpan...</span>
+                </>
+              ) : (
+                <span>Simpan Perubahan</span>
+              )}
+            </Button>
+          </div>
+        </form>
       </Modal>
       {/* MODAL EKSPOR REKAP KEUANGAN */}
       <Modal

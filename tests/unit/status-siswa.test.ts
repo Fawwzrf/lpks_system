@@ -95,6 +95,59 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(totalTerbayar, 7500000);
       assert.equal(totalTerbayar >= row["Biaya Pelatihan"], true);
     });
+
+    test("Koreksi typo nominal transaksi (misal dari 750.000 menjadi 7.500.000) memperbarui total dan status lunas", () => {
+      const totalBiaya = 7500000;
+      const txs = [
+        { id: "tx-1", nominal: 750000, tgl_bayar: "2026-09-01", metode: "Tunai", keterangan: "DP" }
+      ];
+      // Sebelum edit: belum lunas
+      let total = txs.reduce((a, b) => a + b.nominal, 0);
+      let isLunas = total >= totalBiaya;
+      assert.equal(total, 750000);
+      assert.equal(isLunas, false);
+
+      // Admin mengoreksi typo menjadi 7.500.000
+      const updatedTx = { ...txs[0], nominal: 7500000, keterangan: "Pelunasan" };
+      txs[0] = updatedTx;
+
+      // Setelah edit: lunas
+      total = txs.reduce((a, b) => a + b.nominal, 0);
+      isLunas = total >= totalBiaya;
+      const sisaTagihan = Math.max(0, totalBiaya - total);
+      assert.equal(total, 7500000);
+      assert.equal(sisaTagihan, 0);
+      assert.equal(isLunas, true);
+    });
+
+    test("Penghapusan transaksi yang salah input menghitung ulang akumulasi pembayaran", () => {
+      const totalBiaya = 8500000;
+      let txs = [
+        { id: "tx-1", nominal: 4000000, tgl_bayar: "2026-09-01" },
+        { id: "tx-2-duplikat", nominal: 4000000, tgl_bayar: "2026-09-01" }, // transaksi keliru / duplikat
+      ];
+      assert.equal(txs.length, 2);
+
+      // Hapus transaksi keliru
+      txs = txs.filter((t) => t.id !== "tx-2-duplikat");
+      assert.equal(txs.length, 1);
+      const total = txs.reduce((a, b) => a + b.nominal, 0);
+      const sisa = totalBiaya - total;
+      assert.equal(total, 4000000);
+      assert.equal(sisa, 4500000);
+    });
+
+    test("Validasi nominal yang diedit harus angka positif > 0", () => {
+      function validateEditNominal(nominal: unknown): boolean {
+        const num = typeof nominal === "number" ? nominal : parseFloat(String(nominal));
+        return !isNaN(num) && num > 0;
+      }
+      assert.equal(validateEditNominal(500000), true);
+      assert.equal(validateEditNominal("1500000"), true);
+      assert.equal(validateEditNominal(0), false);
+      assert.equal(validateEditNominal(-10000), false);
+      assert.equal(validateEditNominal("abc"), false);
+    });
   });
 
   describe("Logika Verifikasi Nomor Sertifikat", () => {
