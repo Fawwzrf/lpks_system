@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       const statusSiswaParam = searchParams.get("status_siswa");
       let siswaQuery = supabase
         .from("siswa")
-        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program_id, program:master_program(id, kode_program, nama, biaya)")
+        .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program_id, biaya_pelatihan, program:master_program(id, kode_program, nama, biaya)")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
 
       const result = (siswaList || []).map((s) => {
         const program = (s.program as unknown) as { id: string; kode_program: string; nama: string; biaya: number } | null;
-        const totalBiaya = Number(program?.biaya || 0);
+        const programBiaya = Number(program?.biaya || 0);
+        const totalBiaya = s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
+          ? Number(s.biaya_pelatihan)
+          : programBiaya;
         const studentTx = txMap.get(s.id) || [];
         const totalTerbayar = studentTx.reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
         const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
@@ -71,6 +74,7 @@ export async function GET(request: NextRequest) {
           tgl_masuk: s.tgl_masuk,
           tgl_keluar: s.tgl_keluar,
           program: program,
+          biaya_pelatihan: s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined ? Number(s.biaya_pelatihan) : null,
           total_biaya: totalBiaya,
           total_terbayar: totalTerbayar,
           sisa_tagihan: sisaTagihan,
@@ -86,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("transaksi_keuangan")
-      .select("*, siswa:siswa(id, nomor_induk, nama_lengkap, program:master_program(nama, biaya))")
+      .select("*, siswa:siswa(id, nomor_induk, nama_lengkap, biaya_pelatihan, program:master_program(nama, biaya))")
       .order("tgl_bayar", { ascending: false });
 
     if (siswaId) {
@@ -103,7 +107,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     return errorResponse(
       "INTERNAL_ERROR",
-      "Gagal memuat data keuangan.",
+      "Gagal memproses data keuangan.",
       500,
       err instanceof Error ? err.message : String(err)
     );
@@ -112,7 +116,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const body = await request.json();
@@ -129,10 +133,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
-    // 1. Dapatkan informasi biaya program siswa
+    // 1. Dapatkan informasi biaya program & biaya khusus siswa
     const { data: siswa, error: siswaError } = await supabase
       .from("siswa")
-      .select("id, nama_lengkap, program:master_program(nama, biaya)")
+      .select("id, nama_lengkap, biaya_pelatihan, program:master_program(nama, biaya)")
       .eq("id", siswa_id)
       .single();
 
@@ -140,7 +144,10 @@ export async function POST(request: NextRequest) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
-    const totalBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const programBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const totalBiaya = siswa.biaya_pelatihan !== null && siswa.biaya_pelatihan !== undefined
+      ? Number(siswa.biaya_pelatihan)
+      : programBiaya;
 
     // 2. Simpan transaksi baru
     const { data: newTx, error: txError } = await supabase
@@ -168,7 +175,7 @@ export async function POST(request: NextRequest) {
 
     const totalTerbayar = allTx?.reduce((acc, curr) => acc + Number(curr.nominal), 0) || 0;
     const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-    const isLunas = sisaTagihan === 0;
+    const isLunas = sisaTagihan === 0 && totalBiaya > 0;
 
     return successResponse(
       {
@@ -189,6 +196,63 @@ export async function POST(request: NextRequest) {
     return errorResponse(
       "INTERNAL_ERROR",
       "Gagal memproses pencatatan transaksi pembayaran.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
+// PATCH: Penyesuaian Biaya Pelatihan Khusus Siswa (Tarif Lama, Beasiswa, Diskon)
+export async function PATCH(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const body = await request.json();
+    const { siswa_id, biaya_pelatihan } = body;
+
+    if (!siswa_id) {
+      return errorResponse("VALIDATION_ERROR", "ID Siswa wajib disertakan.", 400);
+    }
+
+    const numBiaya = biaya_pelatihan === null || biaya_pelatihan === "" || biaya_pelatihan === undefined
+      ? null
+      : parseFloat(biaya_pelatihan);
+
+    if (numBiaya !== null && (isNaN(numBiaya) || numBiaya < 0)) {
+      return errorResponse(
+        "VALIDATION_ERROR",
+        "Biaya pelatihan harus berupa angka >= 0 atau kosongkan untuk kembali mengikuti harga master program.",
+        400
+      );
+    }
+
+    const supabase = await createClient();
+
+    const { data: updatedSiswa, error: updateError } = await supabase
+      .from("siswa")
+      .update({
+        biaya_pelatihan: numBiaya,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", siswa_id)
+      .select("id, nomor_induk, nama_lengkap, biaya_pelatihan, program:master_program(id, kode_program, nama, biaya)")
+      .single();
+
+    if (updateError) {
+      return errorResponse("DATABASE_ERROR", "Gagal memperbarui biaya pelatihan siswa.", 500, updateError.message);
+    }
+
+    return successResponse({
+      siswa: updatedSiswa,
+      message: numBiaya !== null
+        ? `Biaya pelatihan untuk ${updatedSiswa.nama_lengkap} berhasil disesuaikan menjadi Rp ${numBiaya.toLocaleString("id-ID")}.`
+        : `Biaya pelatihan untuk ${updatedSiswa.nama_lengkap} berhasil dikembalikan ke standar program.`,
+    });
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal memproses penyesuaian biaya pelatihan.",
       500,
       err instanceof Error ? err.message : String(err)
     );

@@ -100,6 +100,7 @@ export default function PendaftaranPage() {
   const [nextNomorInduk, setNextNomorInduk] = useState<string | null>(null);
   const [noUrut, setNoUrut] = useState("");
   const [kodeProgram, setKodeProgram] = useState("");
+  const [biayaPelatihan, setBiayaPelatihan] = useState("");
   const [nomorIndukError, setNomorIndukError] = useState("");
 
   // Restore draft from sessionStorage on mount
@@ -116,6 +117,7 @@ export default function PendaftaranPage() {
         if (draft.nextNomorInduk) setNextNomorInduk(draft.nextNomorInduk);
         if (draft.noUrut) setNoUrut(draft.noUrut);
         if (draft.kodeProgram) setKodeProgram(draft.kodeProgram);
+        if (draft.biayaPelatihan) setBiayaPelatihan(draft.biayaPelatihan);
       }
     } catch { /* corrupted storage, ignore */ }
   }, []);
@@ -281,6 +283,7 @@ export default function PendaftaranPage() {
       nisn: rawData.nisn || null,
       tgl_masuk: tanggalMasuk || null,
       tgl_keluar: tglKeluar || null,
+      biaya_pelatihan: biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? parseFloat(biayaPelatihan) : null,
       checklist_berkas: checklistMap,
     };
 
@@ -708,8 +711,12 @@ export default function PendaftaranPage() {
                 required
                 value={programId}
                 onChange={(e) => {
-                  setProgramId(e.target.value);
-                  persistDraft({ programId: e.target.value });
+                  const newPid = e.target.value;
+                  setProgramId(newPid);
+                  const matched = programs.find((p) => p.id === newPid);
+                  const defaultBiaya = matched ? String(matched.biaya) : "";
+                  setBiayaPelatihan(defaultBiaya);
+                  persistDraft({ programId: newPid, biayaPelatihan: defaultBiaya });
                   if (fieldErrors.program_id) setFieldErrors((prev) => { const n = { ...prev }; delete n.program_id; return n; });
                 }}
                 data-next="tgl_masuk"
@@ -734,7 +741,7 @@ export default function PendaftaranPage() {
                       </span>
                     </span>
                     <span className="text-[11px] text-[#6B7280]">
-                      Biaya Program: <strong className="text-[#F9FAFB]">Rp {Number(selectedProgram.biaya).toLocaleString("id-ID")}</strong>
+                      Biaya Standar Program: <strong className="text-[#F9FAFB]">Rp {Number(selectedProgram.biaya).toLocaleString("id-ID")}</strong>
                     </span>
                   </div>
 
@@ -782,6 +789,42 @@ export default function PendaftaranPage() {
                     ) : (
                       <p className="text-[10px] text-[#6B7280] mt-0.5">
                         Nilai default kode program dan nomor urut dibuat otomatis sesuai program terpilih. Anda dapat mengedit kode program jika format data lama berbeda.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Penyesuaian Biaya Pelatihan Siswa (Tarif Lama / Beasiswa) */}
+                  <div className="flex flex-col gap-1.5 pt-3 border-t border-[#10B981]/20">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-[#D1D5DB]">
+                        Biaya Pelatihan Siswa (Rp) *
+                      </label>
+                      <span className="text-[10px] text-[#10B981] font-medium">
+                        Dapat disesuaikan (Tarif Lama / Beasiswa)
+                      </span>
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
+                        Rp
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        name="biaya_pelatihan"
+                        value={biayaPelatihan}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "");
+                          setBiayaPelatihan(val);
+                          persistDraft({ biayaPelatihan: val });
+                        }}
+                        placeholder={String(selectedProgram.biaya)}
+                        className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#111827] text-xs font-mono font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                    </div>
+                    {biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) && (
+                      <p className="text-[10px] text-[#10B981]">
+                        Total tagihan siswa: <strong>Rp {parseFloat(biayaPelatihan).toLocaleString("id-ID")}</strong>
+                        {parseFloat(biayaPelatihan) !== Number(selectedProgram.biaya) && " (Tarif Khusus)"}
                       </p>
                     )}
                   </div>

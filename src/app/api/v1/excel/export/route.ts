@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         const filterStatus = request.nextUrl.searchParams.get("status_siswa"); // "aktif" | "alumni" | "semua" | "lunas" | "belum_lunas" | "out"
         let siswaQuery = supabase
           .from("siswa")
-          .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, program:master_program(id, kode_program, nama, biaya)")
+          .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, biaya_pelatihan, program:master_program(id, kode_program, nama, biaya)")
           .neq("alamat_lengkap", "[DATA DIHAPUS]")
           .order("urutan_nomor", { ascending: true, nullsFirst: false })
           .order("nomor_induk", { ascending: true });
@@ -93,7 +93,10 @@ export async function GET(request: NextRequest) {
 
         const mapped = (siswaList || []).map((s, idx) => {
           const prog = (s.program as unknown) as { kode_program: string; nama: string; biaya: number } | null;
-          const biaya = Number(prog?.biaya || 0);
+          const programBiaya = Number(prog?.biaya || 0);
+          const biaya = s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
+            ? Number(s.biaya_pelatihan)
+            : programBiaya;
           const studentTxs = txMap.get(s.id) || [];
           const terbayar = studentTxs.reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
           const sisa = Math.max(0, biaya - terbayar);

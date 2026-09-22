@@ -64,11 +64,14 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // 3. Ambil ulang biaya program siswa untuk menghitung status terupdate
     const { data: siswa } = await supabase
       .from("siswa")
-      .select("id, program:master_program(biaya)")
+      .select("id, biaya_pelatihan, program:master_program(biaya)")
       .eq("id", existingTx.siswa_id)
       .single();
 
-    const totalBiaya = Number(((siswa?.program as unknown) as { biaya: number })?.biaya) || 0;
+    const programBiaya = Number(((siswa?.program as unknown) as { biaya: number })?.biaya) || 0;
+    const totalBiaya = siswa?.biaya_pelatihan !== null && siswa?.biaya_pelatihan !== undefined
+      ? Number(siswa.biaya_pelatihan)
+      : programBiaya;
 
     const { data: allTx } = await supabase
       .from("transaksi_keuangan")

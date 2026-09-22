@@ -275,6 +275,9 @@ export async function POST(request: NextRequest) {
         status_siswa: body.status_siswa && body.status_siswa !== "aktif"
           ? body.status_siswa
           : (finalTglKeluar && finalTglKeluar <= new Date().toISOString().split("T")[0] ? "alumni" : (body.status_siswa || "aktif")),
+        biaya_pelatihan: body.biaya_pelatihan !== undefined && body.biaya_pelatihan !== null && body.biaya_pelatihan !== ""
+          ? parseFloat(body.biaya_pelatihan)
+          : null,
         checklist_berkas: checklist_berkas || {},
         is_password_default: true,
       })

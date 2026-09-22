@@ -15,7 +15,7 @@ export async function GET() {
     // 1. Ambil seluruh siswa aktif & alumni yang belum dihapus
     const { data: siswaList, error: siswaErr } = await supabase
       .from("siswa")
-      .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, program:master_program(id, nama, biaya)")
+      .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, biaya_pelatihan, program:master_program(id, nama, biaya)")
       .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]")
       .order("urutan_nomor", { ascending: true, nullsFirst: false })
@@ -67,7 +67,10 @@ export async function GET() {
       const u = ujianMap.get(s.id) || null;
       const st = sertifikatMap.get(s.id) || null;
       const program = (s.program as unknown) as { nama: string; biaya: number } | null;
-      const totalBiaya = Number(program?.biaya || 0);
+      const programBiaya = Number(program?.biaya || 0);
+      const totalBiaya = s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
+        ? Number(s.biaya_pelatihan)
+        : programBiaya;
       const totalTerbayar = txMap.get(s.id) || 0;
       const isLunas = totalBiaya > 0 && totalTerbayar >= totalBiaya;
       const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;

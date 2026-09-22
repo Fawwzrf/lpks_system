@@ -219,5 +219,76 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(status, "alumni");
     });
   });
+
+  describe("Perhitungan Keuangan Berdasarkan Biaya Pelatihan Khusus Siswa (Tarif Lama vs Standar)", () => {
+    interface StudentFinanceFixture {
+      id: string;
+      nama: string;
+      programBiaya: number;
+      biayaPelatihan: number | null;
+      txs: number[];
+    }
+
+    function calculateFinance(fixture: StudentFinanceFixture) {
+      const totalBiaya = fixture.biayaPelatihan !== null && fixture.biayaPelatihan !== undefined
+        ? fixture.biayaPelatihan
+        : fixture.programBiaya;
+      const totalTerbayar = fixture.txs.reduce((a, b) => a + b, 0);
+      const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
+      const isLunas = totalTerbayar >= totalBiaya;
+      const persentase = totalBiaya > 0 ? Math.min(100, Math.round((totalTerbayar / totalBiaya) * 100)) : 100;
+
+      return { totalBiaya, totalTerbayar, sisaTagihan, isLunas, persentase };
+    }
+
+    test("Siswa tanpa biaya_pelatihan (null) menggunakan tarif standar master_program (Rp 8.500.000)", () => {
+      const student: StudentFinanceFixture = {
+        id: "s1",
+        nama: "Siswa Baru GTAW",
+        programBiaya: 8500000,
+        biayaPelatihan: null,
+        txs: [8000000], // baru bayar 8jt
+      };
+      const result = calculateFinance(student);
+      assert.equal(result.totalBiaya, 8500000);
+      assert.equal(result.totalTerbayar, 8000000);
+      assert.equal(result.sisaTagihan, 500000);
+      assert.equal(result.isLunas, false);
+      assert.equal(result.persentase, 94);
+    });
+
+    test("Siswa lama dengan biaya_pelatihan khusus Rp 8.000.000 tercatat Lunas saat membayar Rp 8.000.000", () => {
+      const student: StudentFinanceFixture = {
+        id: "s2",
+        nama: "Siswa Lama GTAW 2024",
+        programBiaya: 8500000, // tarif baru di master program
+        biayaPelatihan: 8000000, // tarif lama yang berlaku untuk siswa ini
+        txs: [8000000],
+      };
+      const result = calculateFinance(student);
+      assert.equal(result.totalBiaya, 8000000);
+      assert.equal(result.totalTerbayar, 8000000);
+      assert.equal(result.sisaTagihan, 0);
+      assert.equal(result.isLunas, true);
+      assert.equal(result.persentase, 100);
+    });
+
+    test("Siswa penerima beasiswa / diskon khusus dengan biaya_pelatihan Rp 0 tercatat Lunas", () => {
+      const student: StudentFinanceFixture = {
+        id: "s3",
+        nama: "Siswa Beasiswa Penuh",
+        programBiaya: 8500000,
+        biayaPelatihan: 0,
+        txs: [],
+      };
+      const result = calculateFinance(student);
+      assert.equal(result.totalBiaya, 0);
+      assert.equal(result.totalTerbayar, 0);
+      assert.equal(result.sisaTagihan, 0);
+      assert.equal(result.isLunas, true);
+      assert.equal(result.persentase, 100);
+    });
+  });
 });
+
 

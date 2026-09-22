@@ -53,6 +53,7 @@ interface SiswaKeuanganItem {
     nama: string;
     biaya: number;
   };
+  biaya_pelatihan?: number | null;
   total_biaya: number;
   total_terbayar: number;
   sisa_tagihan: number;
@@ -125,6 +126,14 @@ export default function KeuanganSuperadminPage() {
   const [txDeleteSiswaContext, setTxDeleteSiswaContext] = useState<SiswaKeuanganItem | null>(null);
   const [isDeletingTx, setIsDeletingTx] = useState(false);
   const [deleteTxErrorMsg, setDeleteTxErrorMsg] = useState<string | null>(null);
+
+  // Modal Sesuaikan Biaya Pelatihan Siswa (Tarif Khusus / Siswa Lama)
+  const [modalEditBiayaOpen, setModalEditBiayaOpen] = useState(false);
+  const [editingBiayaSiswa, setEditingBiayaSiswa] = useState<SiswaKeuanganItem | null>(null);
+  const [inputBiayaPelatihan, setInputBiayaPelatihan] = useState<string>("");
+  const [isSavingBiaya, setIsSavingBiaya] = useState(false);
+  const [editBiayaErrorMsg, setEditBiayaErrorMsg] = useState<string | null>(null);
+  const [editBiayaSuccessMsg, setEditBiayaSuccessMsg] = useState<string | null>(null);
 
   // Modal Ekspor Rekap Keuangan Bulanan
   const [modalExportOpen, setModalExportOpen] = useState(false);
@@ -317,6 +326,80 @@ export default function KeuanganSuperadminPage() {
       setDeleteTxErrorMsg("Terjadi gangguan koneksi saat menghapus transaksi.");
     } finally {
       setIsDeletingTx(false);
+    }
+  }
+
+  // Handler Buka Modal Sesuaikan Biaya Pelatihan Siswa
+  function handleOpenEditBiayaModal(siswa: SiswaKeuanganItem) {
+    setEditingBiayaSiswa(siswa);
+    setInputBiayaPelatihan(
+      siswa.biaya_pelatihan !== null && siswa.biaya_pelatihan !== undefined
+        ? String(siswa.biaya_pelatihan)
+        : (siswa.program?.biaya ? String(siswa.program.biaya) : "")
+    );
+    setEditBiayaErrorMsg(null);
+    setEditBiayaSuccessMsg(null);
+    setModalEditBiayaOpen(true);
+  }
+
+  // Handler Simpan Perubahan Biaya Pelatihan Siswa (PATCH /api/v1/keuangan)
+  async function handleSaveBiayaPelatihan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingBiayaSiswa) return;
+
+    let parsedBiaya: number | null = null;
+    if (inputBiayaPelatihan.trim() !== "") {
+      const num = parseFloat(inputBiayaPelatihan);
+      if (isNaN(num) || num < 0) {
+        setEditBiayaErrorMsg("Biaya pelatihan harus berupa angka valid non-negatif.");
+        return;
+      }
+      parsedBiaya = num;
+    }
+
+    setIsSavingBiaya(true);
+    setEditBiayaErrorMsg(null);
+    setEditBiayaSuccessMsg(null);
+
+    try {
+      const res = await fetch("/api/v1/keuangan", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          siswa_id: editingBiayaSiswa.id,
+          biaya_pelatihan: parsedBiaya,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setEditBiayaErrorMsg(data?.error?.message || "Gagal memperbarui biaya pelatihan.");
+        return;
+      }
+
+      setEditBiayaSuccessMsg("Biaya pelatihan siswa berhasil diperbarui.");
+      const updatedList = await loadData();
+      const refreshedSiswa = updatedList.find((s) => s.id === editingBiayaSiswa.id);
+      if (refreshedSiswa) {
+        if (selectedSiswa && selectedSiswa.id === refreshedSiswa.id) {
+          setSelectedSiswa(refreshedSiswa);
+          if (skema === "lunas") {
+            setNominal(String(refreshedSiswa.sisa_tagihan));
+          }
+        }
+        if (historySiswa && historySiswa.id === refreshedSiswa.id) {
+          setHistorySiswa(refreshedSiswa);
+        }
+        setEditingBiayaSiswa(refreshedSiswa);
+      }
+
+      setTimeout(() => {
+        setModalEditBiayaOpen(false);
+      }, 700);
+    } catch {
+      setEditBiayaErrorMsg("Terjadi gangguan koneksi saat memperbarui biaya.");
+    } finally {
+      setIsSavingBiaya(false);
     }
   }
 
@@ -544,11 +627,28 @@ export default function KeuanganSuperadminPage() {
     {
       key: "biaya",
       header: "Biaya Pelatihan",
-      className: "w-32",
+      className: "w-36",
       render: (r: SiswaKeuanganItem) => (
-        <span className="text-xs font-medium text-[#D1D5DB]">
-          {r.total_biaya > 0 ? formatRupiah(r.total_biaya) : "Gratis / —"}
-        </span>
+        <div className="flex items-center gap-1.5 group">
+          <div className="flex flex-col">
+            <span className="text-xs font-medium text-[#D1D5DB]">
+              {r.total_biaya > 0 ? formatRupiah(r.total_biaya) : "Gratis / —"}
+            </span>
+            {r.biaya_pelatihan !== null && r.biaya_pelatihan !== undefined && r.program && r.biaya_pelatihan !== r.program.biaya && (
+              <span className="text-[10px] text-[#10B981] font-medium">
+                Tarif Khusus
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleOpenEditBiayaModal(r)}
+            className="p-1 rounded text-[#6B7280] hover:text-[#10B981] hover:bg-[#10B981]/10 transition-colors opacity-70 group-hover:opacity-100"
+            title="Sesuaikan Biaya Pelatihan (Tarif Lama / Khusus)"
+          >
+            <Pencil className="h-3 w-3" />
+          </button>
+        </div>
       ),
     },
     {
@@ -903,7 +1003,17 @@ export default function KeuanganSuperadminPage() {
 
               <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-[#1F2937]/70 text-center">
                 <div>
-                  <p className="text-[10px] text-[#9CA3AF]">Total Biaya</p>
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="text-[10px] text-[#9CA3AF]">Total Biaya</p>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditBiayaModal(selectedSiswa)}
+                      className="text-[#6B7280] hover:text-[#10B981] transition-colors"
+                      title="Ubah / Sesuaikan Biaya Pelatihan Siswa"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                    </button>
+                  </div>
                   <p className="text-xs font-semibold text-[#F9FAFB]">
                     {formatRupiah(selectedSiswa.total_biaya)}
                   </p>
@@ -1202,7 +1312,17 @@ export default function KeuanganSuperadminPage() {
             {/* Box Status Ringkasan */}
             <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-3.5 grid grid-cols-3 gap-2 text-center">
               <div>
-                <p className="text-[10px] text-[#9CA3AF]">Biaya Pelatihan</p>
+                <div className="flex items-center justify-center gap-1">
+                  <p className="text-[10px] text-[#9CA3AF]">Biaya Pelatihan</p>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditBiayaModal(historySiswa)}
+                    className="text-[#6B7280] hover:text-[#10B981] transition-colors"
+                    title="Ubah / Sesuaikan Biaya Pelatihan Siswa"
+                  >
+                    <Pencil className="h-2.5 w-2.5" />
+                  </button>
+                </div>
                 <p className="text-xs font-bold text-[#F9FAFB]">
                   {formatRupiah(historySiswa.total_biaya)}
                 </p>
@@ -1508,6 +1628,129 @@ export default function KeuanganSuperadminPage() {
           </div>
         )}
       </Modal>
+
+      {/* MODAL SESUAIKAN BIAYA PELATIHAN SISWA (TARIF KHUSUS / SISWA LAMA) */}
+      <Modal
+        open={modalEditBiayaOpen}
+        onClose={() => !isSavingBiaya && setModalEditBiayaOpen(false)}
+        title="Sesuaikan Biaya Pelatihan Siswa"
+        description={
+          editingBiayaSiswa
+            ? `Atur total biaya pelatihan khusus untuk ${editingBiayaSiswa.nama_lengkap} (${editingBiayaSiswa.nomor_induk})`
+            : "Sesuaikan biaya pelatihan siswa."
+        }
+      >
+        {editingBiayaSiswa && (
+          <form onSubmit={handleSaveBiayaPelatihan} onKeyDown={handleFormKeyDown} className="flex flex-col gap-4">
+            <div className="p-3 rounded-xl border border-[#1F2937] bg-[#0B0F17] flex flex-col gap-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-[#9CA3AF]">Program:</span>
+                <span className="text-[#F9FAFB] font-medium">{editingBiayaSiswa.program?.nama || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#9CA3AF]">Biaya Standar Program:</span>
+                <span className="text-[#F9FAFB] font-mono font-medium">
+                  {editingBiayaSiswa.program ? formatRupiah(editingBiayaSiswa.program.biaya) : "—"}
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-[#1F2937] pt-1.5">
+                <span className="text-[#9CA3AF]">Total Terbayar Saat Ini:</span>
+                <span className="text-[#10B981] font-mono font-semibold">
+                  {formatRupiah(editingBiayaSiswa.total_terbayar)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-[#D1D5DB] mb-1.5">
+                Biaya Pelatihan Siswa (Rp) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
+                  Rp
+                </span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={inputBiayaPelatihan}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "");
+                    setInputBiayaPelatihan(val);
+                  }}
+                  placeholder={editingBiayaSiswa.program ? String(editingBiayaSiswa.program.biaya) : "0"}
+                  className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#111827] text-xs font-mono font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoFocus
+                />
+              </div>
+              {inputBiayaPelatihan && !isNaN(parseFloat(inputBiayaPelatihan)) ? (
+                <div className="flex flex-col gap-0.5 mt-1.5">
+                  <p className="text-[11px] text-[#10B981]">
+                    Tagihan baru: <strong>{formatRupiah(parseFloat(inputBiayaPelatihan))}</strong>
+                    {editingBiayaSiswa.program && parseFloat(inputBiayaPelatihan) !== Number(editingBiayaSiswa.program.biaya) && " (Tarif Khusus)"}
+                  </p>
+                  <p className="text-[10px] text-[#9CA3AF]">
+                    Sisa tagihan setelah disesuaikan:{" "}
+                    <strong className={parseFloat(inputBiayaPelatihan) - editingBiayaSiswa.total_terbayar <= 0 ? "text-[#10B981]" : "text-[#F43F5E]"}>
+                      {parseFloat(inputBiayaPelatihan) - editingBiayaSiswa.total_terbayar <= 0
+                        ? "Rp 0 (Lunas)"
+                        : formatRupiah(parseFloat(inputBiayaPelatihan) - editingBiayaSiswa.total_terbayar)}
+                    </strong>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-[10px] text-[#6B7280] mt-1">
+                  Kosongkan jika ingin kembali menggunakan tarif standar program.
+                </p>
+              )}
+            </div>
+
+            {/* Error Message */}
+            {editBiayaErrorMsg && (
+              <div className="rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/20 p-2.5 text-xs text-[#F43F5E] flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{editBiayaErrorMsg}</span>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {editBiayaSuccessMsg && (
+              <div className="rounded-lg bg-[#10B981]/10 border border-[#10B981]/20 p-2.5 text-xs text-[#10B981] flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{editBiayaSuccessMsg}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-[#1F2937]">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setModalEditBiayaOpen(false)}
+                disabled={isSavingBiaya}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSavingBiaya}
+                className="bg-[#10B981] hover:bg-[#059669] text-black font-semibold text-xs gap-1.5"
+              >
+                {isSavingBiaya ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Menyimpan...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Simpan Biaya
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
       {/* MODAL EKSPOR REKAP KEUANGAN */}
       <Modal
         open={modalExportOpen}

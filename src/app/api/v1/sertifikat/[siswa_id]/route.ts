@@ -27,7 +27,10 @@ export async function GET(_request: NextRequest, { params }: Params) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
-    const totalBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const programBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const totalBiaya = siswa.biaya_pelatihan !== null && siswa.biaya_pelatihan !== undefined
+      ? Number(siswa.biaya_pelatihan)
+      : programBiaya;
 
     // 2. Gate 1: Cek Status Keuangan (Wajib LUNAS)
     const { data: transaksi } = await supabase

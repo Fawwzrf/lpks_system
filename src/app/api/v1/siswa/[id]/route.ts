@@ -72,6 +72,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
       "tgl_keluar",
       "checklist_berkas",
       "status_siswa",
+      "biaya_pelatihan",
     ];
 
     const updates: Record<string, unknown> = {
@@ -80,7 +81,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        updates[field] = body[field];
+        if (field === "biaya_pelatihan") {
+          updates[field] = body[field] === null || body[field] === "" ? null : parseFloat(body[field]);
+        } else {
+          updates[field] = body[field];
+        }
       }
     }
 

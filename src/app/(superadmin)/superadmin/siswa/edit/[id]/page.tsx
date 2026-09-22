@@ -93,9 +93,10 @@ export default function EditSiswaPage({ params }: PageProps) {
   const [tanggalMasuk, setTanggalMasuk] = useState("");
   const [tanggalKeluar, setTanggalKeluar] = useState("");
   const [statusSiswa, setStatusSiswa] = useState<"aktif" | "alumni" | "out">("aktif");
-  const [programInfo, setProgramInfo] = useState<{ id: string; nama: string; kode: string; } | null>(null);
+  const [programInfo, setProgramInfo] = useState<{ id: string; nama: string; kode: string; biaya: number; } | null>(null);
   const [noUrut, setNoUrut] = useState("");
   const [kodeProgram, setKodeProgram] = useState("");
+  const [biayaPelatihan, setBiayaPelatihan] = useState("");
 
   const loadSiswa = useCallback(async () => {
     try {
@@ -110,6 +111,11 @@ export default function EditSiswaPage({ params }: PageProps) {
       const initialUrut = parts.length > 1 ? parts.slice(1).join(".") : parts[0] || "";
       setKodeProgram(initialKode);
       setNoUrut(initialUrut);
+      setBiayaPelatihan(
+        siswa.biaya_pelatihan !== null && siswa.biaya_pelatihan !== undefined
+          ? String(siswa.biaya_pelatihan)
+          : (siswa.program?.biaya ? String(siswa.program.biaya) : "")
+      );
 
       // Pecah alamat
       const addr = siswa.alamat_lengkap || "";
@@ -154,6 +160,7 @@ export default function EditSiswaPage({ params }: PageProps) {
           id: siswa.program.id,
           nama: siswa.program.nama,
           kode: siswa.program.kode_program,
+          biaya: Number(siswa.program.biaya || 0),
         });
       }
     } catch (e) {
@@ -186,10 +193,8 @@ export default function EditSiswaPage({ params }: PageProps) {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSuccessMsg("");
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const rawData: Record<string, string> = {};
-    formData.forEach((val, key) => { rawData[key] = val as string; });
+
+    const rawData = { ...formValues };
     rawData.tgl_masuk = tanggalMasuk;
 
     const errors = validateForm(rawData);
@@ -229,7 +234,8 @@ export default function EditSiswaPage({ params }: PageProps) {
       nisn: rawData.nisn || null,
       tgl_masuk: tanggalMasuk || null,
       tgl_keluar: tanggalKeluar || null,
-      status_siswa: statusSiswa
+      status_siswa: statusSiswa,
+      biaya_pelatihan: biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? parseFloat(biayaPelatihan) : null,
     };
 
     try {
@@ -378,6 +384,47 @@ export default function EditSiswaPage({ params }: PageProps) {
             <Input label="Program Pelatihan" value={programInfo ? `${programInfo.kode} - ${programInfo.nama}` : ""} readOnly className="bg-[#1F2937]/30 text-[#9CA3AF]" />
           </div>
           <p className="text-[10px] text-[#6B7280] mt-1.5">Program Pelatihan terikat permanen. Nomor urut siswa dapat disesuaikan jika diperlukan.</p>
+
+          {/* Biaya Pelatihan Siswa */}
+          <div className="mt-3 pt-3 border-t border-[#1F2937]">
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-medium text-[#D1D5DB]">
+                Biaya Pelatihan Siswa (Rp)
+              </label>
+              {programInfo && (
+                <span className="text-[10px] text-[#6B7280]">
+                  Biaya Standar: <strong className="text-[#F9FAFB]">Rp {Number(programInfo.biaya).toLocaleString("id-ID")}</strong>
+                </span>
+              )}
+            </div>
+            <div className="relative max-w-sm">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6B7280]">
+                Rp
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                name="biaya_pelatihan"
+                value={biayaPelatihan}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, "");
+                  setBiayaPelatihan(val);
+                }}
+                placeholder={programInfo ? String(programInfo.biaya) : "0"}
+                className="w-full h-10 pl-9 pr-3 rounded-lg border border-[#374151] bg-[#111827] text-xs font-mono font-bold text-[#F9FAFB] focus:border-[#10B981] focus:outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            {biayaPelatihan && !isNaN(parseFloat(biayaPelatihan)) ? (
+              <p className="text-[10px] text-[#10B981] mt-1">
+                Total tagihan siswa: <strong>Rp {parseFloat(biayaPelatihan).toLocaleString("id-ID")}</strong>
+                {programInfo && parseFloat(biayaPelatihan) !== Number(programInfo.biaya) && " (Tarif Khusus / Berbeda dari Standar)"}
+              </p>
+            ) : (
+              <p className="text-[10px] text-[#6B7280] mt-1">
+                Kosongkan untuk mengikuti tarif standar program.
+              </p>
+            )}
+          </div>
 
           {/* DATA PRIBADI */}
           <div className="flex items-center gap-4 mt-6 mb-4">
