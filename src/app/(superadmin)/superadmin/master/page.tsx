@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
   Plus,
   Trash2,
+  Pencil,
   MapPin,
   Layers,
   CheckSquare,
@@ -78,12 +79,52 @@ export default function MasterPage() {
 
   // Modal State
   const [modalOpen, setModalOpen] = useState(false);
+  const [editItem, setEditItem] = useState<{ id: string; type: Tab } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   // Forms
   const [formProgram, setFormProgram] = useState({ kode: "", nama: "", biaya: "", durasi: "30" });
   const [formKriteria, setFormKriteria] = useState({ nama: "", batas_lulus: "80", urutan: "1" });
   const [formBerkas, setFormBerkas] = useState({ kode: "", nama: "", wajib: true });
+
+  function handleOpenAdd() {
+    if (activeTab === "program") {
+      setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30" });
+    } else if (activeTab === "kriteria") {
+      setFormKriteria({ nama: "", batas_lulus: "80", urutan: String(kriteriaList.length + 1) });
+    } else if (activeTab === "berkas") {
+      setFormBerkas({ kode: "", nama: "", wajib: true });
+    }
+    setModalOpen(true);
+  }
+
+  function handleEditProgram(item: ProgramItem) {
+    setFormProgram({
+      kode: item.kode_program,
+      nama: item.nama,
+      biaya: String(item.biaya),
+      durasi: String(item.estimasi_durasi_hari || 30),
+    });
+    setEditItem({ id: item.id, type: "program" });
+  }
+
+  function handleEditKriteria(item: KriteriaItem) {
+    setFormKriteria({
+      nama: item.nama_kriteria,
+      batas_lulus: String(item.batas_lulus),
+      urutan: String(item.urutan),
+    });
+    setEditItem({ id: item.id, type: "kriteria" });
+  }
+
+  function handleEditBerkas(item: BerkasItem) {
+    setFormBerkas({
+      kode: item.kode_berkas,
+      nama: item.nama_berkas,
+      wajib: item.wajib,
+    });
+    setEditItem({ id: item.id, type: "berkas" });
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -175,6 +216,64 @@ export default function MasterPage() {
       setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30" });
       setFormKriteria({ nama: "", batas_lulus: "80", urutan: "1" });
       setFormBerkas({ kode: "", nama: "", wajib: true });
+      await fetchData();
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editItem) return;
+    setSubmitting(true);
+    setErrorMsg("");
+    setSuccessMsg("");
+
+    try {
+      let endpoint = "";
+      let payload = {};
+
+      if (editItem.type === "program") {
+        endpoint = "/api/v1/master/program";
+        payload = {
+          id: editItem.id,
+          kode_program: formProgram.kode,
+          nama: formProgram.nama,
+          biaya: parseFloat(formProgram.biaya),
+          estimasi_durasi_hari: parseInt(formProgram.durasi, 10),
+        };
+      } else if (editItem.type === "kriteria") {
+        endpoint = "/api/v1/master/kriteria";
+        payload = {
+          id: editItem.id,
+          nama_kriteria: formKriteria.nama,
+          batas_lulus: parseInt(formKriteria.batas_lulus, 10),
+          urutan: parseInt(formKriteria.urutan, 10),
+        };
+      } else if (editItem.type === "berkas") {
+        endpoint = "/api/v1/master/syarat-berkas";
+        payload = {
+          id: editItem.id,
+          kode_berkas: formBerkas.kode,
+          nama_berkas: formBerkas.nama,
+          wajib: formBerkas.wajib,
+        };
+      }
+
+      const res = await fetch(endpoint, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message ?? "Gagal memperbarui item.");
+      }
+
+      setSuccessMsg("Data berhasil diperbarui!");
+      setEditItem(null);
       await fetchData();
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Terjadi kesalahan.");
@@ -363,7 +462,7 @@ export default function MasterPage() {
             <span className="text-xs font-semibold text-[#F9FAFB]">
               Daftar {TABS.find((t) => t.id === activeTab)?.label}
             </span>
-            <Button size="sm" onClick={() => setModalOpen(true)} className="gap-1.5 bg-[#DC2626] hover:bg-[#B91C1C]">
+            <Button size="sm" onClick={handleOpenAdd} className="gap-1.5 bg-[#DC2626] hover:bg-[#B91C1C]">
               <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Tambah Item
             </Button>
           </div>
@@ -407,13 +506,22 @@ export default function MasterPage() {
                           {item.estimasi_durasi_hari} Hari
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
-                        title="Hapus Program"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditProgram(item)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#38BDF8]/10 text-[#6B7280] hover:text-[#38BDF8] flex items-center justify-center transition-colors"
+                          title="Edit Program"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
+                          title="Hapus Program"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </li>
                   ))
                 ))}
@@ -439,13 +547,22 @@ export default function MasterPage() {
                           Standar Batas Kelulusan: <span className="text-[#10B981] font-semibold">{item.batas_lulus}</span> / 100
                         </p>
                       </div>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
-                        title="Hapus Kriteria"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditKriteria(item)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#38BDF8]/10 text-[#6B7280] hover:text-[#38BDF8] flex items-center justify-center transition-colors"
+                          title="Edit Kriteria"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
+                          title="Hapus Kriteria"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </li>
                   ))
                 ))}
@@ -477,13 +594,22 @@ export default function MasterPage() {
                           </span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
-                        title="Hapus Syarat Berkas"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleEditBerkas(item)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#38BDF8]/10 text-[#6B7280] hover:text-[#38BDF8] flex items-center justify-center transition-colors"
+                          title="Edit Syarat Berkas"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="h-7 w-7 rounded-lg hover:bg-[#F43F5E]/10 text-[#6B7280] hover:text-[#F43F5E] flex items-center justify-center transition-colors"
+                          title="Hapus Syarat Berkas"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </li>
                   ))
                 ))}
@@ -641,6 +767,160 @@ export default function MasterPage() {
               className="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
             >
               {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Simpan"}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal
+        open={!!editItem}
+        onClose={() => !submitting && setEditItem(null)}
+        title={`Edit ${TABS.find((t) => t.id === editItem?.type)?.label || ""}`}
+      >
+        <form
+          data-form-container
+          onKeyDown={handleEnterToNextField}
+          className="flex flex-col gap-4"
+          onSubmit={handleEditSubmit}
+        >
+          {editItem?.type === "program" && (
+            <>
+              <Input
+                label="Kode Program (Misal: 01, 02)"
+                name="edit_kode"
+                required
+                value={formProgram.kode}
+                onChange={(e) => setFormProgram({ ...formProgram, kode: e.target.value })}
+                placeholder="01"
+                data-next="edit-prog-nama"
+              />
+              <Input
+                id="edit-prog-nama"
+                label="Nama Program Pelatihan"
+                name="edit_nama"
+                required
+                value={formProgram.nama}
+                onChange={(e) => setFormProgram({ ...formProgram, nama: e.target.value })}
+                placeholder="SMAW 6G Pipe Welding"
+                data-next="edit-prog-biaya"
+              />
+              <Input
+                id="edit-prog-biaya"
+                label="Biaya Pelatihan (Rp)"
+                name="edit_biaya"
+                type="number"
+                required
+                value={formProgram.biaya}
+                onChange={(e) => setFormProgram({ ...formProgram, biaya: e.target.value })}
+                placeholder="8500000"
+                data-next="edit-prog-durasi"
+              />
+              <Input
+                id="edit-prog-durasi"
+                label="Estimasi Durasi (Hari)"
+                name="edit_durasi"
+                type="number"
+                required
+                value={formProgram.durasi}
+                onChange={(e) => setFormProgram({ ...formProgram, durasi: e.target.value })}
+                placeholder="30"
+                data-next="edit-submit-btn"
+              />
+            </>
+          )}
+
+          {editItem?.type === "kriteria" && (
+            <>
+              <Input
+                label="Nama Kriteria"
+                name="edit_nama"
+                required
+                value={formKriteria.nama}
+                onChange={(e) => setFormKriteria({ ...formKriteria, nama: e.target.value })}
+                placeholder="Misal: Capping"
+                data-next="edit-krit-batas"
+              />
+              <Input
+                id="edit-krit-batas"
+                label="Standar Batas Lulus (Default: 80)"
+                name="edit_batas_lulus"
+                type="number"
+                min={0}
+                max={100}
+                required
+                value={formKriteria.batas_lulus}
+                onChange={(e) => setFormKriteria({ ...formKriteria, batas_lulus: e.target.value })}
+                placeholder="80"
+                data-next="edit-krit-urutan"
+              />
+              <Input
+                id="edit-krit-urutan"
+                label="Nomor Urutan Tampilan"
+                name="edit_urutan"
+                type="number"
+                min={1}
+                required
+                value={formKriteria.urutan}
+                onChange={(e) => setFormKriteria({ ...formKriteria, urutan: e.target.value })}
+                placeholder="1"
+                data-next="edit-submit-btn"
+              />
+            </>
+          )}
+
+          {editItem?.type === "berkas" && (
+            <>
+              <Input
+                label="Kode Berkas (Huruf kecil tanpa spasi, misal: ktp)"
+                name="edit_kode"
+                required
+                value={formBerkas.kode}
+                onChange={(e) => setFormBerkas({ ...formBerkas, kode: e.target.value })}
+                placeholder="ktp"
+                data-next="edit-berkas-nama"
+              />
+              <Input
+                id="edit-berkas-nama"
+                label="Nama Berkas Dokumen"
+                name="edit_nama"
+                required
+                value={formBerkas.nama}
+                onChange={(e) => setFormBerkas({ ...formBerkas, nama: e.target.value })}
+                placeholder="Fotokopi KTP Asli"
+                data-next="edit-submit-btn"
+              />
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="edit-wajib-cb"
+                  checked={formBerkas.wajib}
+                  onChange={(e) => setFormBerkas({ ...formBerkas, wajib: e.target.checked })}
+                  className="rounded border-[#374151] bg-[#0B0F17] text-[#DC2626] focus:ring-[#DC2626]"
+                />
+                <label htmlFor="edit-wajib-cb" className="text-xs text-[#D1D5DB] cursor-pointer">
+                  Wajib dilampirkan saat pendaftaran
+                </label>
+              </div>
+            </>
+          )}
+
+          <div className="flex gap-2 justify-end mt-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={() => setEditItem(null)}
+            >
+              Batal
+            </Button>
+            <Button
+              id="edit-submit-btn"
+              type="submit"
+              disabled={submitting}
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white"
+            >
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Simpan Perubahan"}
             </Button>
           </div>
         </form>

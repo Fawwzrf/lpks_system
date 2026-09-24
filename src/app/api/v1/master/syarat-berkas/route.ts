@@ -66,6 +66,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const body = await request.json();
+    const { id, kode_berkas, nama_berkas, wajib } = body;
+
+    if (!id || !kode_berkas || !nama_berkas) {
+      return errorResponse("VALIDATION_ERROR", "ID, kode dan nama berkas wajib diisi.", 400);
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("master_syarat_berkas")
+      .update({
+        kode_berkas: String(kode_berkas).trim(),
+        nama_berkas: String(nama_berkas).trim(),
+        wajib: wajib ?? true,
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return errorResponse("DUPLICATE_CODE", "Kode berkas sudah digunakan.", 409);
+      }
+      return errorResponse("DATABASE_ERROR", "Gagal memperbarui syarat berkas.", 500, error.message);
+    }
+
+    return successResponse(data);
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal memperbarui data syarat berkas.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();

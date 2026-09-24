@@ -70,6 +70,66 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const body = await request.json();
+    const { id, kode_program, nama, biaya, estimasi_durasi_hari } = body;
+
+    if (!id || !kode_program || !nama || biaya === undefined) {
+      return errorResponse("VALIDATION_ERROR", "ID, kode program, nama, dan biaya wajib diisi.", 400);
+    }
+
+    let numBiaya: number;
+    if (typeof biaya === "number") {
+      numBiaya = biaya;
+    } else {
+      let s = String(biaya).trim();
+      if (s.includes(".") && !s.includes(",")) {
+        if (/\.\d{3}/.test(s)) s = s.replace(/\./g, "");
+      } else if (s.includes(".") && s.includes(",")) {
+        s = s.replace(/\./g, "").replace(",", ".");
+      } else if (s.includes(",")) {
+        s = s.replace(",", ".");
+      }
+      numBiaya = parseFloat(s) || 0;
+    }
+    const durasi = parseInt(String(estimasi_durasi_hari || 30), 10) || 30;
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("master_program")
+      .update({
+        kode_program: String(kode_program).trim(),
+        nama: String(nama).trim(),
+        biaya: numBiaya,
+        estimasi_durasi_hari: durasi,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return errorResponse("DUPLICATE_CODE", "Kode program sudah digunakan.", 409);
+      }
+      return errorResponse("DATABASE_ERROR", "Gagal memperbarui program.", 500, error.message);
+    }
+
+    return successResponse(data);
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal memperbarui data program.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();

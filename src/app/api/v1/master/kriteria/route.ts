@@ -66,6 +66,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function PUT(request: NextRequest) {
+  try {
+    const { errorResponse: authError } = await requireSuperadmin();
+    if (authError) return authError;
+
+    const body = await request.json();
+    const { id, nama_kriteria, batas_lulus, urutan } = body;
+
+    if (!id || !nama_kriteria) {
+      return errorResponse("VALIDATION_ERROR", "ID dan nama kriteria wajib diisi.", 400);
+    }
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("master_kriteria")
+      .update({
+        nama_kriteria: String(nama_kriteria).trim(),
+        batas_lulus: parseInt(String(batas_lulus || 80), 10),
+        urutan: parseInt(String(urutan || 1), 10),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return errorResponse("DUPLICATE_NAME", "Nama kriteria sudah digunakan.", 409);
+      }
+      return errorResponse("DATABASE_ERROR", "Gagal memperbarui kriteria.", 500, error.message);
+    }
+
+    return successResponse(data);
+  } catch (err) {
+    return errorResponse(
+      "INTERNAL_ERROR",
+      "Gagal memperbarui data kriteria.",
+      500,
+      err instanceof Error ? err.message : String(err)
+    );
+  }
+}
+
 export async function DELETE(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();
