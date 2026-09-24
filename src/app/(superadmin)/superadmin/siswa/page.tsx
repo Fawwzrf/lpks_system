@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   Search, Download, Upload, FileText, Users, KeyRound,
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
-  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw, ChevronDown
+  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw, ChevronDown,
+  GraduationCap
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,8 @@ interface SiswaItem {
   tgl_masuk?: string;
   tgl_keluar?: string | null;
   status_siswa?: "aktif" | "alumni" | "out";
-  program?: { nama: string };
+  program_id?: string;
+  program?: { id?: string; kode_program?: string; nama: string; biaya?: number };
   is_password_default?: boolean;
 }
 
@@ -37,6 +39,8 @@ interface ProgramItem {
   id: string;
   kode_program: string;
   nama: string;
+  biaya?: number;
+  estimasi_durasi_hari?: number;
 }
 
 type FilterStatus = "aktif" | "alumni" | "out" | "semua";
@@ -68,6 +72,16 @@ export default function SiswaPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [credSaving, setCredSaving] = useState(false);
   const [credMsg, setCredMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Modal Tambah Program Baru
+  const [tambahProgramSiswa, setTambahProgramSiswa] = useState<SiswaItem | null>(null);
+  const [tambahProgId, setTambahProgId] = useState("");
+  const [tambahProgBiaya, setTambahProgBiaya] = useState("");
+  const [tambahProgNoInduk, setTambahProgNoInduk] = useState("");
+  const [tambahProgTglMasuk, setTambahProgTglMasuk] = useState(() => new Date().toISOString().split("T")[0]);
+  const [loadingNextNoInduk, setLoadingNextNoInduk] = useState(false);
+  const [tambahProgSubmitting, setTambahProgSubmitting] = useState(false);
+  const [tambahProgMsg, setTambahProgMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Modal Hapus Siswa
   const [deleteSiswa, setDeleteSiswa] = useState<SiswaItem | null>(null);
@@ -261,6 +275,96 @@ export default function SiswaPage() {
       alert("Kesalahan jaringan saat menghapus siswa.");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function openTambahProgram(siswa: SiswaItem) {
+    setTambahProgramSiswa(siswa);
+    setTambahProgMsg(null);
+    setTambahProgTglMasuk(new Date().toISOString().split("T")[0]);
+
+    // Cari program kandidat (prioritaskan yang belum diambil siswa)
+    const candidateProg = programs.find((p) => p.id !== siswa.program_id && p.nama !== siswa.program?.nama) || programs[0];
+    if (candidateProg) {
+      setTambahProgId(candidateProg.id);
+      setTambahProgBiaya(String(candidateProg.biaya ?? ""));
+      setLoadingNextNoInduk(true);
+      try {
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${candidateProg.id}`);
+        if (res.ok) {
+          const json = await res.json();
+          setTambahProgNoInduk(json.data?.next_nomor_induk || "");
+        }
+      } catch (err) {
+        console.error("Gagal mengambil nomor induk berikutnya:", err);
+      } finally {
+        setLoadingNextNoInduk(false);
+      }
+    } else {
+      setTambahProgId("");
+      setTambahProgBiaya("");
+      setTambahProgNoInduk("");
+    }
+  }
+
+  async function handleProgramChange(progId: string) {
+    setTambahProgId(progId);
+    const prog = programs.find((p) => p.id === progId);
+    if (prog) {
+      setTambahProgBiaya(String(prog.biaya ?? ""));
+      setLoadingNextNoInduk(true);
+      try {
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${prog.id}`);
+        if (res.ok) {
+          const json = await res.json();
+          setTambahProgNoInduk(json.data?.next_nomor_induk || "");
+        }
+      } catch (err) {
+        console.error("Gagal mengambil nomor induk berikutnya:", err);
+      } finally {
+        setLoadingNextNoInduk(false);
+      }
+    }
+  }
+
+  async function handleConfirmTambahProgram(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tambahProgramSiswa || !tambahProgId) return;
+
+    setTambahProgSubmitting(true);
+    setTambahProgMsg(null);
+
+    try {
+      const res = await fetch(`/api/v1/siswa/${tambahProgramSiswa.id}/tambah-program`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          program_id: tambahProgId,
+          nomor_induk: tambahProgNoInduk,
+          biaya_pelatihan: tambahProgBiaya ? parseFloat(tambahProgBiaya) : undefined,
+          tgl_masuk: tambahProgTglMasuk,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Gagal mendaftarkan siswa ke program baru.");
+      }
+
+      setTambahProgMsg({ type: "success", text: json.message || "Berhasil mendaftarkan siswa ke program baru!" });
+      cacheRef.current.clear();
+      await loadSiswa(true);
+
+      setTimeout(() => {
+        setTambahProgramSiswa(null);
+      }, 1500);
+    } catch (err) {
+      setTambahProgMsg({
+        type: "error",
+        text: err instanceof Error ? err.message : "Terjadi kesalahan sistem.",
+      });
+    } finally {
+      setTambahProgSubmitting(false);
     }
   }
 
@@ -462,6 +566,13 @@ export default function SiswaPage() {
             </button>
           )}
           <button
+            onClick={() => openTambahProgram(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#38BDF8]/40 bg-[#0B0F17] hover:bg-[#38BDF8]/10 text-[#9CA3AF] hover:text-[#38BDF8] transition-all"
+            title="Daftarkan Program Baru untuk Siswa Ini"
+          >
+            <GraduationCap className="h-3.5 w-3.5" />
+          </button>
+          <button
             onClick={() => router.push(`/superadmin/siswa/edit/${row.id}`)}
             className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all"
             title="Edit Siswa"
@@ -645,6 +756,156 @@ export default function SiswaPage() {
           </div>
         </div>
       )}
+
+      {/* Modal Tambah Program Baru untuk Siswa */}
+      <Modal
+        open={!!tambahProgramSiswa}
+        onClose={() => !tambahProgSubmitting && setTambahProgramSiswa(null)}
+        title="Daftarkan Siswa ke Program Baru"
+      >
+        {tambahProgramSiswa && (
+          <form onSubmit={handleConfirmTambahProgram} className="flex flex-col gap-4 text-xs">
+            {/* Student Info Card */}
+            <div className="p-3 rounded-lg bg-[#0B0F17] border border-[#1F2937] flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-sm text-[#F9FAFB]">
+                  {tambahProgramSiswa.nama_lengkap}
+                </span>
+                <span className="font-mono text-[10px] text-[#DC2626] font-bold">
+                  {tambahProgramSiswa.nomor_induk}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-[#9CA3AF] pt-1 border-t border-[#1F2937]/60">
+                <p>NIK: <span className="font-mono text-[#D1D5DB]">{tambahProgramSiswa.nik}</span></p>
+                <p>Program Saat Ini: <span className="text-[#38BDF8] font-medium">{tambahProgramSiswa.program?.nama || "—"}</span></p>
+              </div>
+            </div>
+
+            {/* Notification message */}
+            {tambahProgMsg && (
+              <div
+                className={`p-3 rounded-lg flex items-center gap-2 text-xs border ${
+                  tambahProgMsg.type === "success"
+                    ? "bg-[#10B981]/10 border-[#10B981]/30 text-[#10B981]"
+                    : "bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#F43F5E]"
+                }`}
+              >
+                {tambahProgMsg.type === "success" ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                )}
+                <span>{tambahProgMsg.text}</span>
+              </div>
+            )}
+
+            {/* Pilihan Program Baru */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[#D1D5DB]">
+                Pilih Program Pelatihan Baru <span className="text-[#DC2626]">*</span>
+              </label>
+              <Select
+                value={tambahProgId}
+                onChange={(e) => handleProgramChange(e.target.value)}
+                required
+              >
+                <option value="" disabled>-- Pilih Program Baru --</option>
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.kode_program} - {p.nama} {p.id === tambahProgramSiswa.program_id ? "(Sedang Diambil)" : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Nomor Induk Baru */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[#D1D5DB] flex items-center justify-between">
+                <span>Nomor Induk Baru <span className="text-[#DC2626]">*</span></span>
+                {loadingNextNoInduk && (
+                  <span className="text-[10px] text-[#38BDF8] flex items-center gap-1 font-normal">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" /> Menghitung nomor induk...
+                  </span>
+                )}
+              </label>
+              <input
+                type="text"
+                required
+                value={tambahProgNoInduk}
+                onChange={(e) => setTambahProgNoInduk(e.target.value)}
+                placeholder="Contoh: 01.1033"
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] font-mono text-xs"
+              />
+              <p className="text-[10px] text-[#6B7280]">
+                Otomatis di-generate dari nomor urut berikutnya, namun dapat Anda sesuaikan bila ada ketentuan nomor khusus.
+              </p>
+            </div>
+
+            {/* Biaya Pelatihan */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[#D1D5DB]">
+                Biaya Pelatihan Program Baru (Rp) <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                type="number"
+                required
+                min={0}
+                value={tambahProgBiaya}
+                onChange={(e) => setTambahProgBiaya(e.target.value)}
+                placeholder="Contoh: 8500000"
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] text-xs"
+              />
+              <p className="text-[10px] text-[#6B7280]">
+                Tercatat sebagai tagihan di menu Keuangan untuk program baru ini (misal: Banper, tarif khusus, atau diskon).
+              </p>
+            </div>
+
+            {/* Tanggal Masuk */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-medium text-[#D1D5DB]">
+                Tanggal Masuk Program Baru <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={tambahProgTglMasuk}
+                onChange={(e) => setTambahProgTglMasuk(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] focus:outline-none focus:border-[#DC2626] text-xs"
+              />
+            </div>
+
+            <p className="text-[11px] text-[#9CA3AF] bg-[#1F2937]/40 p-2.5 rounded-lg border border-[#1F2937]">
+              Semua data pribadi (NIK, Tempat/Tgl Lahir, Alamat, Orang Tua, No. HP, Berkas) akan disalin secara otomatis dari data siswa saat ini.
+            </p>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-[#1F2937]">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={tambahProgSubmitting}
+                onClick={() => setTambahProgramSiswa(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={tambahProgSubmitting || loadingNextNoInduk || !tambahProgId || !tambahProgNoInduk}
+                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5"
+              >
+                {tambahProgSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Mendaftarkan...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Daftarkan Program Baru
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Modal Kelola Akun */}
       <Modal
