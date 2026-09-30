@@ -6,7 +6,7 @@ import {
   Search, Download, Upload, FileText, Users, KeyRound,
   Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
   Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw, ChevronDown,
-  GraduationCap
+  GraduationCap, XCircle, Check
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,16 @@ export default function SiswaPage() {
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState("");
-  const [importResult, setImportResult] = useState<{ success: boolean; message: string; errors?: { row: number; reason: string }[] } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    success: boolean;
+    message: string;
+    total_rows?: number;
+    imported_count?: number;
+    updated_count?: number;
+    failed_count?: number;
+    warning_count?: number;
+    errors?: { row: number; reason: string; type?: "warning" | "error" }[];
+  } | null>(null);
 
   useEffect(() => {
     async function loadPrograms() {
@@ -387,41 +396,105 @@ export default function SiswaPage() {
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setImportResult({ success: false, message: json.error?.message || "Gagal mengimpor file." });
+        setImportResult({
+          success: false,
+          message: json.error?.message || "Gagal mengimpor file.",
+          total_rows: 0,
+          imported_count: 0,
+          updated_count: 0,
+          failed_count: 1,
+          warning_count: 0,
+          errors: [{ row: 0, reason: json.error?.message || "Gagal menghubungi server", type: "error" }],
+        });
         setImporting(false);
         return;
       }
 
       const reader = res.body?.getReader();
       if (!reader) {
+        setImportResult({
+          success: false,
+          message: "Respon server tidak mendukung streaming pembacaan data.",
+          total_rows: 0,
+          imported_count: 0,
+          updated_count: 0,
+          failed_count: 1,
+          warning_count: 0,
+          errors: [{ row: 0, reason: "Stream reader tidak tersedia", type: "error" }],
+        });
         setImporting(false);
         return;
       }
       const decoder = new TextDecoder();
-      let finalResult = null;
+      let finalResult: {
+        total_rows?: number;
+        imported_count?: number;
+        updated_count?: number;
+        failed_count?: number;
+        warning_count?: number;
+        errors?: { row: number; reason: string; type?: "warning" | "error" }[];
+        message?: string;
+      } | null = null;
 
+      let buffer = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter(Boolean);
-        
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
         for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
           try {
-            const data = JSON.parse(line);
+            const data = JSON.parse(trimmed);
             if (data.type === "progress") {
               setImportProgress(data.progress);
               setImportStatus(data.status);
             } else if (data.type === "done") {
               finalResult = data.result;
             } else if (data.type === "error") {
-              setImportResult({ success: false, message: data.message });
+              setImportResult({
+                success: false,
+                message: data.message,
+                total_rows: 0,
+                imported_count: 0,
+                updated_count: 0,
+                failed_count: 1,
+                warning_count: 0,
+                errors: [{ row: 0, reason: data.message, type: "error" }],
+              });
               setImporting(false);
               return;
             }
-          } catch(e) {}
+          } catch (e) {
+            console.error("Gagal mengurai chunk import:", e);
+          }
         }
+      }
+
+      if (buffer.trim()) {
+        try {
+          const data = JSON.parse(buffer.trim());
+          if (data.type === "done") {
+            finalResult = data.result;
+          } else if (data.type === "error") {
+            setImportResult({
+              success: false,
+              message: data.message,
+              total_rows: 0,
+              imported_count: 0,
+              updated_count: 0,
+              failed_count: 1,
+              warning_count: 0,
+              errors: [{ row: 0, reason: data.message, type: "error" }],
+            });
+            setImporting(false);
+            return;
+          }
+        } catch {}
       }
 
       setImporting(false);
@@ -429,15 +502,44 @@ export default function SiswaPage() {
       await loadSiswa(true);
 
       if (finalResult) {
+        const errs = finalResult.errors || [];
+        const failCount = finalResult.failed_count ?? errs.filter((e) => e.type !== "warning").length;
+        const warnCount = finalResult.warning_count ?? errs.filter((e) => e.type === "warning").length;
         setImportResult({
           success: true,
-          message: finalResult.message,
-          errors: finalResult.errors
+          message: finalResult.message || "Proses impor selesai.",
+          total_rows: finalResult.total_rows ?? ((finalResult.imported_count || 0) + (finalResult.updated_count || 0) + errs.length),
+          imported_count: finalResult.imported_count || 0,
+          updated_count: finalResult.updated_count || 0,
+          failed_count: failCount,
+          warning_count: warnCount,
+          errors: errs,
+        });
+        await loadSiswa();
+      } else {
+        setImportResult({
+          success: true,
+          message: "Proses impor file telah selesai diproses.",
+          total_rows: 0,
+          imported_count: 0,
+          updated_count: 0,
+          failed_count: 0,
+          warning_count: 0,
+          errors: [],
         });
         await loadSiswa();
       }
     } catch {
-      setImportResult({ success: false, message: "Terjadi kesalahan saat mengunggah file." });
+      setImportResult({
+        success: false,
+        message: "Terjadi kesalahan saat mengunggah file.",
+        total_rows: 0,
+        imported_count: 0,
+        updated_count: 0,
+        failed_count: 1,
+        warning_count: 0,
+        errors: [{ row: 0, reason: "Gagal mengunggah file atau koneksi terputus.", type: "error" }],
+      });
       setImporting(false);
     }
   }
@@ -1133,63 +1235,179 @@ export default function SiswaPage() {
             </div>
           )}
 
-          {!importing && importResult && (
-            <div className="flex flex-col gap-3 py-2">
-              <div
-                className={`rounded-lg p-3 text-xs flex items-start gap-2.5 ${
-                  importResult.success && (!importResult.errors || importResult.errors.length === 0)
-                    ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
-                    : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
-                }`}
-              >
-                {importResult.success && (!importResult.errors || importResult.errors.length === 0) ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                )}
-                <span className="leading-relaxed font-medium">{importResult.message}</span>
-              </div>
-              {importResult.errors && importResult.errors.length > 0 && (() => {
-                type ImportError = { row: number; reason: string; type?: "warning" | "error" };
-                const warnings = (importResult.errors as ImportError[]).filter(e => e.type === "warning");
-                const errs     = (importResult.errors as ImportError[]).filter(e => e.type !== "warning");
+          {!importing && importResult && (() => {
+            const errs = (importResult.errors || []).filter((e) => e.type !== "warning");
+            const warnings = (importResult.errors || []).filter((e) => e.type === "warning");
+            const totalSelesai = (importResult.imported_count || 0) + (importResult.updated_count || 0);
+            const totalGagal = importResult.failed_count ?? errs.length;
+            const totalCatatan = importResult.warning_count ?? warnings.length;
+            const isFullSuccess = importResult.success && totalGagal === 0 && totalCatatan === 0;
+            const isPartial = importResult.success && totalSelesai > 0 && (totalGagal > 0 || totalCatatan > 0);
 
-                const groupBy = (items: ImportError[]) =>
-                  Object.entries(
-                    items.reduce((acc, e) => {
-                      if (!acc[e.reason]) acc[e.reason] = [];
-                      acc[e.reason].push(e.row);
-                      return acc;
-                    }, {} as Record<string, number[]>)
-                  );
+            const groupBy = (items: typeof errs) =>
+              Object.entries(
+                items.reduce((acc, e) => {
+                  const key = e.reason || "Alasan tidak diketahui";
+                  if (!acc[key]) acc[key] = [];
+                  if (e.row) acc[key].push(e.row);
+                  return acc;
+                }, {} as Record<string, number[]>)
+              );
 
-                return (
-                  <div className="flex flex-col gap-2">
-                    {warnings.length > 0 && (
-                      <div className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 max-h-36 overflow-y-auto">
-                        <span className="text-[11px] font-semibold text-amber-400 block mb-2">⚠ Dilewati (data sudah ada):</span>
-                        <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-amber-300/90">
-                          {groupBy(warnings).map(([reason, rows], idx) => (
-                            <li key={idx}><b>Baris {rows.join(", ")}:</b> {reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {errs.length > 0 && (
-                      <div className="rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 max-h-36 overflow-y-auto">
-                        <span className="text-[11px] font-semibold text-[#F43F5E] block mb-2">✕ Gagal diimpor:</span>
-                        <ul className="list-disc pl-4 space-y-1.5 text-[11px] text-[#F43F5E]/90">
-                          {groupBy(errs).map(([reason, rows], idx) => (
-                            <li key={idx}><b>Baris {rows.join(", ")}:</b> {reason}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+            return (
+              <div className="flex flex-col gap-4 py-1">
+                {/* Status Banner */}
+                <div
+                  className={`rounded-xl p-4 flex items-start gap-3 border ${
+                    isFullSuccess
+                      ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30"
+                      : isPartial
+                      ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
+                      : "bg-[#F43F5E]/10 text-[#F43F5E] border-[#F43F5E]/30"
+                  }`}
+                >
+                  {isFullSuccess ? (
+                    <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-[#10B981]" />
+                  ) : isPartial ? (
+                    <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-400" />
+                  ) : (
+                    <XCircle className="h-5 w-5 shrink-0 mt-0.5 text-[#F43F5E]" />
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-xs sm:text-sm">
+                      {isFullSuccess
+                        ? "Import Selesai Sepenuhnya"
+                        : isPartial
+                        ? "Import Selesai dengan Catatan"
+                        : "Import Mengalami Kegagalan"}
+                    </span>
+                    <span className="text-xs text-[#D1D5DB] leading-relaxed">
+                      {importResult.message}
+                    </span>
                   </div>
-                );
-              })()}
-            </div>
-          )}
+                </div>
+
+                {/* 4 Cards Ringkasan Metrik: Total, Selesai Baru, Diperbarui, Gagal */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  {/* Card 1: Total */}
+                  <div className="p-3 rounded-xl bg-[#1F2937]/50 border border-[#1F2937] flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wider">
+                      Total Data
+                    </span>
+                    <span className="text-xl font-bold text-[#F9FAFB]">
+                      {importResult.total_rows || 0}
+                    </span>
+                    <span className="text-[10px] text-[#6B7280]">Baris spreadsheet</span>
+                  </div>
+
+                  {/* Card 2: Baru */}
+                  <div className="p-3 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-[#10B981] uppercase tracking-wider">
+                      {importModul === "arsip_alumni" ? "Arsip Baru" : "Siswa Baru"}
+                    </span>
+                    <span className="text-xl font-bold text-[#10B981]">
+                      {importResult.imported_count || 0}
+                    </span>
+                    <span className="text-[10px] text-[#10B981]/80">Berhasil disimpan</span>
+                  </div>
+
+                  {/* Card 3: Diperbarui */}
+                  <div className="p-3 rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/30 flex flex-col gap-1">
+                    <span className="text-[10px] font-semibold text-[#38BDF8] uppercase tracking-wider">
+                      Diperbarui
+                    </span>
+                    <span className="text-xl font-bold text-[#38BDF8]">
+                      {importResult.updated_count || 0}
+                    </span>
+                    <span className="text-[10px] text-[#38BDF8]/80">Data disinkronkan</span>
+                  </div>
+
+                  {/* Card 4: Gagal / Error */}
+                  <div
+                    className={`p-3 rounded-xl border flex flex-col gap-1 ${
+                      totalGagal > 0
+                        ? "bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#F43F5E]"
+                        : "bg-[#1F2937]/30 border-[#1F2937] text-[#9CA3AF]"
+                    }`}
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-wider">
+                      Gagal
+                    </span>
+                    <span className={`text-xl font-bold ${totalGagal > 0 ? "text-[#F43F5E]" : "text-[#9CA3AF]"}`}>
+                      {totalGagal}
+                    </span>
+                    <span className="text-[10px] text-[#6B7280]">
+                      {totalCatatan > 0 ? `+${totalCatatan} catatan` : totalGagal > 0 ? "Perlu koreksi" : "Tanpa kendala"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Daftar Rincian Error jika ada */}
+                {errs.length > 0 && (
+                  <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3.5 flex flex-col gap-2 max-h-44 overflow-y-auto">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#F43F5E]">
+                      <XCircle className="h-4 w-4 shrink-0" />
+                      <span>Rincian Data Gagal Diimpor ({errs.length} baris):</span>
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1 text-[11px] text-[#F43F5E]/90">
+                      {groupBy(errs).map(([reason, rows], idx) => (
+                        <li key={idx}>
+                          {rows.length > 0 ? <b>Baris {rows.join(", ")}: </b> : null}
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Daftar Catatan / Warning jika ada */}
+                {warnings.length > 0 && (
+                  <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3.5 flex flex-col gap-2 max-h-44 overflow-y-auto">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
+                      <AlertTriangle className="h-4 w-4 shrink-0" />
+                      <span>Catatan & Data Dilewati ({warnings.length} baris):</span>
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1 text-[11px] text-amber-300/90">
+                      {groupBy(warnings).map(([reason, rows], idx) => (
+                        <li key={idx}>
+                          {rows.length > 0 ? <b>Baris {rows.join(", ")}: </b> : null}
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Footer Tombol */}
+                <div className="flex items-center justify-between pt-2 border-t border-[#1F2937]">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setImportResult(null);
+                      setImportFile(null);
+                    }}
+                    className="text-xs"
+                  >
+                    Import File Lain
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-[#DC2626] hover:bg-[#B91C1C] text-white font-semibold text-xs px-4"
+                    onClick={() => {
+                      setImportOpen(false);
+                      setImportResult(null);
+                      setImportFile(null);
+                    }}
+                  >
+                    Selesai & Tutup
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
 
           <div className="flex items-center gap-2 justify-end pt-2">
             {(!importing && !importResult) && (
@@ -1201,11 +1419,6 @@ export default function SiswaPage() {
                   Mulai Import {importModul === "arsip_alumni" ? "Arsip Alumni" : "Siswa"}
                 </Button>
               </>
-            )}
-            {!importing && importResult && (
-              <Button type="button" size="sm" onClick={() => { setImportOpen(false); setImportResult(null); setImportFile(null); }}>
-                Tutup
-              </Button>
             )}
           </div>
         </form>

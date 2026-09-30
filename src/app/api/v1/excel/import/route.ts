@@ -393,10 +393,13 @@ export async function POST(request: NextRequest) {
             }
 
             // Send done
+            const failCount = errors.filter(e => e.type !== "warning").length;
+            const warnCount = errors.filter(e => e.type === "warning").length;
             const statusParts: string[] = [];
             if (importedCount > 0) statusParts.push(`${importedCount} data siswa baru disimpan`);
             if (updatedCount > 0) statusParts.push(`${updatedCount} data siswa diperbarui`);
-            if (errors.length > 0) statusParts.push(`${errors.length} gagal/dilewati`);
+            if (failCount > 0) statusParts.push(`${failCount} gagal`);
+            if (warnCount > 0) statusParts.push(`${warnCount} dilewati`);
             const summaryMsg = `Impor selesai: ${statusParts.join(", ") || "0 data diproses"}.`;
 
             controller.enqueue(encoder.encode(JSON.stringify({
@@ -405,7 +408,8 @@ export async function POST(request: NextRequest) {
                 total_rows:     rows.length,
                 imported_count: importedCount,
                 updated_count:  updatedCount,
-                failed_count:   errors.length,
+                failed_count:   failCount,
+                warning_count:  warnCount,
                 errors,
                 message: summaryMsg,
               },
@@ -888,19 +892,25 @@ export async function POST(request: NextRequest) {
                   .maybeSingle();
 
                 if (!existingCert) {
-                  await supabase.from("sertifikat").insert({
+                  const { error: certErr } = await supabase.from("sertifikat").insert({
                     siswa_id: siswaId,
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
                     tgl_antrean: tglMasuk,
                     tgl_cetak: tglLulus,
                   });
+                  if (certErr) {
+                    errors.push({ row: excelRow, reason: `Gagal mencatat nomor sertifikat: ${certErr.message}`, type: "warning" });
+                  }
                 } else {
-                  await supabase.from("sertifikat").update({
+                  const { error: certErr } = await supabase.from("sertifikat").update({
                     no_sertifikat: noSertifikat,
                     status: "dicetak",
                     tgl_cetak: tglLulus,
                   }).eq("id", existingCert.id);
+                  if (certErr) {
+                    errors.push({ row: excelRow, reason: `Gagal memperbarui nomor sertifikat: ${certErr.message}`, type: "warning" });
+                  }
                 }
               }
 
@@ -912,10 +922,13 @@ export async function POST(request: NextRequest) {
               }) + "\n"));
             }
 
+            const failCount = errors.filter(e => e.type !== "warning").length;
+            const warnCount = errors.filter(e => e.type === "warning").length;
             const statusParts: string[] = [];
             if (importedCount > 0) statusParts.push(`${importedCount} arsip alumni baru disimpan`);
             if (updatedCount > 0) statusParts.push(`${updatedCount} data alumni diperbarui`);
-            if (errors.length > 0) statusParts.push(`${errors.length} dilewati/gagal`);
+            if (failCount > 0) statusParts.push(`${failCount} gagal`);
+            if (warnCount > 0) statusParts.push(`${warnCount} catatan`);
             const summaryMsg = `Impor Arsip Selesai: ${statusParts.join(", ") || "0 data diproses"}. Siswa alumni, status keuangan lunas, dan nomor sertifikat telah tercatat.`;
 
             controller.enqueue(encoder.encode(JSON.stringify({
@@ -924,7 +937,8 @@ export async function POST(request: NextRequest) {
                 total_rows: rows.length,
                 imported_count: importedCount,
                 updated_count: updatedCount,
-                failed_count: errors.length,
+                failed_count: failCount,
+                warning_count: warnCount,
                 errors,
                 message: summaryMsg,
               },
