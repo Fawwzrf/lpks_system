@@ -162,13 +162,14 @@ export async function POST(request: NextRequest) {
               // Jika berisi teks (mis. "SMAW 4G"), cari berdasarkan nama.
               let programId: string | null = null;
               let estimasiDurasiHari: number = 0;
+              let programBiaya: number | null = null;
               const isNumericCode = /^\d+$/.test(namaProgram);
 
               if (isNumericCode) {
                 const kodePrefix = manualNoInduk.split(".")[0].trim().padStart(2, "0");
                 const { data: programs } = await supabase
                   .from("master_program")
-                  .select("id, kode_program, estimasi_durasi_hari")
+                  .select("id, kode_program, estimasi_durasi_hari, biaya")
                   .eq("kode_program", kodePrefix);
 
                 if (!programs || programs.length === 0) {
@@ -178,10 +179,11 @@ export async function POST(request: NextRequest) {
                 }
                 programId = programs[0].id;
                 estimasiDurasiHari = Number(programs[0].estimasi_durasi_hari || 0);
+                programBiaya = programs[0].biaya !== null && programs[0].biaya !== undefined ? Number(programs[0].biaya) : null;
               } else {
                 const { data: prog } = await supabase
                   .from("master_program")
-                  .select("id, estimasi_durasi_hari")
+                  .select("id, estimasi_durasi_hari, biaya")
                   .ilike("nama", `%${namaProgram}%`)
                   .limit(1)
                   .maybeSingle();
@@ -193,6 +195,7 @@ export async function POST(request: NextRequest) {
                 }
                 programId = prog.id;
                 estimasiDurasiHari = Number(prog.estimasi_durasi_hari || 0);
+                programBiaya = prog.biaya !== null && prog.biaya !== undefined ? Number(prog.biaya) : null;
               }
 
               // ── Nomor Induk ─────────────────────────────────────────────
@@ -228,6 +231,30 @@ export async function POST(request: NextRequest) {
 
               const supabaseAdmin = createAdminClient();
 
+              // Ekstraksi Biaya Pelatihan: prioritaskan kolom Excel jika ada, fallback ke biaya program
+              const rawBiayaInput = row["Biaya Pelatihan"] || row["Biaya"] || row["biaya_pelatihan"] || row["biaya"];
+              let parsedBiayaSiswa: number | null = programBiaya;
+              if (rawBiayaInput !== undefined && rawBiayaInput !== null && String(rawBiayaInput).trim() !== "") {
+                if (typeof rawBiayaInput === "number") {
+                  parsedBiayaSiswa = rawBiayaInput;
+                } else {
+                  let s = String(rawBiayaInput).trim();
+                  if (s.includes(".") && !s.includes(",")) {
+                    if (/\.\d{3}/.test(s)) s = s.replace(/\./g, "");
+                  } else if (s.includes(".") && s.includes(",")) {
+                    s = s.replace(/\./g, "").replace(",", ".");
+                  } else if (s.includes(",")) {
+                    s = s.replace(",", ".");
+                  } else {
+                    s = s.replace(/[^\d.-]/g, "");
+                  }
+                  const cleanedBiaya = parseFloat(s);
+                  if (!isNaN(cleanedBiaya) && cleanedBiaya >= 0) {
+                    parsedBiayaSiswa = cleanedBiaya;
+                  }
+                }
+              }
+
               // Cek duplikat siswa:
               // Siswa boleh terdaftar lebih dari 1 kali jika mengambil program berbeda (misal 2 pelatihan berbeda).
               // Duplikat dicegah jika:
@@ -235,9 +262,9 @@ export async function POST(request: NextRequest) {
               // 2. Username sudah terdaftar
               // 3. NIK yang sama di program yang sama sudah terdaftar
               const [{ data: byNoInduk }, { data: byUsername }, { data: byNikSameProgram }] = await Promise.all([
-                supabase.from("siswa").select("id, status_siswa").eq("nomor_induk", noInduk).maybeSingle(),
-                supabase.from("siswa").select("id, status_siswa").eq("username", username).maybeSingle(),
-                programId ? supabase.from("siswa").select("id, status_siswa").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
+                supabase.from("siswa").select("id, status_siswa, biaya_pelatihan").eq("nomor_induk", noInduk).maybeSingle(),
+                supabase.from("siswa").select("id, status_siswa, biaya_pelatihan").eq("username", username).maybeSingle(),
+                programId ? supabase.from("siswa").select("id, status_siswa, biaya_pelatihan").eq("nik", nik).eq("program_id", programId).maybeSingle() : Promise.resolve({ data: null }),
               ]);
 
               const existingUser = byNoInduk || byNikSameProgram || byUsername;
@@ -285,6 +312,10 @@ export async function POST(request: NextRequest) {
                 }
                 if (noInduk) {
                   updatePayload.nomor_induk = noInduk;
+                }
+                // Amankan snapshot biaya jika data siswa lama di DB belum memiliki biaya_pelatihan
+                if (existingUser.biaya_pelatihan === null && parsedBiayaSiswa !== null) {
+                  updatePayload.biaya_pelatihan = parsedBiayaSiswa;
                 }
 
                 // Jika di Excel ada email valid dan email di DB saat ini masih dummy @lpks.id, perbarui
@@ -370,6 +401,7 @@ export async function POST(request: NextRequest) {
                     tgl_masuk:            tglMasukFinal,
                     tgl_keluar:           tglKeluarFinal,
                     status_siswa:         statusSiswa,
+                    biaya_pelatihan:      parsedBiayaSiswa,
                     checklist_berkas: { ijazah: true, ktp: true, kk: true, foto: true, suket_sehat: true },
                     is_password_default:  true,
                   });
@@ -801,7 +833,7 @@ export async function POST(request: NextRequest) {
                     tgl_masuk: tglMasuk,
                     tgl_keluar: tglLulus,
                     status_siswa: statusSiswa,
-                    biaya_pelatihan: biaya > 0 ? biaya : null,
+                    biaya_pelatihan: biaya > 0 ? biaya : (matchedProg?.biaya !== null && matchedProg?.biaya !== undefined ? Number(matchedProg.biaya) : null),
                     is_password_default: true,
                   })
                   .select("id")

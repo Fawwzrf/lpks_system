@@ -99,6 +99,23 @@ export async function PUT(request: NextRequest) {
     const durasi = parseInt(String(estimasi_durasi_hari || 30), 10) || 30;
 
     const supabase = await createClient();
+
+    // Auto-grandfathering: Amankan siswa lama sebelum biaya program diperbarui.
+    // Jika biaya berubah, kunci harga lama pada siswa yang masih bernilai NULL agar tidak terdampak secara retroaktif.
+    const { data: currentProg } = await supabase
+      .from("master_program")
+      .select("biaya")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (currentProg && currentProg.biaya !== null && Number(currentProg.biaya) !== numBiaya) {
+      await supabase
+        .from("siswa")
+        .update({ biaya_pelatihan: Number(currentProg.biaya) })
+        .eq("program_id", id)
+        .is("biaya_pelatihan", null);
+    }
+
     const { data, error } = await supabase
       .from("master_program")
       .update({

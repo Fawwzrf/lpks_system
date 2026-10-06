@@ -94,4 +94,52 @@ describe("Master Program Update Logic Unit Tests", () => {
     assert.equal(res.valid, true);
     assert.equal(res.data?.estimasi_durasi_hari, 30);
   });
+
+  test("Auto-grandfathering terdeteksi jika harga program berubah dari harga saat ini", () => {
+    const shouldTriggerGrandfathering = (currentBiaya: number | null | undefined, newBiaya: number) => {
+      return currentBiaya !== null && currentBiaya !== undefined && Number(currentBiaya) !== newBiaya;
+    };
+
+    // Harga naik dari 7.500.000 ke 8.000.000 -> harus trigger grandfathering
+    assert.equal(shouldTriggerGrandfathering(7500000, 8000000), true);
+
+    // Harga sama -> tidak trigger
+    assert.equal(shouldTriggerGrandfathering(7500000, 7500000), false);
+
+    // Current biaya null (program baru belum ada harga) -> tidak trigger
+    assert.equal(shouldTriggerGrandfathering(null, 7500000), false);
+  });
+
+  test("Snapshot biaya siswa memprioritaskan biaya kustom jika ada, atau fallback ke harga program", () => {
+    const resolveSiswaBiaya = (
+      inputBiaya: string | number | null | undefined,
+      programBiaya: number | null | undefined
+    ): number | null => {
+      if (inputBiaya !== undefined && inputBiaya !== null && inputBiaya !== "") {
+        if (typeof inputBiaya === "number") return inputBiaya;
+        let s = String(inputBiaya).trim();
+        if (s.includes(".") && !s.includes(",")) {
+          if (/\.\d{3}/.test(s)) s = s.replace(/\./g, "");
+        } else if (s.includes(".") && s.includes(",")) {
+          s = s.replace(/\./g, "").replace(",", ".");
+        } else if (s.includes(",")) {
+          s = s.replace(",", ".");
+        } else {
+          s = s.replace(/[^\d.-]/g, "");
+        }
+        const parsed = parseFloat(s);
+        if (!isNaN(parsed) && parsed >= 0) return parsed;
+      }
+      return programBiaya !== undefined && programBiaya !== null ? Number(programBiaya) : null;
+    };
+
+    // Siswa didaftarkan tanpa input biaya -> otomatis mengambil snapshot harga program
+    assert.equal(resolveSiswaBiaya(null, 7500000), 7500000);
+    assert.equal(resolveSiswaBiaya("", 8500000), 8500000);
+
+    // Siswa didaftarkan dengan beasiswa/diskon kustom -> memakai input kustom
+    assert.equal(resolveSiswaBiaya("5.000.000", 7500000), 5000000);
+    assert.equal(resolveSiswaBiaya(4000000, 7500000), 4000000);
+  });
 });
+

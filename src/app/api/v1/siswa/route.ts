@@ -233,13 +233,18 @@ export async function POST(request: NextRequest) {
     // Hitung tanggal keluar otomatis jika belum ditentukan
     const finalTglMasuk = tgl_masuk || new Date().toISOString().split("T")[0];
     let finalTglKeluar = body.tgl_keluar || null;
-    if (!finalTglKeluar && program_id) {
+    let defaultBiaya: number | null = null;
+    if (program_id) {
       const { data: prog } = await supabase
         .from("master_program")
-        .select("estimasi_durasi_hari")
+        .select("estimasi_durasi_hari, biaya")
         .eq("id", program_id)
         .maybeSingle();
-      if (prog?.estimasi_durasi_hari) {
+
+      if (prog?.biaya !== undefined && prog?.biaya !== null) {
+        defaultBiaya = Number(prog.biaya);
+      }
+      if (!finalTglKeluar && prog?.estimasi_durasi_hari) {
         const d = new Date(finalTglMasuk);
         d.setDate(d.getDate() + Number(prog.estimasi_durasi_hari));
         finalTglKeluar = d.toISOString().split("T")[0];
@@ -279,7 +284,7 @@ export async function POST(request: NextRequest) {
           : (finalTglKeluar && finalTglKeluar <= new Date().toISOString().split("T")[0] ? "alumni" : (body.status_siswa || "aktif")),
         biaya_pelatihan: body.biaya_pelatihan !== undefined && body.biaya_pelatihan !== null && body.biaya_pelatihan !== ""
           ? parseFloat(body.biaya_pelatihan)
-          : null,
+          : defaultBiaya,
         checklist_berkas: checklist_berkas || {},
         is_password_default: true,
       })
