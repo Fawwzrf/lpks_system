@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireAuth } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { inspectGpsTelemetry } from "@/lib/geo";
 
 export async function GET(request: NextRequest) {
   try {
@@ -333,10 +334,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 2B. Presensi Hadir (Menggunakan GPS Geofencing)
-    const { lat, lng } = body;
+    // 2B. Presensi Hadir (Menggunakan GPS Geofencing & Telemetry Inspection)
+    const { lat, lng, telemetry } = body;
     if (typeof lat !== "number" || typeof lng !== "number") {
       return errorResponse("INVALID_COORDINATES", "Koordinat GPS (lat dan lng) wajib disertakan dalam format numerik.", 400);
+    }
+
+    // Inspeksi Telemetri Sensor GPS (Anti-Fake GPS)
+    const telemetryCheck = inspectGpsTelemetry(telemetry);
+    if (!telemetryCheck.valid) {
+      return errorResponse(
+        telemetryCheck.code || "TELEMETRY_INVALID",
+        telemetryCheck.message || "Validasi telemetri GPS gagal.",
+        400,
+        { code: telemetryCheck.code }
+      );
     }
 
     // Validasi hari: hanya Senin(1), Selasa(2), Rabu(3), Kamis(4), Sabtu(6)
@@ -418,6 +430,8 @@ export async function POST(request: NextRequest) {
     const now = new Date();
     const timeStr = now.toTimeString().split(" ")[0];
 
+    const accuracyNote = typeof telemetry?.accuracy === "number" ? ` [GPS: ±${Math.round(telemetry.accuracy)}m]` : "";
+
     const { data: presensiResult, error: insertError } = await supabase
       .from("presensi")
       .insert({
@@ -428,6 +442,7 @@ export async function POST(request: NextRequest) {
         lng,
         jarak_meter: calculatedDistance,
         status: "Hadir",
+        keterangan: `Presensi mandiri siswa${accuracyNote}`,
         created_by: "siswa",
       })
       .select()

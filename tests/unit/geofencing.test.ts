@@ -1,6 +1,11 @@
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { haversineDistance, isWithinGeofence, formatDistance } from "../../src/lib/geo.ts";
+import {
+  haversineDistance,
+  isWithinGeofence,
+  formatDistance,
+  inspectGpsTelemetry,
+} from "../../src/lib/geo.ts";
 
 describe("Geofencing & Haversine Distance Unit Tests", () => {
   // Titik Referensi Bengkel LPKS Sumbu Hidup
@@ -46,3 +51,99 @@ describe("Geofencing & Haversine Distance Unit Tests", () => {
     assert.equal(formatDistance(5000), "5.0 km");
   });
 });
+
+describe("GPS Telemetry Inspection Unit Tests (Anti-Fake GPS)", () => {
+  const FIXED_NOW = 1700000000000;
+
+  test("Telemetri GPS normal dari perangkat fisik diterima dengan valid", () => {
+    const res = inspectGpsTelemetry(
+      {
+        accuracy: 12.4,
+        altitude: 45.2,
+        timestamp: FIXED_NOW - 1500, // 1.5 detik lalu
+        is_mocked: false,
+      },
+      FIXED_NOW
+    );
+
+    assert.equal(res.valid, true);
+  });
+
+  test("Ditolak jika payload telemetri tidak disertakan", () => {
+    assert.equal(inspectGpsTelemetry(null, FIXED_NOW).code, "MISSING_TELEMETRY");
+    assert.equal(inspectGpsTelemetry(undefined, FIXED_NOW).code, "MISSING_TELEMETRY");
+    assert.equal(inspectGpsTelemetry("invalid", FIXED_NOW).code, "MISSING_TELEMETRY");
+  });
+
+  test("Ditolak jika akurasi bernilai 0 atau micro precision <= 0.5m (khas simulator/mock location)", () => {
+    const resZero = inspectGpsTelemetry(
+      {
+        accuracy: 0,
+        timestamp: FIXED_NOW - 1000,
+      },
+      FIXED_NOW
+    );
+    assert.equal(resZero.valid, false);
+    assert.equal(resZero.code, "UNREALISTIC_ACCURACY");
+
+    const resMicro = inspectGpsTelemetry(
+      {
+        accuracy: 0.2,
+        timestamp: FIXED_NOW - 1000,
+      },
+      FIXED_NOW
+    );
+    assert.equal(resMicro.valid, false);
+    assert.equal(resMicro.code, "UNREALISTIC_ACCURACY");
+  });
+
+  test("Ditolak jika akurasi GPS terlalu lemah (> 150m, triangulasi seluler kasar)", () => {
+    const resWeak = inspectGpsTelemetry(
+      {
+        accuracy: 250,
+        timestamp: FIXED_NOW - 2000,
+      },
+      FIXED_NOW
+    );
+    assert.equal(resWeak.valid, false);
+    assert.equal(resWeak.code, "LOW_GPS_ACCURACY");
+  });
+
+  test("Ditolak jika data GPS kedaluwarsa atau terindikasi replay attack (timestamp drift > 35 detik)", () => {
+    const resStale = inspectGpsTelemetry(
+      {
+        accuracy: 15,
+        timestamp: FIXED_NOW - 60000, // 60 detik lalu
+      },
+      FIXED_NOW
+    );
+    assert.equal(resStale.valid, false);
+    assert.equal(resStale.code, "STALE_GPS_DATA");
+  });
+
+  test("Ditolak jika timestamp sensor GPS berada di masa depan (> 10 detik)", () => {
+    const resFuture = inspectGpsTelemetry(
+      {
+        accuracy: 10,
+        timestamp: FIXED_NOW + 20000, // 20 detik ke masa depan
+      },
+      FIXED_NOW
+    );
+    assert.equal(resFuture.valid, false);
+    assert.equal(resFuture.code, "FUTURE_GPS_TIMESTAMP");
+  });
+
+  test("Ditolak jika terindikasi mock provider atau client automation", () => {
+    const resMock = inspectGpsTelemetry(
+      {
+        accuracy: 8.5,
+        timestamp: FIXED_NOW - 1000,
+        is_mocked: true,
+      },
+      FIXED_NOW
+    );
+    assert.equal(resMock.valid, false);
+    assert.equal(resMock.code, "MOCK_LOCATION_DETECTED");
+  });
+});
+

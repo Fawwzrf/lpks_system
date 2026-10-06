@@ -162,12 +162,26 @@ export default function PresensiSiswaPage() {
     setSubmitSuccess(null);
 
     try {
+      const isWebdriver = Boolean((navigator as { webdriver?: boolean }).webdriver);
+      const isMockAccuracy = position.coords.accuracy <= 0.5;
+
+      const telemetry = {
+        accuracy: position.coords.accuracy,
+        altitude: position.coords.altitude ?? null,
+        altitudeAccuracy: position.coords.altitudeAccuracy ?? null,
+        heading: position.coords.heading ?? null,
+        speed: position.coords.speed ?? null,
+        timestamp: position.timestamp || Date.now(),
+        is_mocked: isWebdriver || isMockAccuracy,
+      };
+
       const res = await fetch("/api/v1/presensi", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          telemetry,
         }),
       });
       const data = await res.json();
@@ -369,8 +383,20 @@ export default function PresensiSiswaPage() {
           </p>
         </div>
         {position && (
-          <div className="text-right shrink-0 text-[10px] text-[#6B7280] hidden sm:block">
-            Akurasi GPS: ±{Math.round(position.coords.accuracy)}m
+          <div className="text-right shrink-0 text-[10px] hidden sm:block">
+            {position.coords.accuracy <= 0.5 ? (
+              <span className="text-[#F43F5E] font-medium bg-[#F43F5E]/10 px-2 py-0.5 rounded border border-[#F43F5E]/20">
+                ⚠️ Akurasi 0m (Mock terdeteksi)
+              </span>
+            ) : position.coords.accuracy > 150 ? (
+              <span className="text-[#F59E0B] font-medium bg-[#F59E0B]/10 px-2 py-0.5 rounded border border-[#F59E0B]/20">
+                ⚠️ Sinyal Lemah (±{Math.round(position.coords.accuracy)}m)
+              </span>
+            ) : (
+              <span className="text-[#10B981] bg-[#10B981]/10 px-2 py-0.5 rounded border border-[#10B981]/20">
+                Akurasi GPS: ±{Math.round(position.coords.accuracy)}m ✓
+              </span>
+            )}
           </div>
         )}
       </div>
