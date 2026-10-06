@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
+import { useStreamingImport } from "@/lib/use-streaming-import";
+import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
 
 const STATUS_OPTIONS = ["Hadir", "Izin", "Sakit", "Alpa"] as const;
 type StatusPresensi = typeof STATUS_OPTIONS[number];
@@ -99,15 +101,9 @@ export default function PresensiAdminPage() {
 
   // Modal Import Excel
   const [importOpen, setImportOpen] = useState(false);
-  const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [importProgress, setImportProgress] = useState(0);
-  const [importStatus, setImportStatus] = useState("");
-  const [importResult, setImportResult] = useState<{
-    success: boolean;
-    message: string;
-    errors?: { row: number; reason: string; type: "warning" | "error" }[];
-  } | null>(null);
+  const importHook = useStreamingImport(() => {
+    loadPresensi();
+  });
 
   // Modal Batch Alpa
   const [batchAlpaModalOpen, setBatchAlpaModalOpen] = useState(false);
@@ -256,70 +252,7 @@ export default function PresensiAdminPage() {
 
   // Handler Import Excel
   async function handleImportSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!importFile) return;
-    setImporting(true);
-    setImportProgress(0);
-    setImportStatus("Mempersiapkan riwayat presensi...");
-    setImportResult(null);
-
-    const formData = new FormData();
-    formData.append("file", importFile);
-
-    try {
-      const res = await fetch("/api/v1/excel/import?modul=presensi", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.body) {
-        setImportResult({ success: false, message: "Gagal memulai proses import." });
-        setImporting(false);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let finalResult = null;
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n").filter(Boolean);
-
-        for (const line of lines) {
-          try {
-            const data = JSON.parse(line);
-            if (data.type === "progress") {
-              setImportProgress(data.progress);
-              setImportStatus(data.status);
-            } else if (data.type === "done") {
-              finalResult = data.result;
-            } else if (data.type === "error") {
-              setImportResult({ success: false, message: data.message });
-              setImporting(false);
-              return;
-            }
-          } catch {}
-        }
-      }
-
-      setImporting(false);
-
-      if (finalResult) {
-        setImportResult({
-          success: true,
-          message: finalResult.message,
-          errors: finalResult.errors,
-        });
-        await loadPresensi();
-      }
-    } catch {
-      setImportResult({ success: false, message: "Terjadi kesalahan saat mengunggah file." });
-      setImporting(false);
-    }
+    await importHook.run(e, "/api/v1/excel/import?modul=presensi");
   }
 
   // Filter List Siswa
@@ -513,8 +446,7 @@ export default function PresensiAdminPage() {
           <button
             type="button"
             onClick={() => {
-              setImportFile(null);
-              setImportResult(null);
+              importHook.reset();
               setImportOpen(true);
             }}
             className="h-8 px-2.5 rounded-lg border border-[#374151] hover:border-[#6B7280] bg-[#111827] text-xs font-semibold text-[#D1D5DB] hover:text-white flex items-center gap-1.5 transition-colors"
@@ -882,78 +814,70 @@ export default function PresensiAdminPage() {
       {/* ===================================================================== */}
       <Modal
         open={importOpen}
-        onClose={() => setImportOpen(false)}
+        onClose={() => {
+          if (!importHook.importing) {
+            setImportOpen(false);
+            importHook.reset();
+          }
+        }}
         title="Import Riwayat Presensi dari Excel"
         description="Unggah file spreadsheet .xlsx dengan kolom nomor_induk, tanggal, status, keterangan."
-        size="sm"
+        size="lg"
       >
-        <form onSubmit={handleImportSubmit} className="flex flex-col gap-4">
-          {!importing && !importResult && (
-            <>
+        <div className="flex flex-col gap-4">
+          {!importHook.importing && !importHook.result && (
+            <form onSubmit={handleImportSubmit} className="flex flex-col gap-4">
               <p className="text-xs text-[#9CA3AF] leading-relaxed">
                 Gunakan template resmi untuk mencegah kegagalan format. Status yang didukung: Hadir, Izin, Sakit, Alpa.
               </p>
               <input
                 type="file"
                 accept=".xlsx, .csv"
-                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                onChange={(e) => importHook.setFile(e.target.files?.[0] || null)}
                 className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
               />
-            </>
-          )}
-
-          {importing && (
-            <div className="flex flex-col justify-center items-center py-6 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-[#DC2626]" />
-              <div className="text-xs font-medium text-[#F9FAFB]">{importStatus}</div>
-              <div className="w-full bg-[#1F2937] rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-[#DC2626] h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${importProgress}%` }}
-                />
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+                <button
+                  type="button"
+                  onClick={() => setImportOpen(false)}
+                  className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="submit"
+                  disabled={!importHook.file || importHook.importing}
+                  className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {importHook.importing && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Mulai Import
+                </button>
               </div>
-            </div>
+            </form>
           )}
 
-          {!importing && importResult && (
-            <div className="flex flex-col gap-3 py-2">
-              <div
-                className={`rounded-lg p-3 text-xs flex items-start gap-2.5 ${
-                  importResult.success && (!importResult.errors || importResult.errors.length === 0)
-                    ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
-                    : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
-                }`}
-              >
-                {importResult.success && (!importResult.errors || importResult.errors.length === 0) ? (
-                  <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
-                ) : (
-                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                )}
-                <span className="leading-relaxed font-medium">{importResult.message}</span>
-              </div>
-            </div>
+          {importHook.importing && (
+            <ImportProgressRing
+              progress={importHook.progress}
+              status={importHook.status}
+              color="#DC2626"
+              label="Sistem sedang memproses sinkronisasi data presensi siswa. Mohon tunggu..."
+            />
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
-            <button
-              type="button"
-              onClick={() => setImportOpen(false)}
-              className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white"
-            >
-              Tutup
-            </button>
-            {!importResult && (
-              <button
-                type="submit"
-                disabled={!importFile || importing}
-                className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {importing && <Loader2 className="h-3 w-3 animate-spin" />}
-                Mulai Import
-              </button>
-            )}
-          </div>
-        </form>
+          {!importHook.importing && importHook.result && (
+            <ImportResultPanel
+              result={importHook.result}
+              newLabel="Presensi Baru"
+              closeButtonClass="bg-[#DC2626] hover:bg-[#B91C1C] text-white font-semibold text-xs px-4"
+              onImportAnother={() => importHook.reset()}
+              onClose={() => {
+                setImportOpen(false);
+                importHook.reset();
+              }}
+            />
+          )}
+        </div>
       </Modal>
 
       {/* ===================================================================== */}

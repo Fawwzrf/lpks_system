@@ -34,6 +34,8 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { handleEnterToNextField } from "@/lib/form-utils";
 import { CardSkeleton } from "@/components/ui/skeleton";
+import { useStreamingImport } from "@/lib/use-streaming-import";
+import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
 
 interface SiswaUjianItem {
   id: string;
@@ -160,20 +162,10 @@ export default function UjianPage() {
 
   // Import Arsip Alumni State
   const [importArsipOpen, setImportArsipOpen] = useState(false);
-  const [importArsipFile, setImportArsipFile] = useState<File | null>(null);
-  const [importingArsip, setImportingArsip] = useState(false);
-  const [importArsipProgress, setImportArsipProgress] = useState(0);
-  const [importArsipStatus, setImportArsipStatus] = useState("");
-  const [importArsipResult, setImportArsipResult] = useState<{
-    success: boolean;
-    message: string;
-    total_rows?: number;
-    imported_count?: number;
-    updated_count?: number;
-    failed_count?: number;
-    warning_count?: number;
-    errors?: { row: number; reason: string; type?: "warning" | "error" }[];
-  } | null>(null);
+  const importArsipHook = useStreamingImport(async () => {
+    await fetchQueueAndHistory();
+    await fetchData();
+  });
 
   // Modal Catat / Edit Nomor Sertifikat Alumni (Arsip Fisik)
   const [modalAlumniCertOpen, setModalAlumniCertOpen] = useState(false);
@@ -315,168 +307,7 @@ export default function UjianPage() {
   }, [fetchData, fetchQueueAndHistory]);
 
   async function handleImportArsip(e: React.FormEvent) {
-    e.preventDefault();
-    if (!importArsipFile) return;
-    setImportingArsip(true);
-    setImportArsipProgress(0);
-    setImportArsipStatus("Mempersiapkan data arsip alumni...");
-    setImportArsipResult(null);
-
-    const formData = new FormData();
-    formData.append("file", importArsipFile);
-
-    try {
-      const res = await fetch("/api/v1/excel/import?modul=arsip_alumni", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        setImportArsipResult({
-          success: false,
-          message: json.error?.message || "Gagal mengimpor file arsip alumni.",
-          total_rows: 0,
-          imported_count: 0,
-          updated_count: 0,
-          failed_count: 1,
-          warning_count: 0,
-          errors: [{ row: 0, reason: json.error?.message || "Gagal menghubungi server", type: "error" }],
-        });
-        setImportingArsip(false);
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) {
-        setImportArsipResult({
-          success: false,
-          message: "Respon server tidak mendukung streaming pembacaan data.",
-          total_rows: 0,
-          imported_count: 0,
-          updated_count: 0,
-          failed_count: 1,
-          warning_count: 0,
-          errors: [{ row: 0, reason: "Stream reader tidak tersedia", type: "error" }],
-        });
-        setImportingArsip(false);
-        return;
-      }
-      const decoder = new TextDecoder();
-      let finalResult: {
-        total_rows?: number;
-        imported_count?: number;
-        updated_count?: number;
-        failed_count?: number;
-        warning_count?: number;
-        errors?: { row: number; reason: string; type?: "warning" | "error" }[];
-        message?: string;
-      } | null = null;
-
-      let buffer = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const parsed = JSON.parse(trimmed);
-            if (parsed.type === "progress") {
-              setImportArsipProgress(parsed.progress);
-              setImportArsipStatus(parsed.status);
-            } else if (parsed.type === "done") {
-              finalResult = parsed.result;
-            } else if (parsed.type === "error") {
-              setImportArsipResult({
-                success: false,
-                message: parsed.message,
-                total_rows: 0,
-                imported_count: 0,
-                updated_count: 0,
-                failed_count: 1,
-                warning_count: 0,
-                errors: [{ row: 0, reason: parsed.message, type: "error" }],
-              });
-              setImportingArsip(false);
-              return;
-            }
-          } catch (err) {
-            console.error("Gagal mengurai chunk import arsip:", err);
-          }
-        }
-      }
-
-      if (buffer.trim()) {
-        try {
-          const parsed = JSON.parse(buffer.trim());
-          if (parsed.type === "done") {
-            finalResult = parsed.result;
-          } else if (parsed.type === "error") {
-            setImportArsipResult({
-              success: false,
-              message: parsed.message,
-              total_rows: 0,
-              imported_count: 0,
-              updated_count: 0,
-              failed_count: 1,
-              warning_count: 0,
-              errors: [{ row: 0, reason: parsed.message, type: "error" }],
-            });
-            setImportingArsip(false);
-            return;
-          }
-        } catch {}
-      }
-
-      setImportingArsip(false);
-      await fetchQueueAndHistory();
-      await fetchData();
-
-      if (finalResult) {
-        const errs = finalResult.errors || [];
-        const failCount = finalResult.failed_count ?? errs.filter((e) => e.type !== "warning").length;
-        const warnCount = finalResult.warning_count ?? errs.filter((e) => e.type === "warning").length;
-        setImportArsipResult({
-          success: true,
-          message: finalResult.message || "Proses impor arsip alumni selesai diproses.",
-          total_rows: finalResult.total_rows ?? ((finalResult.imported_count || 0) + (finalResult.updated_count || 0) + errs.length),
-          imported_count: finalResult.imported_count || 0,
-          updated_count: finalResult.updated_count || 0,
-          failed_count: failCount,
-          warning_count: warnCount,
-          errors: errs,
-        });
-      } else {
-        setImportArsipResult({
-          success: true,
-          message: "Proses impor data arsip alumni & sertifikat telah selesai.",
-          total_rows: 0,
-          imported_count: 0,
-          updated_count: 0,
-          failed_count: 0,
-          warning_count: 0,
-          errors: [],
-        });
-      }
-    } catch {
-      setImportArsipResult({
-        success: false,
-        message: "Terjadi kesalahan saat mengunggah file arsip.",
-        total_rows: 0,
-        imported_count: 0,
-        updated_count: 0,
-        failed_count: 1,
-        warning_count: 0,
-        errors: [{ row: 0, reason: "Gagal mengunggah file atau koneksi terputus.", type: "error" }],
-      });
-      setImportingArsip(false);
-    }
+    await importArsipHook.run(e, "/api/v1/excel/import?modul=arsip_alumni");
   }
 
   // Statistik Ringkasan
@@ -1809,26 +1640,25 @@ export default function UjianPage() {
       <Modal
         open={importArsipOpen}
         onClose={() => {
-          if (!importingArsip) {
+          if (!importArsipHook.importing) {
             setImportArsipOpen(false);
-            setImportArsipResult(null);
-            setImportArsipFile(null);
+            importArsipHook.reset();
           }
         }}
         title={
-          importArsipResult
+          importArsipHook.result
             ? "Hasil Import Data Arsip Alumni & Sertifikat"
             : "Import Data Arsip Alumni & Sertifikat (2015+)"
         }
         description={
-          importArsipResult
+          importArsipHook.result
             ? "Ringkasan data siswa alumni, pencatatan keuangan, dan nomor sertifikat yang berhasil diproses."
             : undefined
         }
-        size={importArsipResult ? "lg" : "md"}
+        size={importArsipHook.result ? "lg" : "md"}
       >
         <div className="flex flex-col gap-4">
-          {!importingArsip && !importArsipResult && (
+          {!importArsipHook.importing && !importArsipHook.result && (
             <form onSubmit={handleImportArsip} className="flex flex-col gap-4">
               <div className="p-3.5 rounded-lg border border-[#38BDF8]/30 bg-[#38BDF8]/10 flex flex-col gap-2">
                 <div className="flex items-center gap-2 text-xs font-semibold text-[#38BDF8]">
@@ -1862,7 +1692,7 @@ export default function UjianPage() {
                 <input
                   type="file"
                   accept=".xlsx, .csv"
-                  onChange={(e) => setImportArsipFile(e.target.files?.[0] || null)}
+                  onChange={(e) => importArsipHook.setFile(e.target.files?.[0] || null)}
                   className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#38BDF8] file:text-black hover:file:bg-[#0ea5e9] cursor-pointer"
                 />
               </div>
@@ -1874,7 +1704,7 @@ export default function UjianPage() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={!importArsipFile}
+                  disabled={!importArsipHook.file}
                   className="bg-[#38BDF8] hover:bg-[#0ea5e9] text-black font-semibold"
                 >
                   Mulai Import Arsip
@@ -1883,221 +1713,46 @@ export default function UjianPage() {
             </form>
           )}
 
-          {importingArsip && (
-            <div className="flex flex-col justify-center items-center py-8 gap-4">
-              <div className="relative w-20 h-20 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-[#1F2937]" />
-                  <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="6" fill="transparent"
-                    strokeDasharray={2 * Math.PI * 36}
-                    strokeDashoffset={2 * Math.PI * 36 * (1 - importArsipProgress / 100)}
-                    className="text-[#38BDF8] transition-all duration-300 ease-out" />
-                </svg>
-                <div className="absolute flex flex-col items-center">
-                  <span className="text-lg font-bold text-[#F9FAFB]">{importArsipProgress}%</span>
-                </div>
-              </div>
-              <div className="text-xs font-medium text-[#F9FAFB]">
-                {importArsipStatus}
-              </div>
-              <p className="text-[10px] text-[#9CA3AF] text-center px-4">
-                Sistem sedang memproses data siswa alumni, mencatat pelunasan keuangan, dan mengarsipkan nomor sertifikat. Mohon tunggu...
-              </p>
-            </div>
+          {importArsipHook.importing && (
+            <ImportProgressRing
+              progress={importArsipHook.progress}
+              status={importArsipHook.status}
+              color="#38BDF8"
+              label="Sistem sedang memproses data siswa alumni, mencatat pelunasan keuangan, dan mengarsipkan nomor sertifikat. Mohon tunggu..."
+            />
           )}
 
-          {!importingArsip && importArsipResult && (() => {
-            const errs = (importArsipResult.errors || []).filter((e) => e.type !== "warning");
-            const warnings = (importArsipResult.errors || []).filter((e) => e.type === "warning");
-            const totalSelesai = (importArsipResult.imported_count || 0) + (importArsipResult.updated_count || 0);
-            const totalGagal = importArsipResult.failed_count ?? errs.length;
-            const totalCatatan = importArsipResult.warning_count ?? warnings.length;
-            const isFullSuccess = importArsipResult.success && totalGagal === 0 && totalCatatan === 0;
-            const isPartial = importArsipResult.success && totalSelesai > 0 && (totalGagal > 0 || totalCatatan > 0);
-
-            const groupBy = (items: typeof errs) =>
-              Object.entries(
-                items.reduce((acc, e) => {
-                  const key = e.reason || "Alasan tidak diketahui";
-                  if (!acc[key]) acc[key] = [];
-                  if (e.row) acc[key].push(e.row);
-                  return acc;
-                }, {} as Record<string, number[]>)
-              );
-
-            return (
-              <div className="flex flex-col gap-4 py-1">
-                {/* Status Banner */}
-                <div
-                  className={`rounded-xl p-4 flex items-start gap-3 border ${
-                    isFullSuccess
-                      ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/30"
-                      : isPartial
-                      ? "bg-amber-500/10 text-amber-300 border-amber-500/30"
-                      : "bg-[#F43F5E]/10 text-[#F43F5E] border-[#F43F5E]/30"
-                  }`}
-                >
-                  {isFullSuccess ? (
-                    <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-[#10B981]" />
-                  ) : isPartial ? (
-                    <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-400" />
-                  ) : (
-                    <XCircle className="h-5 w-5 shrink-0 mt-0.5 text-[#F43F5E]" />
-                  )}
-                  <div className="flex flex-col gap-0.5">
-                    <span className="font-bold text-xs sm:text-sm">
-                      {isFullSuccess
-                        ? "Import Selesai Sepenuhnya"
-                        : isPartial
-                        ? "Import Selesai dengan Catatan"
-                        : "Import Mengalami Kegagalan"}
-                    </span>
-                    <span className="text-xs text-[#D1D5DB] leading-relaxed">
-                      {importArsipResult.message}
-                    </span>
+          {!importArsipHook.importing && importArsipHook.result && (
+            <ImportResultPanel
+              result={importArsipHook.result}
+              newLabel="Arsip Baru"
+              closeButtonClass="bg-[#38BDF8] hover:bg-[#0284C7] text-black font-semibold text-xs px-4"
+              onImportAnother={() => importArsipHook.reset()}
+              onClose={() => {
+                setImportArsipOpen(false);
+                importArsipHook.reset();
+              }}
+            >
+              {/* Status Integrasi Otomatis Checklist */}
+              <div className="p-3 rounded-xl bg-[#1F2937]/30 border border-[#1F2937] text-xs text-[#9CA3AF] flex flex-col gap-1.5">
+                <span className="font-semibold text-[#E5E7EB] text-[11px]">Hasil Integrasi Sistem:</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-[#10B981]">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>Siswa status <strong>Alumni</strong></span>
                   </div>
-                </div>
-
-                {/* 4 Cards Ringkasan Metrik: Total, Selesai Baru, Diperbarui, Gagal */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {/* Card 1: Total */}
-                  <div className="p-3 rounded-xl bg-[#1F2937]/50 border border-[#1F2937] flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold text-[#9CA3AF] uppercase tracking-wider">
-                      Total Data
-                    </span>
-                    <span className="text-xl font-bold text-[#F9FAFB]">
-                      {importArsipResult.total_rows || 0}
-                    </span>
-                    <span className="text-[10px] text-[#6B7280]">Baris spreadsheet</span>
+                  <div className="flex items-center gap-1.5 text-[#10B981]">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>Keuangan status <strong>Lunas</strong></span>
                   </div>
-
-                  {/* Card 2: Arsip Baru */}
-                  <div className="p-3 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold text-[#10B981] uppercase tracking-wider">
-                      Arsip Baru
-                    </span>
-                    <span className="text-xl font-bold text-[#10B981]">
-                      {importArsipResult.imported_count || 0}
-                    </span>
-                    <span className="text-[10px] text-[#10B981]/80">Siswa & sertifikat</span>
+                  <div className="flex items-center gap-1.5 text-[#10B981]">
+                    <Check className="h-3.5 w-3.5 shrink-0" />
+                    <span>Sertifikat <strong>Dicetak</strong></span>
                   </div>
-
-                  {/* Card 3: Diperbarui */}
-                  <div className="p-3 rounded-xl bg-[#38BDF8]/10 border border-[#38BDF8]/30 flex flex-col gap-1">
-                    <span className="text-[10px] font-semibold text-[#38BDF8] uppercase tracking-wider">
-                      Diperbarui
-                    </span>
-                    <span className="text-xl font-bold text-[#38BDF8]">
-                      {importArsipResult.updated_count || 0}
-                    </span>
-                    <span className="text-[10px] text-[#38BDF8]/80">Data disinkronkan</span>
-                  </div>
-
-                  {/* Card 4: Gagal / Error */}
-                  <div
-                    className={`p-3 rounded-xl border flex flex-col gap-1 ${
-                      totalGagal > 0
-                        ? "bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#F43F5E]"
-                        : "bg-[#1F2937]/30 border-[#1F2937] text-[#9CA3AF]"
-                    }`}
-                  >
-                    <span className="text-[10px] font-semibold uppercase tracking-wider">
-                      Gagal
-                    </span>
-                    <span className={`text-xl font-bold ${totalGagal > 0 ? "text-[#F43F5E]" : "text-[#9CA3AF]"}`}>
-                      {totalGagal}
-                    </span>
-                    <span className="text-[10px] text-[#6B7280]">
-                      {totalCatatan > 0 ? `+${totalCatatan} catatan` : totalGagal > 0 ? "Perlu koreksi" : "Tanpa kendala"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Status Integrasi Otomatis Checklist */}
-                <div className="p-3 rounded-xl bg-[#1F2937]/30 border border-[#1F2937] text-xs text-[#9CA3AF] flex flex-col gap-1.5">
-                  <span className="font-semibold text-[#E5E7EB] text-[11px]">Hasil Integrasi Sistem:</span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-[11px]">
-                    <div className="flex items-center gap-1.5 text-[#10B981]">
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                      <span>Siswa status <strong>Alumni</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#10B981]">
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                      <span>Keuangan status <strong>Lunas</strong></span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#10B981]">
-                      <Check className="h-3.5 w-3.5 shrink-0" />
-                      <span>Sertifikat <strong>Dicetak</strong></span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Daftar Rincian Error jika ada */}
-                {errs.length > 0 && (
-                  <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3.5 flex flex-col gap-2 max-h-44 overflow-y-auto">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-[#F43F5E]">
-                      <XCircle className="h-4 w-4 shrink-0" />
-                      <span>Rincian Data Gagal Diimpor ({errs.length} baris):</span>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1 text-[11px] text-[#F43F5E]/90">
-                      {groupBy(errs).map(([reason, rows], idx) => (
-                        <li key={idx}>
-                          {rows.length > 0 ? <b>Baris {rows.join(", ")}: </b> : null}
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Daftar Catatan / Warning jika ada */}
-                {warnings.length > 0 && (
-                  <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3.5 flex flex-col gap-2 max-h-44 overflow-y-auto">
-                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-400">
-                      <AlertTriangle className="h-4 w-4 shrink-0" />
-                      <span>Catatan & Data Dilewati ({warnings.length} baris):</span>
-                    </div>
-                    <ul className="list-disc pl-5 space-y-1 text-[11px] text-amber-300/90">
-                      {groupBy(warnings).map(([reason, rows], idx) => (
-                        <li key={idx}>
-                          {rows.length > 0 ? <b>Baris {rows.join(", ")}: </b> : null}
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Footer Tombol */}
-                <div className="flex items-center justify-between pt-2 border-t border-[#1F2937]">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setImportArsipResult(null);
-                      setImportArsipFile(null);
-                    }}
-                    className="text-xs"
-                  >
-                    Import File Lain
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-[#38BDF8] hover:bg-[#0284C7] text-black font-semibold text-xs px-4"
-                    onClick={() => {
-                      setImportArsipOpen(false);
-                      setImportArsipResult(null);
-                      setImportArsipFile(null);
-                    }}
-                  >
-                    Selesai & Tutup
-                  </Button>
                 </div>
               </div>
-            );
-          })()}
+            </ImportResultPanel>
+          )}
         </div>
       </Modal>
 
