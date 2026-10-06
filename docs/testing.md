@@ -159,10 +159,16 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 | `tests/unit/api-response.test.ts` | Unit | ✅ PASS | 4 test |
 | `tests/unit/gates.test.ts` | Unit | ✅ PASS | 15 test |
 | `tests/unit/geofencing.test.ts` | Unit | ✅ PASS | 5 test |
-| `tests/unit/validation.test.ts` | Unit | ✅ PASS | 13 test |
-| `tests/integration/auth-rbac.test.ts` | Integration | ✅ PASS | 8 test |
+| `tests/unit/master_program.test.ts` | Unit | ✅ PASS | 7 test |
+| `tests/unit/sertifikat_excel.test.ts` | Unit | ✅ PASS | 6 test |
+| `tests/unit/sertifikat_queue.test.ts` | Unit | ✅ PASS | 7 test |
+| `tests/unit/shared-utils.test.ts` | Unit | ✅ PASS | 15 test |
+| `tests/unit/status-siswa.test.ts` | Unit | ✅ PASS | 16 test |
+| `tests/unit/tambah_program.test.ts` | Unit | ✅ PASS | 4 test |
+| `tests/unit/validation.test.ts` | Unit | ✅ PASS | 15 test |
+| `tests/integration/auth-rbac.test.ts` | Integration | ✅ PASS | 4 test |
 | `tests/integration/flow-presensi.test.ts` | Integration | ✅ PASS | 6 test |
-| **Total** | | **✅ 100% PASS** | **51 test** |
+| **Total** | | **✅ 100% PASS** | **104 test (15 suites)** |
 
 ---
 
@@ -292,10 +298,13 @@ Semua **Kriteria Penerimaan (Exit Criteria)** untuk Tahap 3 (Non-Fungsional) tel
 | **UAT-10: Antrean Cetak Batch & Export Percetakan** | Memasukkan siswa lulus & lunas ke antrean, pratinjau modal detail format romawi, ekspor Excel percetakan. | Data masuk ke tab Antrean Cetak, modal detail akurat, ekspor otomatis mengalihkan status ke 'dicetak' dan menjadi Alumni. | Siklus antrean cetak batch berjalan lancar dan otomatis memindahkan siswa ke Riwayat Cetak. | ✅ PASS |
 | **UAT-11: Dismissal Peringatan Sandi & Logout Siswa** | Siswa menutup banner peringatan ganti sandi dengan tombol [X], mengganti sandi mandiri via modal, dan logout. | Banner dapat di-dismiss per sesi tanpa mengganggu navigasi; ganti sandi sukses update status DB; logout menampilkan dialog konfirmasi. | Banner peringatan responsif, modal konfirmasi logout mencegah keluar tanpa sengaja. | ✅ PASS |
 | **UAT-12: Notifikasi Header Operasional** | Cek lonceng notifikasi di navbar header Superadmin dan Siswa. | Muncul unread badge real-time: alert antrean cetak & siap ujian untuk admin, alert sandi default untuk siswa. | Dropdown popover notifikasi informatif dan terintegrasi link navigasi langsung. | ✅ PASS |
+| **UAT-13: Pendaftaran Siswa Multi-Program** | Klik ikon topi wisuda pada baris siswa untuk mendaftarkan ke program pelatihan kedua. | Modal terbuka dengan data identitas terisi otomatis, opsi program baru, nomor induk terbit otomatis, dan biaya pelatihan fleksibel. | Siswa berhasil terdaftar di program kedua tanpa duplikasi biodata; tagihan terisolasi per program. | ✅ PASS |
+| **UAT-14: Streaming Import Excel & Error Panel** | Unggah spreadsheet data siswa, arsip alumni, atau riwayat presensi melalui modal import. | Progress ring berputar real-time (SSE), saat selesai muncul 4 kartu metrik (Total, Baru, Diperbarui, Gagal) & pengelompokan baris error/catatan. | Visualisasi import konsisten, tidak ada proses menggantung, feedback detail baris bermasalah jelas. | ✅ PASS |
+| **UAT-15: Server Component Streaming & a11y** | Akses halaman Data Siswa (`/superadmin/siswa`) dan navigasi menggunakan keyboard/screen reader. | Server Component melakukan SSR prefetching; HTML tampil instan tanpa flash skeleton; seluruh tombol ikon memiliki `aria-label`. | First Contentful Paint < 1s, pembaca layar membaca label tombol aksi secara presisi. | ✅ PASS |
 
 ---
 
 ## 4.2. Kesimpulan Akhir UAT
 
-Seluruh skenario User Acceptance Testing (UAT 01-12) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun serta keamanan password. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
+Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 15**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, streaming import, serta kepatuhan aksesibilitas. Seluruh Exit Criteria Fase Testing telah terpenuhi. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
 
