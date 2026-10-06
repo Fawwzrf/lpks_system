@@ -1,0 +1,1251 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+  Search, Download, Upload, FileText, Users, KeyRound,
+  Eye, EyeOff, Loader2, CheckCircle2, AlertCircle, RefreshCw,
+  Edit, Trash2, AlertTriangle, UserMinus, CreditCard, RotateCcw, ChevronDown,
+  GraduationCap
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Table } from "@/components/ui/table";
+import { Modal } from "@/components/ui/modal";
+import { Select } from "@/components/ui/select";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { useStreamingImport } from "@/lib/use-streaming-import";
+import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
+
+export interface SiswaItem {
+  id: string;
+  nomor_induk: string;
+  nama_lengkap: string;
+  username?: string;
+  nik: string;
+  email: string;
+  no_hp?: string;
+  tempat_lahir?: string;
+  tgl_lahir?: string;
+  alamat_lengkap?: string;
+  pendidikan_terakhir?: string;
+  tgl_masuk?: string;
+  tgl_keluar?: string | null;
+  status_siswa?: "aktif" | "alumni" | "out";
+  program_id?: string;
+  program?: { id?: string; kode_program?: string; nama: string; biaya?: number };
+  is_password_default?: boolean;
+}
+
+export interface ProgramItem {
+  id: string;
+  kode_program: string;
+  nama: string;
+  biaya?: number;
+  estimasi_durasi_hari?: number;
+}
+
+export type FilterStatus = "aktif" | "alumni" | "out" | "semua";
+
+interface SiswaClientProps {
+  initialSiswa?: SiswaItem[];
+  initialTotal?: number;
+  initialPrograms?: ProgramItem[];
+}
+
+export function SiswaClient({
+  initialSiswa = [],
+  initialTotal = 0,
+  initialPrograms = [],
+}: SiswaClientProps) {
+  const router = useRouter();
+
+  // State utama di-hydrate langsung dari Server Component
+  const [siswaList, setSiswaList] = useState<SiswaItem[]>(initialSiswa);
+  const [programs, setPrograms] = useState<ProgramItem[]>(initialPrograms);
+  const [loading, setLoading] = useState(initialSiswa.length === 0);
+  const [filter, setFilter] = useState<FilterStatus>("aktif");
+  const [programFilter, setProgramFilter] = useState<string>("semua");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(15);
+  const [total, setTotal] = useState(initialTotal);
+
+  // In-memory cache untuk performa 0ms / no loading
+  const cacheRef = useRef<Map<string, { data: SiswaItem[]; total: number }>>(
+    new Map(
+      initialSiswa.length > 0
+        ? [["aktif_semua__1_15", { data: initialSiswa, total: initialTotal }]]
+        : []
+    )
+  );
+
+  // Modal Tandai Out
+  const [markOutSiswa, setMarkOutSiswa] = useState<SiswaItem | null>(null);
+  const [outTglKeluar, setOutTglKeluar] = useState<string>(() => new Date().toISOString().split("T")[0]);
+  const [outProcessing, setOutProcessing] = useState(false);
+
+  // Modal Kelola Akun
+  const [selectedSiswa, setSelectedSiswa] = useState<SiswaItem | null>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [credSaving, setCredSaving] = useState(false);
+  const [credMsg, setCredMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Modal Tambah Program Baru
+  const [tambahProgramSiswa, setTambahProgramSiswa] = useState<SiswaItem | null>(null);
+  const [tambahProgId, setTambahProgId] = useState("");
+  const [tambahProgBiaya, setTambahProgBiaya] = useState("");
+  const [tambahProgNoInduk, setTambahProgNoInduk] = useState("");
+  const [tambahProgTglMasuk, setTambahProgTglMasuk] = useState(() => new Date().toISOString().split("T")[0]);
+  const [loadingNextNoInduk, setLoadingNextNoInduk] = useState(false);
+  const [tambahProgSubmitting, setTambahProgSubmitting] = useState(false);
+  const [tambahProgMsg, setTambahProgMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Modal Hapus Siswa
+  const [deleteSiswa, setDeleteSiswa] = useState<SiswaItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Import Modal
+  const [importOpen, setImportOpen] = useState(false);
+  const [importModul, setImportModul] = useState<"siswa" | "arsip_alumni">("siswa");
+  const [templateDropdownOpen, setTemplateDropdownOpen] = useState(false);
+  const importHook = useStreamingImport(async () => {
+    cacheRef.current.clear();
+    await loadSiswa(true);
+  });
+
+  // Muat programs jika belum di-hydrate dari server
+  useEffect(() => {
+    if (initialPrograms.length > 0) return;
+    async function loadPrograms() {
+      try {
+        const res = await fetch("/api/v1/master/program");
+        if (res.ok) {
+          const json = await res.json();
+          setPrograms(json.data || []);
+        }
+      } catch (e) {
+        console.error("Gagal memuat program:", e);
+      }
+    }
+    loadPrograms();
+  }, [initialPrograms]);
+
+  const loadSiswa = useCallback(async (bypassCache = false) => {
+    const cacheKey = `${filter}_${programFilter}_${search.trim()}_${page}_${limit}`;
+    const cached = cacheRef.current.get(cacheKey);
+
+    if (cached && !bypassCache) {
+      setSiswaList(cached.data);
+      setTotal(cached.total);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      let url = `/api/v1/siswa?limit=${limit}&page=${page}`;
+      if (filter !== "semua") {
+        url += `&status=${filter}`;
+      }
+      if (programFilter !== "semua") {
+        url += `&program_id=${programFilter}`;
+      }
+      if (search.trim()) {
+        url += `&search=${encodeURIComponent(search.trim())}`;
+      }
+      const res = await fetch(url);
+      if (res.ok) {
+        const json = await res.json();
+        const data = json.data || [];
+        const totalCount = json.meta?.total || 0;
+        cacheRef.current.set(cacheKey, { data, total: totalCount });
+        setSiswaList(data);
+        setTotal(totalCount);
+      }
+    } catch (err) {
+      console.error("Gagal memuat data siswa:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, programFilter, search, page, limit]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filter, programFilter, search, limit]);
+
+  // Hindari fetch ulang pada initial render jika sudah ada server data untuk query default
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (initialSiswa.length > 0) return;
+    }
+    loadSiswa();
+  }, [loadSiswa, initialSiswa.length]);
+
+  async function handleConfirmMarkOut(targetStatus: "out" | "aktif") {
+    if (!markOutSiswa) return;
+    setOutProcessing(true);
+    try {
+      const payload: Record<string, unknown> = {
+        status_siswa: targetStatus,
+        tgl_keluar: targetStatus === "out" ? (outTglKeluar || new Date().toISOString().split("T")[0]) : null,
+      };
+      const res = await fetch(`/api/v1/siswa/${markOutSiswa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        cacheRef.current.clear();
+        await loadSiswa(true);
+        setMarkOutSiswa(null);
+      } else {
+        const err = await res.json();
+        alert(err.error?.message || "Gagal mengubah status siswa.");
+      }
+    } catch {
+      alert("Kesalahan jaringan saat mengubah status siswa.");
+    } finally {
+      setOutProcessing(false);
+    }
+  }
+
+  async function handleDirectToggleStatus(siswa: SiswaItem, targetStatus: "out" | "aktif") {
+    try {
+      const res = await fetch(`/api/v1/siswa/${siswa.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status_siswa: targetStatus,
+          tgl_keluar: targetStatus === "out" ? new Date().toISOString().split("T")[0] : null,
+        }),
+      });
+      if (res.ok) {
+        cacheRef.current.clear();
+        await loadSiswa(true);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  function openKelolaAkun(s: SiswaItem) {
+    setSelectedSiswa(s);
+    setNewUsername(s.username || "");
+    setNewPassword("");
+    setShowPassword(false);
+    setCredMsg(null);
+  }
+
+  async function handleSaveCredentials(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedSiswa) return;
+    setCredSaving(true);
+    setCredMsg(null);
+
+    const payload: { username?: string; password?: string } = {};
+    if (newUsername.trim() && newUsername.trim() !== selectedSiswa.username) {
+      payload.username = newUsername.trim();
+    }
+    if (newPassword.trim()) {
+      payload.password = newPassword.trim();
+    }
+
+    if (!payload.username && !payload.password) {
+      setCredMsg({ type: "error", text: "Masukkan username baru atau password baru untuk diperbarui." });
+      setCredSaving(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/v1/siswa/${selectedSiswa.id}/credentials`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCredMsg({ type: "error", text: data.error?.message || "Gagal memperbarui kredensial." });
+        return;
+      }
+
+      setCredMsg({ type: "success", text: "Kredensial siswa berhasil diperbarui!" });
+      cacheRef.current.clear();
+      await loadSiswa(true);
+      setTimeout(() => setSelectedSiswa(null), 1500);
+    } catch {
+      setCredMsg({ type: "error", text: "Tidak dapat terhubung ke server." });
+    } finally {
+      setCredSaving(false);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteSiswa) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/v1/siswa/${deleteSiswa.id}`, { method: "DELETE" });
+      if (res.ok) {
+        cacheRef.current.clear();
+        await loadSiswa(true);
+        setDeleteSiswa(null);
+      } else {
+        alert("Gagal menghapus siswa.");
+      }
+    } catch (e) {
+      alert("Kesalahan jaringan saat menghapus siswa.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  async function openTambahProgram(siswa: SiswaItem) {
+    setTambahProgramSiswa(siswa);
+    setTambahProgMsg(null);
+    setTambahProgTglMasuk(new Date().toISOString().split("T")[0]);
+
+    const candidateProg = programs.find((p) => p.id !== siswa.program_id && p.nama !== siswa.program?.nama) || programs[0];
+    if (candidateProg) {
+      setTambahProgId(candidateProg.id);
+      setTambahProgBiaya(String(candidateProg.biaya ?? ""));
+      setLoadingNextNoInduk(true);
+      try {
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${candidateProg.id}`);
+        if (res.ok) {
+          const json = await res.json();
+          setTambahProgNoInduk(json.data?.next_nomor_induk || "");
+        }
+      } catch (err) {
+        console.error("Gagal mengambil nomor induk berikutnya:", err);
+      } finally {
+        setLoadingNextNoInduk(false);
+      }
+    } else {
+      setTambahProgId("");
+      setTambahProgBiaya("");
+      setTambahProgNoInduk("");
+    }
+  }
+
+  async function handleProgramChange(progId: string) {
+    setTambahProgId(progId);
+    const prog = programs.find((p) => p.id === progId);
+    if (prog) {
+      setTambahProgBiaya(String(prog.biaya ?? ""));
+      setLoadingNextNoInduk(true);
+      try {
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${prog.id}`);
+        if (res.ok) {
+          const json = await res.json();
+          setTambahProgNoInduk(json.data?.next_nomor_induk || "");
+        }
+      } catch (err) {
+        console.error("Gagal mengambil nomor induk berikutnya:", err);
+      } finally {
+        setLoadingNextNoInduk(false);
+      }
+    }
+  }
+
+  async function handleConfirmTambahProgram(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tambahProgramSiswa || !tambahProgId) return;
+
+    setTambahProgSubmitting(true);
+    setTambahProgMsg(null);
+
+    try {
+      const res = await fetch(`/api/v1/siswa/${tambahProgramSiswa.id}/tambah-program`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          program_id: tambahProgId,
+          nomor_induk: tambahProgNoInduk,
+          biaya_pelatihan: tambahProgBiaya ? parseFloat(tambahProgBiaya) : undefined,
+          tgl_masuk: tambahProgTglMasuk,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Gagal mendaftarkan siswa ke program baru.");
+      }
+
+      setTambahProgMsg({ type: "success", text: json.message || "Berhasil mendaftarkan siswa ke program baru!" });
+      cacheRef.current.clear();
+      await loadSiswa(true);
+
+      setTimeout(() => {
+        setTambahProgramSiswa(null);
+      }, 1500);
+    } catch (err) {
+      setTambahProgMsg({
+        type: "error",
+        text: err instanceof Error ? err.message : "Terjadi kesalahan sistem.",
+      });
+    } finally {
+      setTambahProgSubmitting(false);
+    }
+  }
+
+  async function handleImport(e: React.FormEvent) {
+    await importHook.run(e, `/api/v1/excel/import?modul=${importModul}`);
+    await loadSiswa();
+  }
+
+  const columns = [
+    {
+      key: "no",
+      header: "No",
+      render: (row: SiswaItem) => (
+        <span className="text-[11px] text-[#9CA3AF]">
+          {(page - 1) * limit + siswaList.indexOf(row) + 1}
+        </span>
+      ),
+    },
+    {
+      key: "nomor_induk",
+      header: "No. Induk",
+      render: (row: SiswaItem) => (
+        <span className="font-mono text-[#DC2626] text-[11px] font-bold">{row.nomor_induk}</span>
+      ),
+    },
+    {
+      key: "nama_lengkap",
+      header: "Nama",
+      render: (row: SiswaItem) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-[#F9FAFB]">{row.nama_lengkap}</span>
+            {row.status_siswa === "out" && (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#EF4444]/20 text-[#F87171] border border-[#EF4444]/40">
+                OUT
+              </span>
+            )}
+            {row.status_siswa === "alumni" && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-[#38BDF8]/10 text-[#38BDF8] border border-[#38BDF8]/20">
+                Alumni
+              </span>
+            )}
+          </div>
+          {row.status_siswa === "out" && (
+            <div>
+              <button
+                type="button"
+                onClick={() => router.push(`/superadmin/keuangan?search=${encodeURIComponent(row.nomor_induk)}`)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-[#DC2626] hover:bg-[#B91C1C] text-white transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-[#DC2626]"
+                title="Menuju ke Pembayaran Keuangan untuk penagihan sisa biaya"
+                aria-label={`Lihat rincian tagihan pembayaran siswa out ${row.nama_lengkap}`}
+              >
+                <CreditCard className="h-3 w-3" aria-hidden="true" />
+                <span>Lihat Pembayaran &rarr;</span>
+              </button>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "nik",
+      header: "NIK",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#D1D5DB] font-mono">{row.nik || "—"}</span>,
+    },
+    {
+      key: "lahir",
+      header: "Lahir",
+      render: (row: SiswaItem) => (
+        <div className="text-[11px] text-[#9CA3AF] min-w-[100px]">
+          <p>{row.tempat_lahir || "—"}</p>
+          <p className="text-[#6B7280]">{row.tgl_lahir || "—"}</p>
+        </div>
+      ),
+    },
+    {
+      key: "alamat",
+      header: "Alamat",
+      render: (row: SiswaItem) => (
+        <span className="text-[11px] text-[#9CA3AF] block max-w-[150px] truncate" title={row.alamat_lengkap}>
+          {row.alamat_lengkap || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "program",
+      header: "Program",
+      render: (row: SiswaItem) => (
+        <span className="text-[11px] text-[#D1D5DB]">{row.program?.nama || "—"}</span>
+      ),
+    },
+    {
+      key: "no_hp",
+      header: "No. HP",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.no_hp || "—"}</span>,
+    },
+    {
+      key: "pendidikan",
+      header: "Pend.",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.pendidikan_terakhir || "—"}</span>,
+    },
+    {
+      key: "masuk",
+      header: "Masuk",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_masuk || "—"}</span>,
+    },
+    {
+      key: "keluar",
+      header: "Keluar",
+      render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_keluar || "—"}</span>,
+    },
+    {
+      key: "aksi",
+      header: "Aksi",
+      className: "w-40 text-right",
+      render: (row: SiswaItem) => (
+        <div className="flex items-center justify-end gap-1.5 flex-wrap">
+          {row.status_siswa === "out" ? (
+            <button
+              type="button"
+              onClick={() => handleDirectToggleStatus(row, "aktif")}
+              className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+              title="Batalkan Status Out / Kembalikan ke Aktif"
+              aria-label={`Batalkan status out untuk ${row.nama_lengkap}`}
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setMarkOutSiswa(row);
+                setOutTglKeluar(new Date().toISOString().split("T")[0]);
+              }}
+              className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#F43F5E]/40 bg-[#0B0F17] hover:bg-[#F43F5E]/10 text-[#9CA3AF] hover:text-[#F43F5E] transition-all focus:outline-none focus:ring-1 focus:ring-[#F43F5E]"
+              title="Tandai Siswa Keluar / Berhenti (Out)"
+              aria-label={`Tandai siswa ${row.nama_lengkap} keluar atau berhenti`}
+            >
+              <UserMinus className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => openTambahProgram(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#38BDF8]/40 bg-[#0B0F17] hover:bg-[#38BDF8]/10 text-[#9CA3AF] hover:text-[#38BDF8] transition-all focus:outline-none focus:ring-1 focus:ring-[#38BDF8]"
+            title="Daftarkan Program Baru untuk Siswa Ini"
+            aria-label={`Daftarkan program baru untuk siswa ${row.nama_lengkap}`}
+          >
+            <GraduationCap className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(`/superadmin/siswa/edit/${row.id}`)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#10B981]/40 bg-[#0B0F17] hover:bg-[#10B981]/10 text-[#9CA3AF] hover:text-[#10B981] transition-all focus:outline-none focus:ring-1 focus:ring-[#10B981]"
+            title="Edit Siswa"
+            aria-label={`Edit data siswa ${row.nama_lengkap}`}
+          >
+            <Edit className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setDeleteSiswa(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#F43F5E]/40 bg-[#0B0F17] hover:bg-[#F43F5E]/10 text-[#9CA3AF] hover:text-[#F43F5E] transition-all focus:outline-none focus:ring-1 focus:ring-[#F43F5E]"
+            title="Hapus Siswa (Anonimisasi)"
+            aria-label={`Hapus data siswa ${row.nama_lengkap}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => openKelolaAkun(row)}
+            className="p-1.5 rounded-md border border-[#1F2937] hover:border-[#3B82F6]/40 bg-[#0B0F17] hover:bg-[#3B82F6]/10 text-[#9CA3AF] hover:text-[#3B82F6] transition-all focus:outline-none focus:ring-1 focus:ring-[#3B82F6]"
+            title="Kelola Akun Login"
+            aria-label={`Kelola akun login untuk ${row.nama_lengkap}`}
+          >
+            <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header Toolbar */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-base font-bold text-[#F9FAFB]">Data Siswa</h1>
+          <p className="text-xs text-[#6B7280] mt-0.5">Direktori seluruh siswa pelatihan &amp; manajemen akun login.</p>
+        </div>
+
+        {/* Toolbar Aksi */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTemplateDropdownOpen(!templateDropdownOpen)}
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] hover:bg-[#1F2937] text-xs font-medium text-[#D1D5DB] transition-colors focus:outline-none focus:ring-1 focus:ring-[#38BDF8]"
+              aria-label="Pilihan unduh template Excel"
+              aria-haspopup="true"
+              aria-expanded={templateDropdownOpen}
+            >
+              <FileText className="h-3.5 w-3.5 text-[#38BDF8]" aria-hidden="true" />
+              <span>Template</span>
+              <ChevronDown className="h-3 w-3 text-[#9CA3AF]" aria-hidden="true" />
+            </button>
+            {templateDropdownOpen && (
+              <div
+                className="absolute left-0 mt-1 w-56 rounded-lg bg-[#111827] border border-[#1F2937] shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-150"
+                onMouseLeave={() => setTemplateDropdownOpen(false)}
+                role="menu"
+                aria-label="Pilihan template spreadsheet"
+              >
+                <a
+                  href="/api/v1/excel/template?modul=siswa"
+                  download
+                  role="menuitem"
+                  onClick={() => setTemplateDropdownOpen(false)}
+                  className="block px-3 py-2 text-xs text-[#D1D5DB] hover:text-white hover:bg-[#1F2937] transition-colors"
+                >
+                  <span className="font-semibold block">Template Siswa Baru</span>
+                  <span className="text-[10px] text-[#9CA3AF]">Format data siswa reguler/aktif</span>
+                </a>
+                <div className="border-t border-[#1F2937] my-1" />
+                <a
+                  href="/api/v1/excel/template?modul=arsip_alumni"
+                  download
+                  role="menuitem"
+                  onClick={() => setTemplateDropdownOpen(false)}
+                  className="block px-3 py-2 text-xs text-[#D1D5DB] hover:text-white hover:bg-[#1F2937] transition-colors"
+                >
+                  <span className="font-semibold block text-[#38BDF8]">Template Arsip Alumni (2015+)</span>
+                  <span className="text-[10px] text-[#9CA3AF]">Siswa + Pembayaran + Sertifikat</span>
+                </a>
+              </div>
+            )}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setImportOpen(true)}
+            aria-label="Buka dialog import data dari file Excel"
+          >
+            <Upload className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Import Excel</span>
+          </Button>
+
+          <a
+            href="/api/v1/excel/export?modul=siswa"
+            download
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] hover:bg-[#1F2937] text-xs font-medium text-[#D1D5DB] transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+            aria-label="Ekspor seluruh data siswa ke format Excel"
+          >
+            <Download className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Export Excel</span>
+          </a>
+        </div>
+      </div>
+
+      {/* Filter + Search Bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div
+          className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1"
+          role="group"
+          aria-label="Filter status siswa"
+        >
+          {[
+            { key: "aktif", label: "Siswa Aktif" },
+            { key: "alumni", label: "Alumni" },
+            { key: "out", label: "Out (Keluar)" },
+            { key: "semua", label: "Semua" },
+          ].map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setFilter(item.key as FilterStatus)}
+              aria-pressed={filter === item.key}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all focus:outline-none focus:ring-1 focus:ring-[#DC2626] ${
+                filter === item.key ? "bg-[#DC2626] text-white shadow-sm" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="w-[200px]">
+          <Select
+            value={programFilter}
+            onChange={(e) => setProgramFilter(e.target.value)}
+            aria-label="Filter berdasarkan program pelatihan"
+          >
+            <option value="semua">Semua Program</option>
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.kode_program} - {p.nama}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className="relative flex-1 max-w-xs">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" aria-hidden="true" />
+          <input
+            id="search-siswa-input"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari nama, NIK, nomor induk..."
+            aria-label="Cari siswa berdasarkan nama, NIK, atau nomor induk"
+            className="h-9 w-full rounded-lg border border-[#1F2937] bg-[#111827] pl-8 pr-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => loadSiswa(true)}
+          className="p-2 rounded-lg border border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-white transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+          title="Segarkan data"
+          aria-label="Segarkan data tabel siswa"
+        >
+          <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
+        </button>
+
+        <div className="ml-auto flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#111827] border border-[#1F2937] text-sm text-[#9CA3AF] shadow-sm">
+          <Users className="h-4 w-4 text-[#EF4444]" aria-hidden="true" />
+          <span>
+            Total: <strong className="text-white font-semibold text-base">{total}</strong> siswa terdaftar
+          </span>
+        </div>
+      </div>
+
+      {/* Tabel Data & Pagination */}
+      {loading ? (
+        <TableSkeleton rows={8} columns={6} />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div aria-live="polite" className="overflow-x-auto">
+            <Table
+              columns={columns}
+              data={siswaList}
+              emptyMessage="Tidak ada siswa yang cocok dengan kriteria pencarian."
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
+            <div className="flex items-center gap-2">
+              <label htmlFor="limit-select">Menampilkan</label>
+              <select
+                id="limit-select"
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                aria-label="Jumlah data per halaman"
+                className="bg-[#111827] border border-[#1F2937] rounded px-2 py-1 focus:outline-none focus:border-[#DC2626]"
+              >
+                <option value={10}>10</option>
+                <option value={15}>15</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+              <span>data per halaman</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                aria-label="Halaman sebelumnya"
+                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+              >
+                Sebelumnya
+              </button>
+              <span className="px-3 py-1.5 font-medium" aria-current="page">
+                Halaman {page} dari {Math.max(1, Math.ceil(total / limit))}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= Math.ceil(total / limit) || siswaList.length === 0}
+                aria-label="Halaman selanjutnya"
+                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
+              >
+                Selanjutnya
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tambah Program Baru untuk Siswa */}
+      <Modal
+        open={!!tambahProgramSiswa}
+        onClose={() => !tambahProgSubmitting && setTambahProgramSiswa(null)}
+        title="Daftarkan Siswa ke Program Baru"
+      >
+        {tambahProgramSiswa && (
+          <form onSubmit={handleConfirmTambahProgram} className="flex flex-col gap-4 text-xs">
+            {/* Student Info Card */}
+            <div className="p-3 rounded-lg bg-[#0B0F17] border border-[#1F2937] flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-sm text-[#F9FAFB]">
+                  {tambahProgramSiswa.nama_lengkap}
+                </span>
+                <span className="font-mono text-[10px] text-[#DC2626] font-bold">
+                  {tambahProgramSiswa.nomor_induk}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-[#9CA3AF] pt-1 border-t border-[#1F2937]/60">
+                <p>NIK: <span className="font-mono text-[#D1D5DB]">{tambahProgramSiswa.nik}</span></p>
+                <p>Program Saat Ini: <span className="text-[#38BDF8] font-medium">{tambahProgramSiswa.program?.nama || "—"}</span></p>
+              </div>
+            </div>
+
+            {/* Notification message */}
+            {tambahProgMsg && (
+              <div
+                role="status"
+                className={`p-3 rounded-lg flex items-center gap-2 text-xs border ${
+                  tambahProgMsg.type === "success"
+                    ? "bg-[#10B981]/10 border-[#10B981]/30 text-[#10B981]"
+                    : "bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#F43F5E]"
+                }`}
+              >
+                {tambahProgMsg.type === "success" ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span>{tambahProgMsg.text}</span>
+              </div>
+            )}
+
+            {/* Pilihan Program Baru */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="tambah-prog-select" className="font-medium text-[#D1D5DB]">
+                Pilih Program Pelatihan Baru <span className="text-[#DC2626]">*</span>
+              </label>
+              <Select
+                id="tambah-prog-select"
+                value={tambahProgId}
+                onChange={(e) => handleProgramChange(e.target.value)}
+                required
+              >
+                <option value="" disabled>-- Pilih Program Baru --</option>
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.kode_program} - {p.nama} {p.id === tambahProgramSiswa.program_id ? "(Sedang Diambil)" : ""}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            {/* Nomor Induk Baru */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="tambah-prog-noinduk" className="font-medium text-[#D1D5DB] flex items-center justify-between">
+                <span>Nomor Induk Baru <span className="text-[#DC2626]">*</span></span>
+                {loadingNextNoInduk && (
+                  <span className="text-[10px] text-[#38BDF8] flex items-center gap-1 font-normal">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden="true" /> Menghitung nomor induk...
+                  </span>
+                )}
+              </label>
+              <input
+                id="tambah-prog-noinduk"
+                type="text"
+                required
+                value={tambahProgNoInduk}
+                onChange={(e) => setTambahProgNoInduk(e.target.value)}
+                placeholder="Contoh: 01.1033"
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] font-mono text-xs"
+              />
+              <p className="text-[10px] text-[#6B7280]">
+                Otomatis di-generate dari nomor urut berikutnya, namun dapat Anda sesuaikan bila ada ketentuan nomor khusus.
+              </p>
+            </div>
+
+            {/* Biaya Pelatihan */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="tambah-prog-biaya" className="font-medium text-[#D1D5DB]">
+                Biaya Pelatihan Program Baru (Rp) <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                id="tambah-prog-biaya"
+                type="number"
+                required
+                min={0}
+                value={tambahProgBiaya}
+                onChange={(e) => setTambahProgBiaya(e.target.value)}
+                placeholder="Contoh: 8500000"
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] text-xs"
+              />
+              <p className="text-[10px] text-[#6B7280]">
+                Tercatat sebagai tagihan di menu Keuangan untuk program baru ini (misal: Banper, tarif khusus, atau diskon).
+              </p>
+            </div>
+
+            {/* Tanggal Masuk */}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="tambah-prog-tgl" className="font-medium text-[#D1D5DB]">
+                Tanggal Masuk Program Baru <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                id="tambah-prog-tgl"
+                type="date"
+                required
+                value={tambahProgTglMasuk}
+                onChange={(e) => setTambahProgTglMasuk(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] text-[#F9FAFB] focus:outline-none focus:border-[#DC2626] text-xs"
+              />
+            </div>
+
+            <p className="text-[11px] text-[#9CA3AF] bg-[#1F2937]/40 p-2.5 rounded-lg border border-[#1F2937]">
+              Semua data pribadi (NIK, Tempat/Tgl Lahir, Alamat, Orang Tua, No. HP, Berkas) akan disalin secara otomatis dari data siswa saat ini.
+            </p>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-[#1F2937]">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={tambahProgSubmitting}
+                onClick={() => setTambahProgramSiswa(null)}
+              >
+                Batal
+              </Button>
+              <Button
+                type="submit"
+                disabled={tambahProgSubmitting || loadingNextNoInduk || !tambahProgId || !tambahProgNoInduk}
+                className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5"
+              >
+                {tambahProgSubmitting ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Mendaftarkan...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> Daftarkan Program Baru
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal Kelola Akun */}
+      <Modal
+        open={!!selectedSiswa}
+        onClose={() => setSelectedSiswa(null)}
+        title="Kelola Akun Siswa"
+        size="sm"
+      >
+        {selectedSiswa && (
+          <form onSubmit={handleSaveCredentials} className="flex flex-col gap-4">
+            <div className="rounded-xl border border-[#1F2937] bg-[#0B0F17] p-3 text-xs space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">Nama Siswa:</span>
+                <strong className="text-[#F9FAFB]">{selectedSiswa.nama_lengkap}</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">No. Induk:</span>
+                <span className="font-mono font-bold text-[#DC2626]">{selectedSiswa.nomor_induk}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-[#9CA3AF]">Status Kata Sandi:</span>
+                {selectedSiswa.is_password_default !== false ? (
+                  <span className="text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[11px]">
+                    Default ({selectedSiswa.username})
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px]">
+                    Telah diubah mandiri oleh siswa
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-[#111827] border border-[#1F2937] p-2.5 text-[11px] text-[#9CA3AF] leading-relaxed">
+              <p>
+                <strong className="text-[#D1D5DB]">Keamanan Kata Sandi:</strong> Sesuai standar enkripsi hash (OWASP), password yang telah diubah siswa tersimpan aman dan tidak dapat dilihat dalam teks polos oleh siapapun. Gunakan formulir di bawah untuk mereset kata sandi jika siswa lupa.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="new-username-input" className="text-xs font-medium text-[#9CA3AF]">
+                Username Login
+              </label>
+              <input
+                id="new-username-input"
+                type="text"
+                value={newUsername}
+                onChange={(e) => setNewUsername(e.target.value)}
+                placeholder="Username baru"
+                className="h-9 w-full rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="new-password-input" className="text-xs font-medium text-[#9CA3AF]">
+                Reset Kata Sandi
+              </label>
+              <div className="relative">
+                <input
+                  id="new-password-input"
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Kosongkan jika tidak ingin diubah"
+                  className="h-9 w-full rounded-lg border border-[#374151] bg-[#0B0F17] px-3 pr-9 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Sembunyikan kata sandi" : "Tampilkan kata sandi"}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#6B7280] hover:text-[#D1D5DB] focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                </button>
+              </div>
+              <span className="text-[10px] text-[#6B7280]">Minimal 6 karakter jika ingin mengganti sandi.</span>
+            </div>
+
+            {credMsg && (
+              <div
+                role="status"
+                className={`rounded-lg p-2.5 text-xs flex items-center gap-2 ${
+                  credMsg.type === "success"
+                    ? "bg-[#10B981]/10 text-[#10B981] border border-[#10B981]/20"
+                    : "bg-[#F43F5E]/10 text-[#F43F5E] border border-[#F43F5E]/20"
+                }`}
+              >
+                {credMsg.type === "success" ? (
+                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                )}
+                <span>{credMsg.text}</span>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 justify-end pt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setSelectedSiswa(null)}>
+                Batal
+              </Button>
+              <Button type="submit" size="sm" disabled={credSaving}>
+                {credSaving ? <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Menyimpan...</> : "Simpan Perubahan"}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* Modal Hapus Siswa */}
+      <Modal
+        open={!!deleteSiswa}
+        onClose={() => setDeleteSiswa(null)}
+        title="Hapus Data Siswa"
+        size="sm"
+      >
+        {deleteSiswa && (
+          <div className="flex flex-col gap-4">
+            <div className="rounded-xl border border-[#F43F5E]/30 bg-[#F43F5E]/10 p-3 text-xs text-[#F43F5E] flex items-start gap-2.5">
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="flex flex-col gap-1 text-[11px]">
+                <strong className="text-xs">Peringatan Penghapusan</strong>
+                <p className="leading-relaxed opacity-90">
+                  Data akademik (nilai, presensi) akan tetap dipertahankan untuk kebutuhan riwayat statistik. Namun data pribadi <b>(NIK, No. HP, Alamat)</b> akan dihapus secara permanen (anonimisasi) sesuai dengan kebijakan privasi.
+                </p>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#9CA3AF] mt-1">
+              Apakah Anda yakin ingin menghapus/menonaktifkan siswa <b>{deleteSiswa.nama_lengkap}</b> ({deleteSiswa.nomor_induk})?
+            </div>
+
+            <div className="flex items-center gap-2 justify-end mt-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setDeleteSiswa(null)}>
+                Batal
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+                className="bg-[#DC2626] text-white hover:bg-[#B91C1C]"
+              >
+                {deleting ? <><Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Menghapus...</> : "Ya, Hapus Data"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal Import Excel */}
+      <Modal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        title="Import Data Siswa / Arsip dari Excel"
+        size="md"
+      >
+        <form onSubmit={handleImport} className="flex flex-col gap-4">
+          {!importHook.importing && !importHook.result && (
+            <>
+              {/* Pilihan Modul Import */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-[#D1D5DB]">Pilih Format Data Import:</label>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Format data import">
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={importModul === "siswa"}
+                    onClick={() => setImportModul("siswa")}
+                    className={`p-2.5 rounded-lg border text-left transition-all focus:outline-none focus:ring-1 focus:ring-[#DC2626] ${
+                      importModul === "siswa"
+                        ? "border-[#DC2626] bg-[#DC2626]/10 text-white"
+                        : "border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-[#D1D5DB]"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs">Siswa Reguler</div>
+                    <div className="text-[10px] text-[#9CA3AF] mt-0.5">Siswa baru / aktif tahun berjalan</div>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={importModul === "arsip_alumni"}
+                    onClick={() => setImportModul("arsip_alumni")}
+                    className={`p-2.5 rounded-lg border text-left transition-all focus:outline-none focus:ring-1 focus:ring-[#38BDF8] ${
+                      importModul === "arsip_alumni"
+                        ? "border-[#38BDF8] bg-[#38BDF8]/10 text-white"
+                        : "border-[#1F2937] bg-[#111827] text-[#9CA3AF] hover:text-[#D1D5DB]"
+                    }`}
+                  >
+                    <div className="font-semibold text-xs text-[#38BDF8]">Arsip Alumni (2015+)</div>
+                    <div className="text-[10px] text-[#9CA3AF] mt-0.5">Siswa + Lunas + Sertifikat</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Info Keterangan & Link Unduh Template */}
+              <div className="p-3 rounded-lg border border-[#1F2937] bg-[#0B0F17] flex flex-col gap-2">
+                <p className="text-xs text-[#9CA3AF] leading-relaxed">
+                  {importModul === "siswa" ? (
+                    "Unggah spreadsheet data siswa reguler. Sistem otomatis membuatkan nomor induk dan kredensial akun login."
+                  ) : (
+                    "Unggah spreadsheet arsip alumni lama. Sistem otomatis menetapkan status Alumni, mencatat pembayaran Lunas, dan mencatatkan nomor sertifikat yang telah terbit."
+                  )}
+                </p>
+                <a
+                  href={`/api/v1/excel/template?modul=${importModul}`}
+                  download
+                  className="inline-flex items-center gap-1.5 text-xs text-[#38BDF8] hover:underline font-medium"
+                >
+                  <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Unduh template Excel untuk {importModul === "siswa" ? "Siswa Reguler" : "Arsip Alumni"} (.xlsx)</span>
+                </a>
+              </div>
+
+              <div>
+                <label htmlFor="file-import-input" className="block text-xs font-semibold text-[#D1D5DB] mb-1.5">
+                  Pilih File Spreadsheet:
+                </label>
+                <input
+                  id="file-import-input"
+                  type="file"
+                  accept=".xlsx, .csv"
+                  onChange={(e) => importHook.setFile(e.target.files?.[0] || null)}
+                  aria-label="Pilih file spreadsheet Excel atau CSV untuk diimport"
+                  className="text-xs text-[#D1D5DB] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#DC2626] file:text-white hover:file:bg-[#B91C1C] cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 justify-end pt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setImportOpen(false)}>
+                  Batal
+                </Button>
+                <Button type="submit" size="sm" disabled={!importHook.file}>
+                  Mulai Import {importModul === "arsip_alumni" ? "Arsip Alumni" : "Siswa"}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {importHook.importing && (
+            <ImportProgressRing
+              progress={importHook.progress}
+              status={importHook.status}
+              label="Sistem sedang memproses data dan secara otomatis membuatkan username serta kata sandi untuk setiap siswa. Mohon tunggu..."
+            />
+          )}
+
+          {!importHook.importing && importHook.result && (
+            <ImportResultPanel
+              result={importHook.result}
+              newLabel={importModul === "arsip_alumni" ? "Arsip Baru" : "Siswa Baru"}
+              onImportAnother={() => importHook.reset()}
+              onClose={() => {
+                setImportOpen(false);
+                importHook.reset();
+              }}
+            />
+          )}
+        </form>
+      </Modal>
+
+      {/* Modal Tandai Siswa Out */}
+      <Modal
+        open={!!markOutSiswa}
+        onClose={() => setMarkOutSiswa(null)}
+        title="Tandai Siswa Keluar (Out)"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="p-3 rounded-lg border border-[#F43F5E]/30 bg-[#F43F5E]/10 text-xs text-[#F43F5E]">
+            <p className="font-semibold">Perhatian:</p>
+            <p className="mt-1 leading-relaxed">
+              Siswa <strong>{markOutSiswa?.nama_lengkap}</strong> ({markOutSiswa?.nomor_induk}) akan ditandai keluar / berhenti di tengah masa pelatihan. Data tagihan pembayarannya akan otomatis muncul di menu Keuangan pada filter <strong>"Out (Belum Lunas)"</strong> untuk penagihan atau pelunasan.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="out-tgl-keluar-input" className="block text-xs font-semibold text-[#D1D5DB] mb-1">
+              Tanggal Berhenti / Keluar
+            </label>
+            <input
+              id="out-tgl-keluar-input"
+              type="date"
+              value={outTglKeluar}
+              onChange={(e) => setOutTglKeluar(e.target.value)}
+              className="h-9 w-full rounded-lg border border-[#1F2937] bg-[#111827] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setMarkOutSiswa(null)}
+              disabled={outProcessing}
+            >
+              Batal
+            </Button>
+            <Button
+              size="sm"
+              className="bg-[#DC2626] hover:bg-[#B91C1C] text-white gap-1.5"
+              onClick={() => handleConfirmMarkOut("out")}
+              disabled={outProcessing}
+            >
+              {outProcessing ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <UserMinus className="h-3.5 w-3.5" aria-hidden="true" />}
+              <span>Konfirmasi Siswa Out</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
+}

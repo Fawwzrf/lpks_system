@@ -367,29 +367,33 @@ export default function PresensiAdminPage() {
                 <>
                   <button
                     onClick={() => handleSetStatus(r.siswa.id, "Hadir")}
-                    className="px-2 py-1 rounded bg-[#10B981]/15 hover:bg-[#10B981]/25 text-[#10B981] border border-[#10B981]/30 text-[10px] font-bold transition-all"
+                    className="px-2 py-1 rounded bg-[#10B981]/15 hover:bg-[#10B981]/25 text-[#10B981] border border-[#10B981]/30 text-[10px] font-bold transition-all focus:outline-none focus:ring-1 focus:ring-[#10B981]"
                     title="Tandai Hadir manual"
+                    aria-label={`Tandai kehadiran ${r.siswa.nama_lengkap} hadir manual`}
                   >
                     + Hadir
                   </button>
                   <button
                     onClick={() => handleSetStatus(r.siswa.id, "Izin")}
-                    className="px-2 py-1 rounded bg-[#F59E0B]/15 hover:bg-[#F59E0B]/25 text-[#F59E0B] border border-[#F59E0B]/30 text-[10px] font-bold transition-all"
+                    className="px-2 py-1 rounded bg-[#F59E0B]/15 hover:bg-[#F59E0B]/25 text-[#F59E0B] border border-[#F59E0B]/30 text-[10px] font-bold transition-all focus:outline-none focus:ring-1 focus:ring-[#F59E0B]"
                     title="Tandai Izin"
+                    aria-label={`Tandai status ${r.siswa.nama_lengkap} izin`}
                   >
                     + Izin
                   </button>
                   <button
                     onClick={() => handleSetStatus(r.siswa.id, "Sakit")}
-                    className="px-2 py-1 rounded bg-[#38BDF8]/15 hover:bg-[#38BDF8]/25 text-[#38BDF8] border border-[#38BDF8]/30 text-[10px] font-bold transition-all"
+                    className="px-2 py-1 rounded bg-[#38BDF8]/15 hover:bg-[#38BDF8]/25 text-[#38BDF8] border border-[#38BDF8]/30 text-[10px] font-bold transition-all focus:outline-none focus:ring-1 focus:ring-[#38BDF8]"
                     title="Tandai Sakit"
+                    aria-label={`Tandai status ${r.siswa.nama_lengkap} sakit`}
                   >
                     + Sakit
                   </button>
                   <button
                     onClick={() => handleSetStatus(r.siswa.id, "Alpa")}
-                    className="px-2 py-1 rounded bg-[#F43F5E]/15 hover:bg-[#F43F5E]/25 text-[#F43F5E] border border-[#F43F5E]/30 text-[10px] font-bold transition-all"
+                    className="px-2 py-1 rounded bg-[#F43F5E]/15 hover:bg-[#F43F5E]/25 text-[#F43F5E] border border-[#F43F5E]/30 text-[10px] font-bold transition-all focus:outline-none focus:ring-1 focus:ring-[#F43F5E]"
                     title="Tandai Alpa"
+                    aria-label={`Tandai status ${r.siswa.nama_lengkap} alpa`}
                   >
                     + Alpa
                   </button>
@@ -494,10 +498,11 @@ export default function PresensiAdminPage() {
           />
           <button
             onClick={loadPresensi}
-            className="p-1.5 rounded-lg border border-[#374151] hover:bg-[#1F2937] text-[#9CA3AF] hover:text-white transition-colors"
+            className="p-1.5 rounded-lg border border-[#374151] hover:bg-[#1F2937] text-[#9CA3AF] hover:text-white transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
             title="Segarkan data tanggal ini"
+            aria-label="Segarkan data presensi tanggal ini"
           >
-            <RefreshCw className="h-3.5 w-3.5" />
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
 
