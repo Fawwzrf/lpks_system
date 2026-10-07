@@ -34,6 +34,7 @@ export interface SiswaItem {
   program_id?: string;
   program?: { id?: string; kode_program?: string; nama: string; biaya?: number };
   is_password_default?: boolean;
+  auth_id?: string | null;
 }
 
 export interface ProgramItem {
@@ -957,8 +958,12 @@ export function SiswaClient({
                 <span className="font-mono font-bold text-[#DC2626]">{selectedSiswa.nomor_induk}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#9CA3AF]">Status Kata Sandi:</span>
-                {selectedSiswa.is_password_default !== false ? (
+                <span className="text-[#9CA3AF]">Status Akun:</span>
+                {!selectedSiswa.auth_id ? (
+                  <span className="text-rose-400 font-medium bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded text-[11px]">
+                    Belum Dibuat (Simpan untuk Aktivasi)
+                  </span>
+                ) : selectedSiswa.is_password_default !== false ? (
                   <span className="text-amber-400 font-medium bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded text-[11px]">
                     Default ({selectedSiswa.username})
                   </span>

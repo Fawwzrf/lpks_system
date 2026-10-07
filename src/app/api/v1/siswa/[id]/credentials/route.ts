@@ -3,7 +3,7 @@ import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-res
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-// PUT /api/v1/siswa/[id]/credentials — admin ubah username/password siswa
+// PUT /api/v1/siswa/[id]/credentials — admin ubah atau buatkan username/password siswa
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -30,29 +30,26 @@ export async function PUT(
     const supabase = await createClient();
     const supabaseAdmin = createAdminClient();
 
-    // Ambil auth_id siswa
+    // Ambil data siswa
     const { data: siswa, error: fetchError } = await supabase
       .from("siswa")
-      .select("id, auth_id, username")
+      .select("id, auth_id, username, nama_lengkap, nomor_induk")
       .eq("id", id)
       .single();
 
     if (fetchError || !siswa) {
       return errorResponse("NOT_FOUND", "Siswa tidak ditemukan.", 404);
     }
-    if (!siswa.auth_id) {
-      return errorResponse("NO_AUTH", "Siswa belum memiliki akun login.", 400);
-    }
 
-    // Build update payload untuk Supabase Auth
-    const authUpdate: { email?: string; password?: string } = {};
-    if (username) {
-      // Validasi username: izinkan alphanumeric, @, dot, dash, underscore
-      const cleanUsername = username.trim().toLowerCase().replace(/[^a-z0-9@._-]/g, "");
+    const cleanUsername =
+      typeof username === "string"
+        ? username.trim().toLowerCase().replace(/[^a-z0-9@._-]/g, "")
+        : null;
+
+    if (cleanUsername) {
       if (cleanUsername.length < 3) {
         return errorResponse("VALIDATION_ERROR", "Username minimal 3 karakter.", 400);
       }
-      // Cek duplikat username (kecuali milik siswa ini sendiri)
       const { data: dup } = await supabase
         .from("siswa")
         .select("id")
@@ -62,19 +59,50 @@ export async function PUT(
       if (dup) {
         return errorResponse("DUPLICATE_USERNAME", "Username sudah digunakan siswa lain.", 409);
       }
-      authUpdate.email = `${cleanUsername.replace(/@/g, "")}@lpks.id`;
+    }
 
-      // Update username di tabel siswa
+    // Jika siswa BELUM memiliki akun auth, buatkan akun baru (Aktivasi Akun)
+    if (!siswa.auth_id) {
+      const finalUsername = cleanUsername || siswa.username || `siswa@${id.slice(0, 4)}`;
+      const finalPassword = password || finalUsername;
+      const finalEmail = `${finalUsername.replace(/@/g, "")}@lpks.id`;
+
+      const { data: createdAuth, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email: finalEmail,
+        password: finalPassword,
+        email_confirm: true,
+        user_metadata: { role: "siswa", nama: siswa.nama_lengkap || finalUsername },
+      });
+
+      if (createError || !createdAuth?.user) {
+        return errorResponse(
+          "AUTH_CREATE_FAILED",
+          `Gagal membuat akun login siswa: ${createError?.message || "Unknown error"}`,
+          500
+        );
+      }
+
+      await supabase.from("siswa").update({
+        auth_id: createdAuth.user.id,
+        username: finalUsername,
+        is_password_default: true,
+      }).eq("id", id);
+
+      return successResponse({ message: "Akun login siswa berhasil dibuat dan diaktifkan!" });
+    }
+
+    // Jika siswa SUDAH memiliki akun auth, perbarui kredensial
+    const authUpdate: { email?: string; password?: string } = {};
+    if (cleanUsername) {
+      authUpdate.email = `${cleanUsername.replace(/@/g, "")}@lpks.id`;
       await supabase.from("siswa").update({ username: cleanUsername }).eq("id", id);
     }
 
     if (password) {
       authUpdate.password = password;
-      // Jika admin set ulang password, tandai kembali sebagai default
       await supabase.from("siswa").update({ is_password_default: true }).eq("id", id);
     }
 
-    // Update Supabase Auth user
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       siswa.auth_id,
       authUpdate

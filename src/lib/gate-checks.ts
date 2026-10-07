@@ -153,3 +153,61 @@ export function generateStudentUsername(namaLengkap: string, urutanNoInduk?: str
 export function generateStudentPassword(username?: string): string {
   return username || "budi@0001";
 }
+
+/**
+ * Resolver Kandidat Email Auth: Memetakan input identifier (username, no induk, email)
+ * ke seluruh variasi email internal Supabase Auth yang mungkin terdaftar.
+ */
+export function resolveLoginCandidateEmails(identifier: string): string[] {
+  if (!identifier || typeof identifier !== "string") return [];
+  const trimmed = identifier.trim();
+  const lower = trimmed.toLowerCase();
+  const candidates: string[] = [];
+
+  // 1. Email format lengkap (admin atau email pribadi)
+  const isFullEmail = lower.includes("@") && lower.split("@").length === 2 && lower.split("@")[1].includes(".");
+  if (isFullEmail) {
+    candidates.push(trimmed);
+  }
+
+  let handle = lower;
+  if (handle.endsWith("@lpks.id")) {
+    handle = handle.slice(0, -"@lpks.id".length);
+  }
+
+  if (handle.includes("@")) {
+    const [namePart, numPart] = handle.split("@");
+    const cleanName = namePart.replace(/[^a-z0-9]/g, "");
+    const cleanNum = numPart.replace(/[^a-z0-9]/g, "");
+    const lastSegment = numPart.includes(".") ? numPart.split(".").pop()!.replace(/[^a-z0-9]/g, "") : cleanNum;
+
+    if (cleanName && lastSegment) {
+      candidates.push(`${cleanName}${lastSegment}@lpks.id`);
+      candidates.push(`${cleanName}.${lastSegment}@lpks.id`);
+    }
+    if (cleanName && cleanNum && cleanNum !== lastSegment) {
+      candidates.push(`${cleanName}${cleanNum}@lpks.id`);
+      candidates.push(`${cleanName}.${cleanNum}@lpks.id`);
+    }
+  } else {
+    const cleanHandle = handle.replace(/[^a-z0-9]/g, "");
+    if (cleanHandle) {
+      candidates.push(`${cleanHandle}@lpks.id`);
+    }
+    if (handle.includes(".")) {
+      const lastPart = handle.split(".").pop()!.replace(/[^a-z0-9]/g, "");
+      if (lastPart) {
+        candidates.push(`siswa${lastPart}@lpks.id`);
+        candidates.push(`siswa.${lastPart}@lpks.id`);
+      }
+    }
+  }
+
+  const directAtLpks = `${handle.replace(/@/g, "")}@lpks.id`;
+  if (!candidates.includes(directAtLpks)) {
+    candidates.push(directAtLpks);
+  }
+
+  return Array.from(new Set(candidates));
+}
+

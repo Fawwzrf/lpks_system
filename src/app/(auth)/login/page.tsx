@@ -83,7 +83,7 @@ export default function SiswaLoginPage() {
               type="text"
               autoComplete="username"
               required
-              placeholder="budi42"
+              placeholder="contoh: budi@0001 atau 01.0001"
               data-next="password"
               className="h-9 w-full rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
             />
