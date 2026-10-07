@@ -1,0 +1,73 @@
+name: Scheduled Database Backup & Supabase Keep-Alive
+
+on:
+  schedule:
+    # Berjalan setiap hari pukul 19:00 UTC (02:00 WIB dini hari)
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+    inputs:
+      run_backup:
+        description: 'Jalankan ekspor backup database'
+        required: true
+        type: boolean
+        default: true
+      run_prune:
+        description: 'Jalankan pembersihan audit log lama'
+        required: false
+        type: boolean
+        default: false
+      retention_days:
+        description: 'Batas retensi log (hari) jika prune dijalankan'
+        required: false
+        type: string
+        default: '365'
+
+jobs:
+  maintenance-tasks:
+    name: Database Maintenance & Health Keep-Alive
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Keep-Alive Ping (Prevent Supabase Free Tier Auto-Pause)
+        run: |
+          if [ -n "${{ secrets.PRODUCTION_URL }}" ]; then
+            echo "📡 Mengirim keep-alive ping ke endpoint health check produksi..."
+            HEALTH_URL="${{ secrets.PRODUCTION_URL }}/api/v1/health"
+            curl -s -f -m 30 "$HEALTH_URL" || echo "⚠️ Warning: Endpoint $HEALTH_URL tidak merespons, melanjutkan ke direct DB query..."
+          else
+            echo "ℹ️ Secret PRODUCTION_URL belum dikonfigurasi. Direct query ke Supabase pada langkah backup akan tetap mencegah auto-pause."
+          fi
+
+      - name: Execute Full Database Backup
+        if: ${{ github.event_name == 'schedule' || inputs.run_backup == true }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run db:backup
+
+      - name: Upload Backup Artifact to GitHub Storage
+        if: ${{ github.event_name == 'schedule' || inputs.run_backup == true }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpks-db-backup-${{ github.run_id }}
+          path: backups/*.json
+          retention-days: 90
+
+      - name: Execute Audit Log Pruning (Optional)
+        if: ${{ inputs.run_prune == true }}
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/prune-audit-log.mjs ${{ inputs.retention_days }}

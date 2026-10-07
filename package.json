@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --experimental-strip-types --test tests/unit/*.test.ts tests/integration/*.test.ts"
+    "test": "node --experimental-strip-types --test tests/unit/*.test.ts tests/integration/*.test.ts",
+    "db:backup": "node scripts/backup-db.mjs",
+    "db:restore": "node scripts/restore-db.mjs",
+    "db:prune": "node scripts/prune-audit-log.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.21.0",
