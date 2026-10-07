@@ -104,16 +104,21 @@ async function getInitialPresensiData(): Promise<{
   }
 }
 
-export default async function PresensiAdminPage() {
+async function PresensiContent() {
   const { items, programs, todayStr } = await getInitialPresensiData();
+  return (
+    <PresensiClient
+      initialItems={items}
+      initialPrograms={programs}
+      initialDate={todayStr}
+    />
+  );
+}
 
+export default function PresensiAdminPage() {
   return (
     <Suspense fallback={<TableSkeleton rows={10} columns={6} />}>
-      <PresensiClient
-        initialItems={items}
-        initialPrograms={programs}
-        initialDate={todayStr}
-      />
+      <PresensiContent />
     </Suspense>
   );
 }

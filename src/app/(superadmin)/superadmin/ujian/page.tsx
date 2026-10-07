@@ -265,16 +265,21 @@ async function getInitialUjianData(): Promise<{
   }
 }
 
-export default async function UjianPage() {
+async function UjianContent() {
   const { data, queueData, historyData } = await getInitialUjianData();
+  return (
+    <UjianClient
+      initialData={data}
+      initialQueueData={queueData}
+      initialHistoryData={historyData}
+    />
+  );
+}
 
+export default function UjianPage() {
   return (
     <Suspense fallback={<CardSkeleton count={6} />}>
-      <UjianClient
-        initialData={data}
-        initialQueueData={queueData}
-        initialHistoryData={historyData}
-      />
+      <UjianContent />
     </Suspense>
   );
 }

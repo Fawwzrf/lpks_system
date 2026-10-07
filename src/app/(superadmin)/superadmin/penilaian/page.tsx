@@ -148,16 +148,21 @@ async function getInitialPenilaianData(): Promise<{
   }
 }
 
-export default async function PenilaianSuperadminPage() {
+async function PenilaianContent() {
   const { items, programs, kriteriaList } = await getInitialPenilaianData();
+  return (
+    <PenilaianClient
+      initialItems={items}
+      initialPrograms={programs}
+      initialKriteria={kriteriaList}
+    />
+  );
+}
 
+export default function PenilaianSuperadminPage() {
   return (
     <Suspense fallback={<TableSkeleton rows={10} columns={6} />}>
-      <PenilaianClient
-        initialItems={items}
-        initialPrograms={programs}
-        initialKriteria={kriteriaList}
-      />
+      <PenilaianContent />
     </Suspense>
   );
 }

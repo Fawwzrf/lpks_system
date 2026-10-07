@@ -81,14 +81,17 @@ async function getInitialDashboardStats(): Promise<DashboardStats> {
   }
 }
 
-export default async function DashboardPage() {
+async function DashboardContent() {
   const stats = await getInitialDashboardStats();
+  return <DashboardClient initialStats={stats} />;
+}
 
+export default function DashboardPage() {
   return (
     <Suspense
       fallback={<CardSkeleton count={4} className="grid-cols-2 lg:grid-cols-4 gap-3" />}
     >
-      <DashboardClient initialStats={stats} />
+      <DashboardContent />
     </Suspense>
   );
 }

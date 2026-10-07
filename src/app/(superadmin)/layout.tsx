@@ -37,17 +37,23 @@ function NavItem({
   active,
   collapsed,
   onClick,
+  onNavigateStart,
 }: {
   item: NavItemType;
   active: boolean;
   collapsed?: boolean;
   onClick?: () => void;
+  onNavigateStart?: () => void;
 }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
-      onClick={onClick}
+      prefetch={true}
+      onClick={() => {
+        if (!active && onNavigateStart) onNavigateStart();
+        if (onClick) onClick();
+      }}
       title={item.label}
       className={cn(
         "flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-all duration-150 group relative",
@@ -71,12 +77,14 @@ function Sidebar({
   isMobile = false,
   adminUser,
   onLogout,
+  onNavigateStart,
 }: {
   collapsed?: boolean;
   onClose?: () => void;
   isMobile?: boolean;
   adminUser: { nama?: string; email?: string } | null;
   onLogout: () => void;
+  onNavigateStart?: () => void;
 }) {
   const pathname = usePathname();
 
@@ -122,6 +130,7 @@ function Sidebar({
             active={pathname.startsWith(item.href)}
             collapsed={collapsed && !isMobile}
             onClick={isMobile ? onClose : undefined}
+            onNavigateStart={onNavigateStart}
           />
         ))}
       </nav>
@@ -135,6 +144,7 @@ function Sidebar({
             active={pathname.startsWith(item.href)}
             collapsed={collapsed && !isMobile}
             onClick={isMobile ? onClose : undefined}
+            onNavigateStart={onNavigateStart}
           />
         ))}
         <button
@@ -161,8 +171,15 @@ interface NotificationItem {
 
 export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const [isNavigating, setIsNavigating] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Reset navigating indicator when pathname changes
+  useEffect(() => {
+    setIsNavigating(false);
+  }, [pathname]);
 
   // Admin user data
   const [adminUser, setAdminUser] = useState<{ nama?: string; email?: string } | null>(null);
@@ -285,13 +302,19 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   }
 
   return (
-    <div className="flex h-screen bg-[#0B0F17] overflow-hidden">
+    <div className="flex h-screen bg-[#0B0F17] overflow-hidden relative">
+      {/* Top instant navigation indicator bar */}
+      {isNavigating && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] h-[3px] bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 animate-pulse shadow-[0_0_12px_rgba(220,38,38,0.8)] pointer-events-none" />
+      )}
+
       {/* Desktop Sidebar */}
       <div className="hidden md:flex flex-col h-full">
         <Sidebar
           collapsed={sidebarCollapsed}
           adminUser={adminUser}
           onLogout={handleLogout}
+          onNavigateStart={() => setIsNavigating(true)}
         />
       </div>
 
@@ -318,6 +341,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
           onClose={() => setDrawerOpen(false)}
           adminUser={adminUser}
           onLogout={handleLogout}
+          onNavigateStart={() => setIsNavigating(true)}
         />
       </div>
 

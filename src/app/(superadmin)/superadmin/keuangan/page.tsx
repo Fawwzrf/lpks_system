@@ -124,12 +124,15 @@ async function getInitialKeuanganData(): Promise<{
   }
 }
 
-export default async function KeuanganSuperadminPage() {
+async function KeuanganContent() {
   const { items, programs } = await getInitialKeuanganData();
+  return <KeuanganClient initialItems={items} initialPrograms={programs} />;
+}
 
+export default function KeuanganSuperadminPage() {
   return (
     <Suspense fallback={<TableSkeleton rows={10} columns={6} />}>
-      <KeuanganClient initialItems={items} initialPrograms={programs} />
+      <KeuanganContent />
     </Suspense>
   );
 }
