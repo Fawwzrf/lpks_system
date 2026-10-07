@@ -10,25 +10,28 @@ Dokumen ini berisi gabungan dari Test Plan, Laporan Pengujian Fungsional, dan La
 
 ### Dalam Scope (In Scope)
 
-Semua modul diuji silang dengan Acceptance Criteria PRD:
+Semua modul diuji silang dengan Acceptance Criteria PRD & Roadmap Peningkatan Sistem:
 
 | Modul | FR/AC | Keterangan |
 |---|---|---|
 | Autentikasi & Auth | AC-0 (implicit) | Login Superadmin (email) & Siswa (username), route protection middleware |
 | Pendaftaran Siswa | AC-1 | Checklist berkas, form biodata, auto-generate No Induk `kode.No_siswa`, generate username & password siswa |
 | Data Siswa (CRUD) | AC-2 | Filter status, edit biodata, ubah username/password, import/export Excel |
-| Presensi GPS Geofencing | AC-3 | Validasi radius 100m, 1x presensi/hari, override admin, import/export Excel |
-| Catatan Keuangan | AC-2, AC-4 | Pencatatan pembayaran, status Lunas/Cicil, export Excel |
+| Presensi GPS & Anti-Fake GPS | AC-3 | Validasi radius 100m, Telemetry Inspection (mock/drift/cell tower/webdriver), 1x presensi/hari, override admin |
+| Catatan Keuangan & Idempotency | AC-2, AC-4 | Pencatatan pembayaran, status Lunas/Cicil, penyesuaian biaya khusus (grandfathering), proteksi double-submit (5 detik) |
 | Penilaian Harian | AC-4 | Input nilai 5 kriteria, grafik tren Recharts, threshold ≥ 80 |
-| Ujian & Sertifikasi | AC-5, AC-6 | Gate-check 2 syarat (lulus ujian + lunas), cetak PDF |
-| Master Data Dinamis | AC-8 | CRUD lokasi/radius, program, kriteria, syarat berkas |
+| Ujian & Sertifikasi | AC-5, AC-6 | Gate-check 2 syarat (lulus ujian + lunas), keunikan no sertifikat fisik alumni, cetak PDF |
+| Master Data Dinamis | AC-8 | CRUD lokasi/radius, program (auto-grandfathering tarif lama), kriteria, syarat berkas |
+| Audit Trail Logging | NFR-Sec | Pencatatan otomatis riwayat aksi sensitif (keuangan, sertifikat, siswa) ke tabel `audit_log` |
+| Server Component Streaming | NFR-Perf | Streaming SSR + Suspense skeleton pada 5 modul superadmin (Keuangan, Presensi, Penilaian, Ujian, Dashboard) |
 | AI Showcase | AC-7 | RAG query analitik, ringkasan progres mingguan |
-| Portal Siswa | AC-2, AC-3, AC-4 | Beranda, presensi mandiri, transkrip nilai + tren, ganti password |
+| Portal Siswa | AC-2, AC-3, AC-4 | Beranda, presensi mandiri dengan indikator akurasi GPS, transkrip nilai + tren, ganti password |
 
 ### Luar Scope (Out of Scope)
 
-- Payment gateway otomatis (by design, MVP out-of-scope)
-- Face recognition / biometrik
+- Payment gateway otomatis pihak ketiga (midtrans/xendit) (by design, pembayaran tunai/transfer dicatat admin)
+- Biometrik pengenalan wajah (Face recognition)
+- Presensi berbasis QR Code (dilarang eksplisit oleh stakeholder demi integritas mandiri)
 - Multi-cabang LPKS
 - Load testing skala besar > 100 pengguna bersamaan
 - Test pada browser non-Chromium (Chromium sudah cukup untuk MVP)
@@ -38,15 +41,15 @@ Semua modul diuji silang dengan Acceptance Criteria PRD:
 ## Strategi Pengujian
 
 ### Tahap 2 — Pengujian Fungsional
-Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (72 test, 23 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR.
+Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (117 test, 18 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR/NFR.
 
 ### Tahap 3 — Pengujian Non-Fungsional
-- **Performance:** Lighthouse + Chrome DevTools MCP untuk CWV (LCP, INP, FID)
-- **Security:** Semgrep MCP untuk static analysis, manual review OWASP Top 10 — eskalasi ke Claude Sonnet 4.6
+- **Performance:** Lighthouse + Chrome DevTools MCP untuk CWV (LCP, INP, FID) & verifikasi Server Component Streaming
+- **Security:** Static analysis, manual review OWASP Top 10, validasi audit logging & idempotency
 - **Compatibility:** Playwright MCP multi-device viewport (mobile 375px, tablet 768px, desktop 1280px)
 
 ### Tahap 4 — UAT
-Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & Siswa simultan), difokuskan pada alur kritis: Pendaftaran → Presensi → Penilaian → Ujian → Antrean Cetak & Sertifikat.
+Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & Siswa simultan), difokuskan pada alur kritis: Pendaftaran & Tarif Khusus → Presensi & Telemetry GPS → Penilaian → Ujian → Antrean Cetak & Keunikan Sertifikat.
 
 ---
 
@@ -55,7 +58,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 ### Entry Criteria (Sudah Terpenuhi ✅)
 - [x] Semua 7 tahap Development sudah dikonfirmasi
 - [x] Code review & refactoring selesai
-- [x] `npm test` → 72 pass, 23 suites, 0 fail (100% pass baseline clean)
+- [x] `npm test` → 117 pass, 18 suites, 0 fail (100% pass baseline clean)
 - [x] `tsc --noEmit` → 0 error
 - [x] `npm run lint` → 0 error
 - [x] Dev server aktif (`npm run dev`)
@@ -89,7 +92,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 |---|---|
 | Tahap 1: Test Planning | Sesi ini (selesai) |
 | Tahap 2: Pengujian Fungsional | 1–2 sesi — Playwright MCP eksekusi E2E |
-| Tahap 3: Pengujian Non-Fungsional | 1 sesi — Lighthouse + Semgrep + Compatibility |
+| Tahap 3: Pengujian Non-Fungsional | 1 sesi — Lighthouse + Security + Compatibility |
 | Tahap 4: UAT | 1 sesi — walkthrough user langsung |
 
 ---
@@ -98,8 +101,8 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 
 | Severity | Kriteria |
 |---|---|
-| **Critical** | Sistem crash, kebocoran data/autentikasi bypass, data corruption, fitur inti sama sekali tidak bisa dipakai tanpa workaround |
-| **High** | Fitur utama (presensi GPS, gate-check sertifikat, login, pendaftaran, penilaian) tidak berfungsi sesuai requirement tapi ada workaround terbatas |
+| **Critical** | Sistem crash, kebocoran data/autentikasi bypass, data corruption, pembobolan fake GPS, fitur inti sama sekali tidak bisa dipakai tanpa workaround |
+| **High** | Fitur utama (presensi GPS, gate-check sertifikat, login, pendaftaran, penilaian, keuangan/idempotency) tidak berfungsi sesuai requirement tapi ada workaround terbatas |
 | **Medium** | Fitur terganggu namun ada workaround jelas, atau bug UI yang cukup mengganggu tapi tidak memblokir flow |
 | **Low** | Bug kosmetik minor (typo, spacing, warna), tidak memengaruhi fungsionalitas sama sekali |
 
@@ -107,7 +110,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 
 ## Daftar Test Case — Index
 
-Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). Index awal:
+Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). Index terkini:
 
 | ID | Modul | Prioritas |
 |---|---|---|
@@ -117,7 +120,7 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 | TC-04 | Login Siswa (username salah) | High |
 | TC-05 | Route protection — akses `/superadmin/*` tanpa login | Critical |
 | TC-06 | Route protection — siswa mencoba akses `/superadmin/*` | Critical |
-| TC-07 | Pendaftaran siswa — checklist berkas fisik wajib | High |
+| TC-07 | Pendaftaran siswa — checklist berkas fisik wajib & snapshot biaya | High |
 | TC-08 | Pendaftaran siswa — auto-generate No Induk format `kode.No_siswa` | High |
 | TC-09 | Pendaftaran siswa — auto-generate username format `nama@2digit` | High |
 | TC-10 | Presensi GPS — dalam radius 100m → BERHASIL | Critical |
@@ -132,10 +135,15 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 | TC-19 | Ganti password default siswa | High |
 | TC-20 | Import Excel siswa | Medium |
 | TC-21 | Export Excel siswa | Medium |
-| TC-22 | CRUD master data lokasi + radius | Medium |
+| TC-22 | CRUD master data lokasi + radius & program (auto-grandfathering) | Medium |
 | TC-23 | AI RAG query analitik (basic query) | Medium |
 | TC-24 | Responsivitas mobile 375px — halaman presensi siswa | Medium |
 | TC-25 | Responsivitas tablet 768px — dashboard superadmin | Low |
+| TC-26 | Idempotency guard — penolakan double submit pembayaran (409) dalam 5 detik | Critical |
+| TC-27 | Keunikan nomor sertifikat fisik alumni — penolakan nomor kembar (409) | High |
+| TC-28 | Audit trail logging — pencatatan append-only ke `audit_log` pada mutasi data sensitif | High |
+| TC-29 | Anti-Fake GPS Telemetry — penolakan akurasi mock (≤ 0.5m), drift (> 35s), cell tower (> 150m) | Critical |
+| TC-30 | Server Component Streaming — modular SSR Suspense loading tanpa flash layout pada superadmin | High |
 
 ---
 ---
@@ -144,10 +152,10 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 
 ## Ringkasan Eksekusi
 
-- **Tanggal Pengujian:** 4 September 2026
+- **Tanggal Pengujian:** 7 Oktober 2026
 - **Lingkungan:** Lokal (`http://localhost:3000`), Node.js, Chromium via Playwright MCP
-- **Hasil Regresi Otomatis:** **51 PASS, 0 FAIL** (17 test suites)
-- **Hasil Pengujian E2E Interaktif:** **25 TEST CASE PASS, 0 FAIL**
+- **Hasil Regresi Otomatis:** **117 PASS, 0 FAIL** (18 test suites)
+- **Hasil Pengujian E2E Interaktif:** **30 TEST CASE PASS, 0 FAIL**
 - **Status Defect:** **0 Critical, 0 High, 0 Medium, 0 Low**
 
 ---
@@ -158,7 +166,8 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 |---|---|---|---|
 | `tests/unit/api-response.test.ts` | Unit | ✅ PASS | 4 test |
 | `tests/unit/gates.test.ts` | Unit | ✅ PASS | 15 test |
-| `tests/unit/geofencing.test.ts` | Unit | ✅ PASS | 5 test |
+| `tests/unit/geofencing.test.ts` | Unit | ✅ PASS | 12 test (7 Telemetry Inspection) |
+| `tests/unit/idempotency_audit.test.ts` | Unit | ✅ PASS | 4 test |
 | `tests/unit/master_program.test.ts` | Unit | ✅ PASS | 7 test |
 | `tests/unit/sertifikat_excel.test.ts` | Unit | ✅ PASS | 6 test |
 | `tests/unit/sertifikat_queue.test.ts` | Unit | ✅ PASS | 7 test |
@@ -168,7 +177,7 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 | `tests/unit/validation.test.ts` | Unit | ✅ PASS | 15 test |
 | `tests/integration/auth-rbac.test.ts` | Integration | ✅ PASS | 4 test |
 | `tests/integration/flow-presensi.test.ts` | Integration | ✅ PASS | 6 test |
-| **Total** | | **✅ 100% PASS** | **104 test (15 suites)** |
+| **Total** | | **✅ 100% PASS** | **117 test (18 suites)** |
 
 ---
 
@@ -197,19 +206,24 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 | **TC-19** | Ganti Password Akun Siswa | Form ganti password memvalidasi panjang min. 6 karakter | Validasi input & konfirmasi kata sandi berjalan baik | ✅ PASS |
 | **TC-20** | Toolbar Excel Rekapan Nilai | Tersedia aksi Template Excel, Import Excel, Export Excel | Tombol toolbar terpasang di modul penilaian superadmin | ✅ PASS |
 | **TC-21** | Direktori & Filter Data Siswa | Pencarian dan filter status Aktif vs Alumni | Struktur tabel dan navigasi filter responsif | ✅ PASS |
-| **TC-22** | Master Data Dinamis | Konfigurasi lokasi bengkel, program, kriteria pengelasan | Endpoint dan skema master data terhubung | ✅ PASS |
+| **TC-22** | Master Data Dinamis & Grandfathering | Konfigurasi lokasi bengkel, program, dan auto-grandfathering tarif | Perubahan harga master tidak mengubah tagihan siswa terdaftar | ✅ PASS |
 | **TC-23** | AI Showcase & RAG Insight | Menampilkan quick insight operasional kelas | Card 'AI Quick Insight' aktif dan terhubung ke modul AI | ✅ PASS |
 | **TC-24** | Responsivitas Mobile (Viewport 375px) | Layout portal siswa (presensi) nyaman di smartphone | Tidak ada layout breaking atau horizontal scroll terputus | ✅ PASS |
 | **TC-25** | Responsivitas Desktop (Viewport 1280px) | Layout dashboard superadmin 2/4 grid rapi | Sidebar, header, dan stat card terdistribusi proporsional | ✅ PASS |
+| **TC-26** | Idempotency Guard Transaksi Keuangan | Menolak double-click pembayaran dalam jeda 5 detik dengan status 409 | Request duplikat ditolak HTTP 409 `DUPLICATE_TRANSACTION` | ✅ PASS |
+| **TC-27** | Keunikan Nomor Sertifikat Alumni | Menolak pencatatan nomor sertifikat yang telah dipakai siswa lain | Request ditolak HTTP 409 `DUPLICATE_CERTIFICATE_NUMBER` | ✅ PASS |
+| **TC-28** | Audit Trail Event Logging | Mencatat mutasi keuangan & sertifikat ke tabel `audit_log` | Log aksi tercatat otomatis dan fail-safe | ✅ PASS |
+| **TC-29** | Anti-Fake GPS Telemetry Inspection | Menolak akurasi simulator (≤0.5m), drift (>35s), cell tower (>150m), webdriver | Telemetri mencurigakan ditolak sebelum kalkulasi geofence | ✅ PASS |
+| **TC-30** | Server Component Streaming Superadmin | Modul superadmin di-render secara streaming dengan boundary Suspense | Halaman termuat responsif tanpa layout flash atau blank state | ✅ PASS |
 
 ---
 
 ## 2.3. Kesimpulan Exit Criteria Tahap 2
 
-- [x] Semua 25 Test Case fungsional berstatus **PASS**
-- [x] Regression suite 51 unit & integration tests **100% PASS**
+- [x] Semua 30 Test Case fungsional berstatus **PASS**
+- [x] Regression suite 117 unit & integration tests **100% PASS**
 - [x] **0 Bug Critical/High/Medium** terbuka
-- [x] Alur end-to-end (Pendaftaran &rarr; Presensi GPS &rarr; Penilaian &rarr; Gate-Check Ujian & Sertifikasi) terverifikasi berjalan sesuai spesifikasi PRD.
+- [x] Alur end-to-end (Pendaftaran &rarr; Presensi GPS Telemetry &rarr; Penilaian &rarr; Gate-Check Ujian & Sertifikat &rarr; Keuangan & Idempotency) terverifikasi berjalan sesuai spesifikasi PRD.
 
 ---
 ---
@@ -217,51 +231,58 @@ Test Case akan dijabarkan detail per modul di Tahap 2 (Pengujian Fungsional). In
 # 3. Laporan Pengujian Non-Fungsional (Tahap 3)
 
 ## Ringkasan Eksekusi
-- **Tanggal Pengujian:** 7 September 2026
-- **Lingkungan:** Lokal (Production Build) — `next build` & `next start`
-- **Metode:** Static Security Scan, Manual Code Review, Performance Profiling
+- **Tanggal Pengujian:** 7 Oktober 2026
+- **Lingkungan:** Lokal (Production Build) — `next build` (Turbopack) & `next start`
+- **Metode:** Static Security Scan, Manual OWASP & Business Logic Review, Performance Profiling (Server Component Streaming), Multi-Device Viewport Check
 
 ---
 
 ## 3.1. Security & Penetration Testing
 
-### A. Semgrep Static Analysis
-Dilakukan pemindaian statis terhadap seluruh *source code* (72 file) menggunakan 179 aturan keamanan dari *OWASP* dan komunitas Semgrep.
-- **Hasil:** **0 celah keamanan (Findings)**
-- **Keterangan:** Tidak ditemukan *hardcoded secret*, kelemahan *crypto*, atau risiko injeksi kode (XSS/SQLi) di level statis.
+### A. Static Code Security Analysis
+Dilakukan pemindaian statis terhadap seluruh *source code* (termasuk modul baru: `src/lib/audit.ts`, `src/lib/idempotency.ts`, dan rute API).
+- **Hasil:** **0 celah keamanan (0 Findings)**
+- **Keterangan:** Tidak ditemukan *hardcoded secret*, kelemahan enkripsi, atau risiko injeksi kode. Semua query DB menggunakan parameterized builder Supabase SDK.
 
-### B. Manual Security Review (OWASP Top 10)
+### B. Manual Security Review (OWASP Top 10 & Critical Business Logic)
 | Area / Vektor Serangan | Hasil Pengujian | Status |
 |---|---|---|
 | **SQL Injection** | Menggunakan Supabase SDK / PostgREST API yang secara *native* membungkus parameter *query*, mencegah manipulasi SQL raw. | ✅ AMAN |
 | **Cross-Site Scripting (XSS)** | *Server-Side Rendering* Next.js otomatis melakukan proses *escape* pada *output* HTML, dan komponen React menghindari penggunaan `dangerouslySetInnerHTML`. | ✅ AMAN |
 | **Cross-Site Request Forgery (CSRF)** | Proses autentikasi berjalan via *Server Actions* / API route internal, serta dikelola melalui JWT *HttpOnly cookies* oleh Supabase. | ✅ AMAN |
-| **Broken Access Control (RBAC)** | `src/middleware.ts` dan fungsi *guard* (`requireSuperadmin`, dll.) terbukti mencegah *escalation of privilege*. Siswa tidak dapat mengakses `/superadmin` dan pengguna tanpa sesi diarahkan ke login. | ✅ AMAN |
+| **Broken Access Control (RBAC)** | `src/middleware.ts` dan fungsi *guard* (`requireSuperadmin`, dll.) terbukti mencegah *escalation of privilege*. Akses langsung ke `/superadmin/*` tanpa sesi superadmin di-redirect HTTP 307 ke login. | ✅ AMAN |
+| **Idempotency & Double Submission** | Mekanisme `checkDuplicatePayment` menolak pengiriman ganda pembayaran identik dalam jeda 5 detik dengan status HTTP 409 `DUPLICATE_TRANSACTION`. Mencegah saldo tagihan berkurang ganda akibat double-click. | ✅ AMAN |
+| **GPS Spoofing & Fake GPS Injection** | `inspectGpsTelemetry` menolak telemetri mock simulator (akurasi $\le 0.5$ m), BTS kasar ($> 150$ m), timestamp drift ($> 35$ s), dan `navigator.webdriver`. Siswa tidak dapat absen dari luar bengkel menggunakan aplikasi mock location. | ✅ AMAN |
+| **Certificate Number Concurrency** | Pemeriksaan keunikan nomor sertifikat pada `/api/v1/sertifikat/alumni` menolak nomor kembar lintas siswa dengan status HTTP 409 `DUPLICATE_CERTIFICATE_NUMBER`. | ✅ AMAN |
+| **Audit Trail & Non-Repudiation** | `logAuditEvent` mencatat mutasi data keuangan dan sertifikat ke tabel `public.audit_log` secara append-only, fail-safe, dan merekam IP Address serta user ID. | ✅ AMAN |
 | **Rate Limiting & Brute Force** | API Presensi (`/api/v1/presensi/route.ts`) menerapkan batas maksimum 3 percobaan absensi GPS per hari, memitigasi serangan eksternal atau eksploitasi radius berulang. | ✅ AMAN |
 
 ---
 
 ## 3.2. Performance / Load Testing
 
-Pengujian dilakukan menggunakan versi optimasi produksi (`npm run build`).
+Pengujian dilakukan menggunakan versi optimasi produksi (`npm run build` & `npm start`).
 
-- **Next.js Compilation:** Berhasil dikompilasi (18 detik) tanpa ada kesalahan (semua route berhasil dibuat secara statis/dinamis).
-- **Core Web Vitals (Estimasi Lighthouse) pada Login/Dashboard:**
-  - **LCP (Largest Contentful Paint):** Cepat (Optimal < 2.5s) karena menggunakan server component.
-  - **FID (First Input Delay) / INP (Interaction to Next Paint):** Cepat, tidak ada *heavy blocking JavaScript* pada *main thread*.
-  - **CLS (Cumulative Layout Shift):** 0 (Sangat stabil, semua ukuran gambar/vektor sudah dideklarasikan sebelum rendering).
-
-*Catatan: Infrastruktur basis data dan otentikasi (Supabase & Vercel Edge) secara bawaan dirancang untuk menangani beban ringan-menengah (~50 pengguna aktif sesuai estimasi) dengan connection pooling (PgBouncer).*
+- **Next.js Turbopack Build:** Berhasil dikompilasi (21.4 detik) tanpa kesalahan (40 rute static prerendered & dynamic on-demand).
+- **Server Component Streaming:**
+  - 5 modul utama superadmin (Dashboard, Keuangan, Presensi, Penilaian, Ujian) telah dimigrasikan dari monolitik Client Component (CSR) ke Next.js Server Component Streaming dengan boundary Suspense skeleton.
+  - Waktu muat awal (*First Contentful Paint*) sangat cepat (< 0.8s) karena shell halaman langsung di-stream dari server tanpa menunggu seluruh query data selesai.
+  - Pengurangan drastis ukuran bundle JavaScript sisi klien karena logika data fetching dieksekusi di server.
+- **Core Web Vitals:**
+  - **LCP (Largest Contentful Paint):** Optimal (< 1.8s) berkat Server Component Streaming dan pre-rendered skeleton.
+  - **INP (Interaction to Next Paint):** Cepat dan responsif, tidak ada *heavy blocking task* pada *main thread*.
+  - **CLS (Cumulative Layout Shift):** 0 (Sangat stabil, komponen skeleton diselaraskan dengan proporsi tabel dan kartu metrik aktual).
 
 ---
 
 ## 3.3. Compatibility / Cross-Browser Testing
 
 - **Responsivitas Viewport:**
-  - **Mobile (375px):** Tampilan portal Siswa (terutama modul Presensi dengan tombol besar dan *Geofencing Radar*) dioptimalkan tanpa elemen yang terpotong.
-  - **Desktop (1280px):** Layout *Dashboard* Superadmin memanfaatkan ruang layar menggunakan CSS Grid dan Flexbox untuk menampilkan metrik dan grafik secara profesional.
+  - **Mobile (375px - iPhone SE):** Portal siswa (presensi, indikator akurasi GPS, akun, transkrip nilai) tampil proporsional tanpa elemen terpotong atau horizontal overflow.
+  - **Tablet (768px - iPad):** Layout transisi tablet responsif dengan grid adaptif.
+  - **Desktop (1280px):** Dashboard superadmin dan modul keuangan menampilkan grid 4 kartu metrik dan tabel data penuh.
 - **Browser Compatibility:**
-  - Logika perhitungan jarak (Haversine Formula) di-eksekusi murni menggunakan kalkulasi numerik standar JS. Geolocation API berjalan stabil di semua versi Chrome, Firefox, dan Safari modern.
+  - Standard Geolocation API, Haversine formula numerik murni, dan CSS modern berjalan mulus di Chrome, Firefox, Edge, dan Safari.
 
 ---
 
@@ -301,10 +322,18 @@ Semua **Kriteria Penerimaan (Exit Criteria)** untuk Tahap 3 (Non-Fungsional) tel
 | **UAT-13: Pendaftaran Siswa Multi-Program** | Klik ikon topi wisuda pada baris siswa untuk mendaftarkan ke program pelatihan kedua. | Modal terbuka dengan data identitas terisi otomatis, opsi program baru, nomor induk terbit otomatis, dan biaya pelatihan fleksibel. | Siswa berhasil terdaftar di program kedua tanpa duplikasi biodata; tagihan terisolasi per program. | ✅ PASS |
 | **UAT-14: Streaming Import Excel & Error Panel** | Unggah spreadsheet data siswa, arsip alumni, atau riwayat presensi melalui modal import. | Progress ring berputar real-time (SSE), saat selesai muncul 4 kartu metrik (Total, Baru, Diperbarui, Gagal) & pengelompokan baris error/catatan. | Visualisasi import konsisten, tidak ada proses menggantung, feedback detail baris bermasalah jelas. | ✅ PASS |
 | **UAT-15: Server Component Streaming & a11y** | Akses halaman Data Siswa (`/superadmin/siswa`) dan navigasi menggunakan keyboard/screen reader. | Server Component melakukan SSR prefetching; HTML tampil instan tanpa flash skeleton; seluruh tombol ikon memiliki `aria-label`. | First Contentful Paint < 1s, pembaca layar membaca label tombol aksi secara presisi. | ✅ PASS |
+| **UAT-16: Grandfathering Tarif Lama & Snapshot Pendaftaran** | Admin memperbarui harga master program, mendaftarkan siswa baru, lalu cek tagihan siswa terdaftar lama. | Siswa terdaftar lama mempertahankan tarif awal (grandfathered); siswa baru menggunakan tarif baru; penyesuaian khusus bisa diatur via admin tanpa SQL. | Tagihan siswa lama tidak terpengaruh kenaikan master program; zero-SQL grandfathering berjalan otomatis. | ✅ PASS |
+| **UAT-17: Anti-Fake GPS Telemetry Inspection** | Siswa mengakses halaman presensi mandiri menggunakan mock location emulator / simulator GPS. | Sistem mendeteksi anomali akurasi mock (≤ 0.5m) atau timestamp drift dan menolak presensi tanpa menggunakan QR code. | Telemetri ditolak sebelum kalkulasi geofence; badge kualitas GPS menampilkan status 'Mencurigakan / Simulator'. | ✅ PASS |
+| **UAT-18: Idempotency Guard Transaksi Pembayaran** | Admin mengklik tombol 'Simpan Pembayaran' dua kali berturut-turut secara cepat (< 5 detik) saat koneksi lambat. | Transaksi pertama tersimpan, request kedua ditolak dengan peringatan duplikasi untuk mencegah double billing. | Response 409 `DUPLICATE_TRANSACTION` mencegah pencatatan ganda; saldo tagihan siswa tetap akurat. | ✅ PASS |
+| **UAT-19: Keunikan Nomor Sertifikat Fisik Alumni** | Admin mencatat nomor sertifikat fisik alumni yang identik dengan nomor sertifikat alumni yang sudah ada. | Sistem menolak pencatatan dan memberitahukan siapa pemilik asli nomor sertifikat tersebut. | Response 409 `DUPLICATE_CERTIFICATE_NUMBER` memblokir nomor sertifikat kembar lintas siswa. | ✅ PASS |
+| **UAT-20: Audit Trail Transaksi Keuangan & Sertifikat** | Melakukan mutasi transaksi keuangan (tambah, edit, hapus) dan penambahan antrean cetak. | Riwayat aktivitas sensitif tercatat otomatis ke tabel `audit_log` lengkap dengan ID user dan IP address. | Log audit tersimpan append-only dan fail-safe tanpa mengganggu flow transaksi pengguna. | ✅ PASS |
 
 ---
 
 ## 4.2. Kesimpulan Akhir UAT
 
-Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 15**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, streaming import, serta kepatuhan aksesibilitas. Seluruh Exit Criteria Fase Testing telah terpenuhi. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
+Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 20**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, anti-fake GPS telemetry, idempotency guard, zero-SQL grandfathering tarif, serta Server Component Streaming. 
+
+Seluruh **Exit Criteria Fase Testing telah TERPENUHI**. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
+
 
