@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { logAuditEvent } from "@/lib/audit";
 
 interface Params {
   params: Promise<{ id: string }>;
@@ -9,7 +10,7 @@ interface Params {
 export async function PUT(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const body = await request.json();
@@ -61,6 +62,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
       );
     }
 
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "KEUANGAN_UPDATE",
+      targetTable: "transaksi_keuangan",
+      targetId: id,
+      details: {
+        siswa_id: existingTx.siswa_id,
+        nominal: numNominal,
+        tgl_bayar: updatePayload.tgl_bayar,
+        metode: updatePayload.metode,
+        keterangan: updatePayload.keterangan,
+      },
+      ipAddress,
+    });
+
     // 3. Ambil ulang biaya program siswa untuk menghitung status terupdate
     const { data: siswa } = await supabase
       .from("siswa")
@@ -103,10 +122,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: NextRequest, { params }: Params) {
+export async function DELETE(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const supabase = await createClient();
@@ -136,6 +155,20 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
         deleteError.message
       );
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "KEUANGAN_DELETE",
+      targetTable: "transaksi_keuangan",
+      targetId: id,
+      details: {
+        siswa_id: existingTx.siswa_id,
+      },
+      ipAddress,
+    });
 
     return successResponse({
       id,

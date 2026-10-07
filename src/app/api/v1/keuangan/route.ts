@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { checkDuplicatePayment } from "@/lib/idempotency";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   try {
@@ -133,6 +135,24 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
 
+    // Idempotency guard: Cegah double click/duplikasi transaksi identik dalam 5 detik
+    const targetTglBayar = tgl_bayar || new Date().toISOString().split("T")[0];
+    const duplicateCheck = await checkDuplicatePayment(supabase, {
+      siswaId: siswa_id,
+      nominal: numNominal,
+      tglBayar: targetTglBayar,
+      thresholdSeconds: 5,
+    });
+
+    if (duplicateCheck.isDuplicate) {
+      return errorResponse(
+        "DUPLICATE_TRANSACTION",
+        "Transaksi serupa baru saja dicatat beberapa detik lalu. Harap tunggu sejenak untuk menghindari duplikasi.",
+        409,
+        { existingId: duplicateCheck.existingId }
+      );
+    }
+
     // 1. Dapatkan informasi biaya program & biaya khusus siswa
     const { data: siswa, error: siswaError } = await supabase
       .from("siswa")
@@ -155,7 +175,7 @@ export async function POST(request: NextRequest) {
       .insert({
         siswa_id,
         nominal: numNominal,
-        tgl_bayar: tgl_bayar || new Date().toISOString().split("T")[0],
+        tgl_bayar: targetTglBayar,
         metode: metode || "Tunai",
         keterangan: keterangan || null,
         penerima: user?.user_metadata?.nama || "Superadmin",
@@ -166,6 +186,24 @@ export async function POST(request: NextRequest) {
     if (txError) {
       return errorResponse("DATABASE_ERROR", "Gagal menyimpan transaksi pembayaran.", 500, txError.message);
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "KEUANGAN_INSERT",
+      targetTable: "transaksi_keuangan",
+      targetId: newTx.id,
+      details: {
+        siswa_id,
+        nama_siswa: siswa.nama_lengkap,
+        nominal: numNominal,
+        tgl_bayar: targetTglBayar,
+        metode: newTx.metode,
+      },
+      ipAddress,
+    });
 
     // 3. Hitung akumulasi pembayaran
     const { data: allTx } = await supabase
@@ -205,7 +243,7 @@ export async function POST(request: NextRequest) {
 // PATCH: Penyesuaian Biaya Pelatihan Khusus Siswa (Tarif Lama, Beasiswa, Diskon)
 export async function PATCH(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const body = await request.json();
@@ -242,6 +280,21 @@ export async function PATCH(request: NextRequest) {
     if (updateError) {
       return errorResponse("DATABASE_ERROR", "Gagal memperbarui biaya pelatihan siswa.", 500, updateError.message);
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "SISWA_BIAYA_PELATIHAN_UPDATE",
+      targetTable: "siswa",
+      targetId: siswa_id,
+      details: {
+        biaya_pelatihan_baru: numBiaya,
+        nama_siswa: updatedSiswa.nama_lengkap,
+      },
+      ipAddress,
+    });
 
     return successResponse({
       siswa: updatedSiswa,

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import { toRomanMonth, formatIndoDate, formatDDMMYYYY } from "@/lib/date-utils";
+import { logAuditEvent } from "@/lib/audit";
 
 // GET: Ambil daftar siswa di antrean atau riwayat percetakan sertifikat
 export async function GET(request: NextRequest) {
@@ -157,7 +158,7 @@ export async function GET(request: NextRequest) {
 // POST: Tambahkan siswa ke antrean percetakan (atau masukkan kembali jika sebelumnya dicetak)
 export async function POST(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const supabase = await createClient();
@@ -214,6 +215,21 @@ export async function POST(request: NextRequest) {
       return errorResponse("DATABASE_ERROR", "Gagal menambahkan ke antrean percetakan.", 500, upsertErr.message);
     }
 
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "SERTIFIKAT_QUEUE_TAMBAH",
+      targetTable: "sertifikat",
+      targetId: sertifikat.id,
+      details: {
+        siswa_id,
+        nama_siswa: siswa.nama_lengkap,
+      },
+      ipAddress,
+    });
+
     return successResponse(
       sertifikat,
       { message: `Siswa ${siswa.nama_lengkap} berhasil ditambahkan ke antrean percetakan sertifikat.` },
@@ -227,7 +243,7 @@ export async function POST(request: NextRequest) {
 // DELETE: Keluarkan siswa dari antrean percetakan
 export async function DELETE(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const supabase = await createClient();
@@ -246,6 +262,20 @@ export async function DELETE(request: NextRequest) {
     if (error) {
       return errorResponse("DATABASE_ERROR", "Gagal menghapus dari antrean percetakan.", 500, error.message);
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "SERTIFIKAT_QUEUE_HAPUS",
+      targetTable: "sertifikat",
+      targetId: siswa_id,
+      details: {
+        siswa_id,
+      },
+      ipAddress,
+    });
 
     return successResponse(null, { message: "Siswa berhasil dikeluarkan dari antrean percetakan." });
   } catch (err) {

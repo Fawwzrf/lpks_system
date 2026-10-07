@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { logAuditEvent } from "@/lib/audit";
 
 // POST: Catat atau perbarui nomor sertifikat alumni secara langsung tanpa perlu nilai ujian
 export async function POST(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const body = await request.json().catch(() => ({}));
@@ -33,10 +34,27 @@ export async function POST(request: NextRequest) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
+    // 2. Concurrency & Uniqueness check: pastikan nomor sertifikat belum dipakai oleh siswa lain
+    const { data: duplicateCert } = await supabase
+      .from("sertifikat")
+      .select("id, siswa_id, siswa:siswa(nama_lengkap, nomor_induk)")
+      .eq("no_sertifikat", cleanNoSertifikat)
+      .neq("siswa_id", siswa_id)
+      .maybeSingle();
+
+    if (duplicateCert) {
+      const existingOwner = (duplicateCert.siswa as unknown as { nama_lengkap: string; nomor_induk: string })?.nama_lengkap || "siswa lain";
+      return errorResponse(
+        "DUPLICATE_CERTIFICATE_NUMBER",
+        `Nomor sertifikat "${cleanNoSertifikat}" sudah digunakan oleh ${existingOwner}. Harap gunakan nomor sertifikat yang unik.`,
+        409
+      );
+    }
+
     const now = new Date().toISOString();
     const finalTglCetak = tgl_cetak || siswa.tgl_keluar || now;
 
-    // 2. Upsert ke tabel sertifikat dengan status 'dicetak'
+    // 3. Upsert ke tabel sertifikat dengan status 'dicetak'
     const { data: sertifikat, error: upsertErr } = await supabase
       .from("sertifikat")
       .upsert(
@@ -56,13 +74,30 @@ export async function POST(request: NextRequest) {
       return errorResponse("DATABASE_ERROR", "Gagal mencatat nomor sertifikat alumni.", 500, upsertErr.message);
     }
 
-    // 3. Pastikan status siswa di tabel siswa diset 'alumni' jika belum
+    // 4. Pastikan status siswa di tabel siswa diset 'alumni' jika belum
     if (siswa.status_siswa !== "alumni") {
       await supabase
         .from("siswa")
         .update({ status_siswa: "alumni", updated_at: now })
         .eq("id", siswa_id);
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "SERTIFIKAT_ALUMNI_CATAT",
+      targetTable: "sertifikat",
+      targetId: sertifikat.id,
+      details: {
+        siswa_id,
+        nama_siswa: siswa.nama_lengkap,
+        no_sertifikat: cleanNoSertifikat,
+        tgl_cetak: finalTglCetak,
+      },
+      ipAddress,
+    });
 
     return successResponse(
       sertifikat,
@@ -82,7 +117,7 @@ export async function POST(request: NextRequest) {
 // DELETE: Hapus pencatatan sertifikat alumni
 export async function DELETE(request: NextRequest) {
   try {
-    const { errorResponse: authError } = await requireSuperadmin();
+    const { errorResponse: authError, user } = await requireSuperadmin();
     if (authError) return authError;
 
     const { searchParams } = new URL(request.url);
@@ -101,6 +136,20 @@ export async function DELETE(request: NextRequest) {
     if (error) {
       return errorResponse("DATABASE_ERROR", "Gagal menghapus sertifikat.", 500, error.message);
     }
+
+    // Audit trail logging
+    const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    await logAuditEvent(supabase, {
+      actorId: user?.id || null,
+      actorRole: user?.role || "superadmin",
+      action: "SERTIFIKAT_ALUMNI_DELETE",
+      targetTable: "sertifikat",
+      targetId: siswa_id,
+      details: {
+        siswa_id,
+      },
+      ipAddress,
+    });
 
     return successResponse(null, { message: "Pencatatan sertifikat berhasil dihapus." });
   } catch (err) {
