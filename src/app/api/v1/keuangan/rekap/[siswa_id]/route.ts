@@ -17,7 +17,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
     // 1. Ambil data siswa dan biaya program
     const { data: siswa, error: siswaError } = await supabase
       .from("siswa")
-      .select("id, nama_lengkap, nomor_induk, program:master_program(nama, biaya)")
+      .select("id, nama_lengkap, nomor_induk, biaya_pelatihan, program:master_program(nama, biaya)")
       .eq("id", siswa_id)
       .single();
 
@@ -25,7 +25,11 @@ export async function GET(_request: NextRequest, { params }: Params) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
-    const totalBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const programBiaya = Number(((siswa.program as unknown) as { biaya: number })?.biaya) || 0;
+    const totalBiaya =
+      siswa.biaya_pelatihan !== null && siswa.biaya_pelatihan !== undefined
+        ? Number(siswa.biaya_pelatihan)
+        : programBiaya;
 
     // 2. Ambil seluruh riwayat transaksi
     const { data: transaksi, error: txError } = await supabase

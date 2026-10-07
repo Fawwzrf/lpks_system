@@ -680,6 +680,7 @@ export async function POST(request: NextRequest) {
                     kode_program: kodePrefix || "01",
                     biaya: biaya || 0,
                     estimasi_durasi_hari: durasiHari || 50,
+                    is_active: false,
                   })
                   .select("id, kode_program, nama, biaya")
                   .single();

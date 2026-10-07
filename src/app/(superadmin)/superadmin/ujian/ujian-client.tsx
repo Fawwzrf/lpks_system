@@ -325,12 +325,13 @@ export function UjianClient({
     await importArsipHook.run(e, "/api/v1/excel/import?modul=arsip_alumni");
   }
 
-  // Statistik Ringkasan
+  // Statistik Ringkasan (hanya menghitung siswa yang belum tuntas cetak)
   const stats = useMemo(() => {
-    const total = data.length;
-    const siapUjian = data.filter((s) => s.nilai_harian_ok && !s.ujian?.is_lulus).length;
-    const lulus = data.filter((s) => !!s.ujian?.is_lulus).length;
-    const dalamBimbingan = data.filter((s) => !s.nilai_harian_ok).length;
+    const activeData = data.filter((s) => s.status_sertifikat !== "dicetak");
+    const total = activeData.length;
+    const siapUjian = activeData.filter((s) => s.nilai_harian_ok && !s.ujian?.is_lulus).length;
+    const lulus = activeData.filter((s) => !!s.ujian?.is_lulus).length;
+    const dalamBimbingan = activeData.filter((s) => !s.nilai_harian_ok).length;
     return { total, siapUjian, lulus, dalamBimbingan };
   }, [data]);
 
@@ -354,6 +355,9 @@ export function UjianClient({
   const filteredAndSortedData = useMemo(() => {
     return data
       .filter((s) => {
+        // Jangan tampilkan siswa yang sertifikatnya sudah dicetak (sudah tuntas & ada di Riwayat Cetak)
+        if (s.status_sertifikat === "dicetak") return false;
+
         if (search.trim()) {
           const q = search.toLowerCase().trim();
           const matchName = s.nama_lengkap.toLowerCase().includes(q);

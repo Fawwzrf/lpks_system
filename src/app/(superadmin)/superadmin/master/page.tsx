@@ -14,6 +14,8 @@ import {
   CheckCircle2,
   Save,
   RefreshCw,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -36,6 +38,7 @@ interface ProgramItem {
   nama: string;
   biaya: number;
   estimasi_durasi_hari: number;
+  is_active?: boolean;
 }
 
 interface KriteriaItem {
@@ -83,13 +86,13 @@ export default function MasterPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Forms
-  const [formProgram, setFormProgram] = useState({ kode: "", nama: "", biaya: "", durasi: "30" });
+  const [formProgram, setFormProgram] = useState({ kode: "", nama: "", biaya: "", durasi: "30", is_active: true });
   const [formKriteria, setFormKriteria] = useState({ nama: "", batas_lulus: "80", urutan: "1" });
   const [formBerkas, setFormBerkas] = useState({ kode: "", nama: "", wajib: true });
 
   function handleOpenAdd() {
     if (activeTab === "program") {
-      setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30" });
+      setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30", is_active: true });
     } else if (activeTab === "kriteria") {
       setFormKriteria({ nama: "", batas_lulus: "80", urutan: String(kriteriaList.length + 1) });
     } else if (activeTab === "berkas") {
@@ -104,8 +107,37 @@ export default function MasterPage() {
       nama: item.nama,
       biaya: String(item.biaya),
       durasi: String(item.estimasi_durasi_hari || 30),
+      is_active: item.is_active !== false,
     });
     setEditItem({ id: item.id, type: "program" });
+  }
+
+  async function handleToggleProgramActive(item: ProgramItem) {
+    const nextState = item.is_active === false;
+    try {
+      const res = await fetch("/api/v1/master/program", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: item.id,
+          kode_program: item.kode_program,
+          nama: item.nama,
+          biaya: item.biaya,
+          estimasi_durasi_hari: item.estimasi_durasi_hari,
+          is_active: nextState,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.error?.message || "Gagal mengubah status program.");
+      }
+      setProgramList((prev) =>
+        prev.map((p) => (p.id === item.id ? { ...p, is_active: nextState } : p))
+      );
+      setSuccessMsg(`Program berhasil di-${nextState ? "aktifkan" : "arsipkan"}.`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Gagal mengubah status program.");
+    }
   }
 
   function handleEditKriteria(item: KriteriaItem) {
@@ -183,6 +215,7 @@ export default function MasterPage() {
           nama: formProgram.nama,
           biaya: parseFloat(formProgram.biaya),
           estimasi_durasi_hari: parseInt(formProgram.durasi, 10),
+          is_active: formProgram.is_active,
         };
       } else if (activeTab === "kriteria") {
         endpoint = "/api/v1/master/kriteria";
@@ -213,7 +246,7 @@ export default function MasterPage() {
       setSuccessMsg("Data berhasil ditambahkan!");
       setModalOpen(false);
       // Reset form
-      setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30" });
+      setFormProgram({ kode: "", nama: "", biaya: "", durasi: "30", is_active: true });
       setFormKriteria({ nama: "", batas_lulus: "80", urutan: "1" });
       setFormBerkas({ kode: "", nama: "", wajib: true });
       await fetchData();
@@ -243,6 +276,7 @@ export default function MasterPage() {
           nama: formProgram.nama,
           biaya: parseFloat(formProgram.biaya),
           estimasi_durasi_hari: parseInt(formProgram.durasi, 10),
+          is_active: formProgram.is_active,
         };
       } else if (editItem.type === "kriteria") {
         endpoint = "/api/v1/master/kriteria";
@@ -500,13 +534,43 @@ export default function MasterPage() {
                             {item.kode_program}
                           </span>
                           <p className="text-xs font-medium text-[#F9FAFB]">{item.nama}</p>
+                          {item.is_active === false ? (
+                            <span className="text-[10px] bg-amber-950/70 border border-amber-500/30 text-amber-400 px-1.5 py-0.5 rounded font-medium">
+                              Arsip
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-emerald-950/70 border border-emerald-500/30 text-emerald-400 px-1.5 py-0.5 rounded font-medium">
+                              Aktif
+                            </span>
+                          )}
                         </div>
                         <p className="text-[11px] text-[#6B7280] mt-1">
                           Biaya: Rp {Number(item.biaya).toLocaleString("id-ID")} &bull; Estimasi Durasi:{" "}
                           {item.estimasi_durasi_hari} Hari
                         </p>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleToggleProgramActive(item)}
+                          className={`flex items-center gap-1 text-[11px] px-2 py-1 rounded border transition-colors ${
+                            item.is_active === false
+                              ? "border-emerald-700/50 text-emerald-400 hover:bg-emerald-950/40"
+                              : "border-amber-700/50 text-amber-400 hover:bg-amber-950/40"
+                          }`}
+                          title={item.is_active === false ? "Aktifkan untuk pendaftaran baru" : "Arsipkan dari form pendaftaran"}
+                        >
+                          {item.is_active === false ? (
+                            <>
+                              <ArchiveRestore className="h-3 w-3" />
+                              <span>Aktifkan</span>
+                            </>
+                          ) : (
+                            <>
+                              <Archive className="h-3 w-3" />
+                              <span>Arsipkan</span>
+                            </>
+                          )}
+                        </button>
                         <button
                           onClick={() => handleEditProgram(item)}
                           className="h-7 w-7 rounded-lg hover:bg-[#38BDF8]/10 text-[#6B7280] hover:text-[#38BDF8] flex items-center justify-center transition-colors"
@@ -673,6 +737,18 @@ export default function MasterPage() {
                 placeholder="30"
                 data-next="submit-btn"
               />
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="prog-active-cb"
+                  checked={formProgram.is_active}
+                  onChange={(e) => setFormProgram({ ...formProgram, is_active: e.target.checked })}
+                  className="rounded border-[#374151] bg-[#0B0F17] text-[#DC2626] focus:ring-[#DC2626]"
+                />
+                <label htmlFor="prog-active-cb" className="text-xs text-[#D1D5DB] cursor-pointer">
+                  Aktif untuk pendaftaran siswa baru
+                </label>
+              </div>
             </>
           )}
 
@@ -827,6 +903,18 @@ export default function MasterPage() {
                 placeholder="30"
                 data-next="edit-submit-btn"
               />
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="edit-prog-active-cb"
+                  checked={formProgram.is_active}
+                  onChange={(e) => setFormProgram({ ...formProgram, is_active: e.target.checked })}
+                  className="rounded border-[#374151] bg-[#0B0F17] text-[#DC2626] focus:ring-[#DC2626]"
+                />
+                <label htmlFor="edit-prog-active-cb" className="text-xs text-[#D1D5DB] cursor-pointer">
+                  Aktif untuk pendaftaran siswa baru
+                </label>
+              </div>
             </>
           )}
 

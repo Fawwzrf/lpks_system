@@ -92,7 +92,7 @@ export async function GET() {
         tgl_cetak_sertifikat: st?.tgl_cetak || null,
         tgl_antrean_sertifikat: st?.tgl_antrean || null,
       };
-    });
+    }).filter((s) => s.status_sertifikat !== "dicetak");
 
     // Pengurutan: Siswa yang siap menjalani ujian internal diletakkan paling atas
     result.sort((a, b) => {

@@ -141,5 +141,39 @@ describe("Master Program Update Logic Unit Tests", () => {
     assert.equal(resolveSiswaBiaya("5.000.000", 7500000), 5000000);
     assert.equal(resolveSiswaBiaya(4000000, 7500000), 4000000);
   });
+
+  test("Parsing is_active field pada payload master program", () => {
+    const parsePayload = (p: { is_active?: boolean }) => ({
+      is_active: p.is_active !== undefined ? Boolean(p.is_active) : true,
+    });
+
+    assert.equal(parsePayload({}).is_active, true);
+    assert.equal(parsePayload({ is_active: true }).is_active, true);
+    assert.equal(parsePayload({ is_active: false }).is_active, false);
+  });
+
+  test("Penyaringan active_only=true hanya meloloskan program aktif dan mengecualikan arsip", () => {
+    const programs = [
+      { id: "1", nama: "SMAW 6G", is_active: true },
+      { id: "2", nama: "GTAW Pipe (Arsip)", is_active: false },
+      { id: "3", nama: "FCAW 3G", is_active: true },
+      { id: "4", nama: "Kombinasi Lama", is_active: false },
+    ];
+
+    const filterActiveOnly = (list: typeof programs, activeOnly: boolean) => {
+      if (!activeOnly) return list;
+      return list.filter((p) => p.is_active !== false);
+    };
+
+    const activeList = filterActiveOnly(programs, true);
+    assert.equal(activeList.length, 2);
+    assert.deepEqual(
+      activeList.map((p) => p.nama),
+      ["SMAW 6G", "FCAW 3G"]
+    );
+
+    const allList = filterActiveOnly(programs, false);
+    assert.equal(allList.length, 4);
+  });
 });
 

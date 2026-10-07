@@ -153,7 +153,7 @@ export default function PendaftaranPage() {
   useEffect(() => {
     async function loadPrograms() {
       try {
-        const res = await fetch("/api/v1/master/program");
+        const res = await fetch("/api/v1/master/program?active_only=true");
         if (res.ok) {
           const json = await res.json();
           setPrograms(json.data || []);

@@ -69,13 +69,18 @@ export default function PresensiSiswaPage() {
   const [izinKeterangan, setIzinKeterangan] = useState("");
   const [izinSubmitting, setIzinSubmitting] = useState(false);
 
-  // Load initial data: master lokasi, status hari ini, dan riwayat presensi
+  // Load initial data secara paralel: master lokasi, status hari ini, dan riwayat presensi
   const loadData = useCallback(async () => {
     try {
+      const [resLokasi, resToday, resHistory] = await Promise.allSettled([
+        fetch("/api/v1/master/lokasi"),
+        fetch("/api/v1/presensi/today"),
+        fetch("/api/v1/presensi?limit=10"),
+      ]);
+
       // 1. Lokasi LPKS dari database (handle format object maupun array)
-      const resLokasi = await fetch("/api/v1/master/lokasi");
-      if (resLokasi.ok) {
-        const json = await resLokasi.json();
+      if (resLokasi.status === "fulfilled" && resLokasi.value.ok) {
+        const json = await resLokasi.value.json();
         const aktif = Array.isArray(json.data)
           ? json.data.find((l: { is_active?: boolean }) => l.is_active) || json.data[0]
           : json.data;
@@ -91,9 +96,8 @@ export default function PresensiSiswaPage() {
       }
 
       // 2. Status Presensi Hari Ini
-      const resToday = await fetch("/api/v1/presensi/today");
-      if (resToday.ok) {
-        const json = await resToday.json();
+      if (resToday.status === "fulfilled" && resToday.value.ok) {
+        const json = await resToday.value.json();
         if (json.data?.sudah_absen) {
           setAbsenDone(true);
           setTodayRecord(json.data.presensi || null);
@@ -107,9 +111,8 @@ export default function PresensiSiswaPage() {
       }
 
       // 3. Riwayat Presensi
-      const resHistory = await fetch("/api/v1/presensi?limit=10");
-      if (resHistory.ok) {
-        const json = await resHistory.json();
+      if (resHistory.status === "fulfilled" && resHistory.value.ok) {
+        const json = await resHistory.value.json();
         setRiwayat(json.data || []);
       }
     } catch (err) {

@@ -7,6 +7,12 @@ import { Home, MapPin, ClipboardList, BarChart2, Wallet, Flame, Settings, LogOut
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import {
+  getCachedSiswaProfile,
+  setCachedSiswaProfile,
+  clearCachedSiswaProfile,
+  CachedSiswaProfile,
+} from "@/lib/siswa-cache";
 
 const NAV_ITEMS = [
   { href: "/siswa/beranda",    icon: Home,          label: "Beranda" },
@@ -18,14 +24,17 @@ const NAV_ITEMS = [
 
 export default function SiswaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [userProfile, setUserProfile] = React.useState<{
-    nama: string;
-    nomor_induk?: string;
-    is_password_default?: boolean;
-  } | null>(null);
+  const [userProfile, setUserProfile] = React.useState<CachedSiswaProfile | null>(() =>
+    getCachedSiswaProfile()
+  );
+  const [pendingNav, setPendingNav] = React.useState<string | null>(null);
   const [showLogoutModal, setShowLogoutModal] = React.useState(false);
   const [loggingOut, setLoggingOut] = React.useState(false);
   const [dismissBanner, setDismissBanner] = React.useState(false);
+
+  React.useEffect(() => {
+    setPendingNav(null);
+  }, [pathname]);
 
   React.useEffect(() => {
     try {
@@ -42,11 +51,15 @@ export default function SiswaLayout({ children }: { children: React.ReactNode })
         if (res.ok) {
           const json = await res.json();
           const u = json.data?.user;
-          setUserProfile({
+          const profile: CachedSiswaProfile = {
+            id: u?.siswa?.id || "",
             nama: u?.nama || "Siswa",
             nomor_induk: u?.siswa?.nomor_induk || undefined,
             is_password_default: u?.siswa?.is_password_default ?? false,
-          });
+            program: u?.siswa?.program?.nama || "Pelatihan Pengelasan",
+          };
+          setUserProfile(profile);
+          setCachedSiswaProfile(profile);
         }
       } catch (e) {
         console.error("Gagal memuat profil:", e);
@@ -57,6 +70,7 @@ export default function SiswaLayout({ children }: { children: React.ReactNode })
 
   async function handleLogout() {
     setLoggingOut(true);
+    clearCachedSiswaProfile();
     try {
       await fetch("/api/v1/auth/logout", { method: "POST" });
     } catch (e) {
@@ -181,6 +195,13 @@ export default function SiswaLayout({ children }: { children: React.ReactNode })
         </div>
       </Modal>
 
+      {/* Top Progress Indicator on Navigation */}
+      {pendingNav && (
+        <div className="fixed top-0 inset-x-0 h-[2.5px] z-50 overflow-hidden bg-transparent pointer-events-none">
+          <div className="h-full w-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 animate-pulse shadow-[0_0_8px_#DC2626]" />
+        </div>
+      )}
+
       {/* Page Content */}
       <main className="flex-1 overflow-y-auto pb-20 px-4 pt-4">
         {children}
@@ -193,18 +214,26 @@ export default function SiswaLayout({ children }: { children: React.ReactNode })
       >
         <div className="flex items-center justify-around px-2 py-1">
           {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
-            const active = pathname.startsWith(href);
+            const isCurrent = pathname.startsWith(href);
+            const isPending = pendingNav === href;
+            const active = isPending || (pendingNav === null && isCurrent);
             return (
               <Link
                 key={href}
                 href={href}
+                prefetch={true}
+                onClick={() => {
+                  if (!pathname.startsWith(href)) {
+                    setPendingNav(href);
+                  }
+                }}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-150 min-w-0",
+                  "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-150 min-w-0 active:scale-95",
                   active ? "text-[#DC2626]" : "text-[#6B7280] hover:text-[#9CA3AF]"
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <Icon className={cn("h-5 w-5 shrink-0 transition-transform", isPending && "animate-pulse")} aria-hidden="true" />
                 <span className={cn("text-[10px] leading-none font-medium truncate", active && "font-bold")}>
                   {label}
                 </span>

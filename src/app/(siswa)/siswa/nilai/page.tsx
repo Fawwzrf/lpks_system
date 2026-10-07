@@ -31,11 +31,14 @@ export default function NilaiPage() {
 
   const loadData = useCallback(async () => {
     try {
-      // 1. Ambil kriteria master
-      const resKriteria = await fetch("/api/v1/master/kriteria");
+      const [resKriteria, resNilai] = await Promise.allSettled([
+        fetch("/api/v1/master/kriteria"),
+        fetch("/api/v1/penilaian"),
+      ]);
+
       let kList: KriteriaItem[] = [];
-      if (resKriteria.ok) {
-        const json = await resKriteria.json();
+      if (resKriteria.status === "fulfilled" && resKriteria.value.ok) {
+        const json = await resKriteria.value.json();
         kList = json.data || [];
       }
       if (kList.length === 0) {
@@ -49,10 +52,8 @@ export default function NilaiPage() {
       }
       setKriteriaList(kList);
 
-      // 2. Ambil riwayat penilaian siswa
-      const resNilai = await fetch("/api/v1/penilaian");
-      if (resNilai.ok) {
-        const json = await resNilai.json();
+      if (resNilai.status === "fulfilled" && resNilai.value.ok) {
+        const json = await resNilai.value.json();
         const raw = json.data?.riwayat_mentah || [];
         // Group by tanggal
         const byDate: Record<string, { total: number; count: number; created_by: string }> = {};

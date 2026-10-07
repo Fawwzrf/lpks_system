@@ -23,6 +23,8 @@ interface KeuanganData {
   riwayat_transaksi: TransaksiItem[];
 }
 
+import { getCachedSiswaProfile, setCachedSiswaProfile } from "@/lib/siswa-cache";
+
 export default function KeuanganSiswaPage() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<KeuanganData | null>(null);
@@ -32,29 +34,44 @@ export default function KeuanganSiswaPage() {
   useEffect(() => {
     async function loadKeuangan() {
       try {
-        const resMe = await fetch("/api/v1/auth/me");
-        if (!resMe.ok) return;
-        const jsonMe = await resMe.json();
-        const id = jsonMe.data?.user?.siswa?.id;
+        let cached = getCachedSiswaProfile();
+        let id = cached?.id;
+
+        if (!id) {
+          const resMe = await fetch("/api/v1/auth/me");
+          if (!resMe.ok) return;
+          const jsonMe = await resMe.json();
+          id = jsonMe.data?.user?.siswa?.id;
+          if (id) {
+            setCachedSiswaProfile({
+              id,
+              nama: jsonMe.data?.user?.nama || "Siswa",
+              nomor_induk: jsonMe.data?.user?.siswa?.nomor_induk,
+              is_password_default: jsonMe.data?.user?.siswa?.is_password_default,
+            });
+          }
+        }
         if (!id) return;
 
-        const resKeu = await fetch(`/api/v1/keuangan/rekap/${id}`);
-        if (resKeu.ok) {
-          const jsonKeu = await resKeu.json();
+        // Paralelkan fetch rekap keuangan, kelayakan nilai, dan kelulusan ujian
+        const [resKeu, resNilai, resUjian] = await Promise.allSettled([
+          fetch(`/api/v1/keuangan/rekap/${id}`),
+          fetch(`/api/v1/penilaian?siswa_id=${id}`),
+          fetch(`/api/v1/ujian/${id}`),
+        ]);
+
+        if (resKeu.status === "fulfilled" && resKeu.value.ok) {
+          const jsonKeu = await resKeu.value.json();
           setData(jsonKeu.data);
         }
 
-        // Cek kelayakan nilai harian
-        const resNilai = await fetch(`/api/v1/penilaian?siswa_id=${id}`);
-        if (resNilai.ok) {
-          const jsonNilai = await resNilai.json();
+        if (resNilai.status === "fulfilled" && resNilai.value.ok) {
+          const jsonNilai = await resNilai.value.json();
           setNilaiLengkap(!!jsonNilai.data?.ringkasan_kelayakan?.siap_ujian);
         }
 
-        // Cek kelulusan ujian internal
-        const resUjian = await fetch(`/api/v1/ujian/${id}`);
-        if (resUjian.ok) {
-          const jsonUjian = await resUjian.json();
+        if (resUjian.status === "fulfilled" && resUjian.value.ok) {
+          const jsonUjian = await resUjian.value.json();
           setUjianLulus(!!jsonUjian.data?.is_lulus);
         }
       } catch (err) {

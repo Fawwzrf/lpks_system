@@ -124,7 +124,7 @@ async function getInitialUjianData(): Promise<{
         tgl_cetak_sertifikat: st?.tgl_cetak || null,
         tgl_antrean_sertifikat: st?.tgl_antrean || null,
       };
-    });
+    }).filter((s) => s.status_sertifikat !== "dicetak");
 
     data.sort((a, b) => {
       const getPriority = (item: typeof a) => {

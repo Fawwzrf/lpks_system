@@ -6,6 +6,7 @@ import { MapPin, CheckCircle2, AlertTriangle, Wallet, Sparkles, Loader2 } from "
 import { Badge } from "@/components/ui/badge";
 import { Skeleton, CardSkeleton } from "@/components/ui/skeleton";
 import { formatRupiah } from "@/lib/utils";
+import { getCachedSiswaProfile, setCachedSiswaProfile } from "@/lib/siswa-cache";
 
 interface StudentDashboardData {
   nama: string;
@@ -26,18 +27,36 @@ export default function BerandaPage() {
   useEffect(() => {
     async function loadDashboard() {
       try {
-        // 1. Get current auth & student info
-        const resMe = await fetch("/api/v1/auth/me");
-        if (!resMe.ok) return;
-        const jsonMe = await resMe.json();
-        const user = jsonMe.data?.user;
-        const siswa = user?.siswa;
-        const siswaId = siswa?.id;
+        // 1. Ambil info siswa dari cache (tanpa round-trip auth/me) atau fallback ke API
+        let cached = getCachedSiswaProfile();
+        let siswaId = cached?.id;
+        let studentName = cached?.nama || "Siswa";
+        let programName = cached?.program || "Program Pelatihan Pengelasan";
+
+        if (!siswaId) {
+          const resMe = await fetch("/api/v1/auth/me");
+          if (!resMe.ok) return;
+          const jsonMe = await resMe.json();
+          const user = jsonMe.data?.user;
+          const siswa = user?.siswa;
+          siswaId = siswa?.id;
+          studentName = siswa?.nama_lengkap || user?.nama || "Siswa";
+          programName = siswa?.program?.nama || "Program Pelatihan Pengelasan";
+          if (siswaId) {
+            setCachedSiswaProfile({
+              id: siswaId,
+              nama: studentName,
+              nomor_induk: siswa?.nomor_induk,
+              is_password_default: siswa?.is_password_default,
+              program: programName,
+            });
+          }
+        }
 
         if (!siswaId) {
           setData({
-            nama: user?.nama || "Siswa",
-            program: "Program Pelatihan Pengelasan",
+            nama: studentName,
+            program: programName,
             siswa_id: "",
             kehadiran: { hadir: 0, total: 25, persen: 0 },
             keuangan: { status: "Cicil", sisa: 0 },
@@ -97,8 +116,8 @@ export default function BerandaPage() {
         }
 
         setData({
-          nama: siswa.nama_lengkap || user.nama || "Siswa",
-          program: siswa.program?.nama || "Pelatihan Pengelasan",
+          nama: studentName,
+          program: programName,
           siswa_id: siswaId,
           kehadiran: {
             hadir: hadirCount,
