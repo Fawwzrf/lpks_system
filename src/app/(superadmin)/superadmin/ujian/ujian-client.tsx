@@ -223,9 +223,11 @@ export function UjianClient({
     return set;
   }, [historyData, queueData]);
 
-  // Daftar siswa yang eligible untuk dicatat sertifikatnya (HANYA siswa yang BELUM memiliki sertifikat)
+  // Daftar siswa yang eligible untuk dicatat sertifikatnya (HANYA siswa yang BELUM memiliki sertifikat dan BUKAN status out)
   const availableStudentsForCert = useMemo(() => {
     return allStudentsList.filter((s) => {
+      // Siswa yang berstatus out tidak boleh mendapatkan sertifikat
+      if (s.status_siswa === "out") return false;
       // Jika mode Edit, tetap tampilkan siswa target yang sedang diedit
       if (alumniCertTarget && s.id === alumniCertTarget.siswa_id) return true;
       // Siswa yang sudah mempunyai data sertifikat TIDAK MUNCUL
@@ -254,7 +256,7 @@ export function UjianClient({
           if (results.length > 0) {
             setAllStudentsList((prev) => {
               const existingIds = new Set(prev.map((s) => s.id));
-              const newItems = results.filter((r: { id: string }) => !existingIds.has(r.id) && !certifiedSiswaIds.has(r.id));
+              const newItems = results.filter((r: { id: string; status_siswa?: string }) => r.status_siswa !== "out" && !existingIds.has(r.id) && !certifiedSiswaIds.has(r.id));
               return newItems.length > 0 ? [...prev, ...newItems] : prev;
             });
           }
@@ -350,9 +352,14 @@ export function UjianClient({
     await importArsipHook.run(e, "/api/v1/excel/import?modul=arsip_alumni");
   }
 
-  // Data siswa ujian internal: HANYA siswa yang BELUM memiliki sertifikat fisik (baik di riwayat cetak maupun antrean)
+  // Data siswa ujian internal: HANYA siswa aktif/alumni yang BELUM memiliki sertifikat fisik dan BUKAN berstatus out
   const eligibleUjianData = useMemo(() => {
-    return data.filter((s) => !certifiedSiswaIds.has(s.id) && s.status_sertifikat !== "dicetak");
+    return data.filter(
+      (s) =>
+        s.status_siswa !== "out" &&
+        !certifiedSiswaIds.has(s.id) &&
+        s.status_sertifikat !== "dicetak"
+    );
   }, [data, certifiedSiswaIds]);
 
   // Statistik Ringkasan (hanya menghitung siswa yang belum tuntas cetak)
@@ -520,7 +527,7 @@ export function UjianClient({
 
       // Seed awal langsung dari data siswa yang belum bersertifikat (tanpa delay loading)
       const initialCandidates = data
-        .filter((d) => !certifiedSiswaIds.has(d.id))
+        .filter((d) => d.status_siswa !== "out" && !certifiedSiswaIds.has(d.id))
         .map((d) => ({
           id: d.id,
           nama_lengkap: d.nama_lengkap,
@@ -536,8 +543,8 @@ export function UjianClient({
         if (res.ok) {
           const json = await res.json();
           const allFetched: { id: string; nama_lengkap: string; nomor_induk: string; status_siswa?: string; program?: { nama: string } }[] = json.data || [];
-          // Saring hanya siswa yang belum memiliki sertifikat
-          setAllStudentsList(allFetched.filter((s) => !certifiedSiswaIds.has(s.id)));
+          // Saring hanya siswa yang belum memiliki sertifikat dan bukan status out
+          setAllStudentsList(allFetched.filter((s) => s.status_siswa !== "out" && !certifiedSiswaIds.has(s.id)));
         }
       } catch (e) {
         console.error("Gagal memuat daftar siswa:", e);

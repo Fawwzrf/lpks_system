@@ -12,10 +12,11 @@ export async function GET() {
 
     const today = new Date().toISOString().split("T")[0];
 
-    // 1. Ambil seluruh siswa aktif & alumni yang belum dihapus
+    // 1. Ambil seluruh siswa aktif & alumni yang belum dihapus (eksklusikan siswa out)
     const { data: siswaList, error: siswaErr } = await supabase
       .from("siswa")
       .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, biaya_pelatihan, program:master_program(id, nama, biaya)")
+      .neq("status_siswa", "out")
       .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]")
       .order("urutan_nomor", { ascending: true, nullsFirst: false })

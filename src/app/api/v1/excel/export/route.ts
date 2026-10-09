@@ -744,6 +744,7 @@ export async function GET(request: NextRequest) {
       let siswaQuery = supabase
         .from("siswa")
         .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, tempat_lahir, tgl_lahir, program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari)")
+        .neq("status_siswa", "out")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]");
 

@@ -126,5 +126,11 @@ describe("Gate-Check Kelayakan & Sertifikasi Unit Tests", () => {
       assert.equal(res.eligible, false);
       assert.equal(res.alasan.length, 2);
     });
+
+    test("Siswa berstatus out otomatis TIDAK ELIGIBLE untuk sertifikat meski lunas dan lulus", () => {
+      const res = isSertifikatEligible(true, true, "out");
+      assert.equal(res.eligible, false);
+      assert.ok(res.alasan.some((a) => a.includes("mengundurkan diri")));
+    });
   });
 });

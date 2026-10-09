@@ -381,13 +381,16 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       { id: "s-2", nama_lengkap: "Alumni Belum Sertif", status_siswa: "alumni", status_sertifikat: null },
       { id: "s-3", nama_lengkap: "Alumni Sudah Dicetak", status_siswa: "alumni", status_sertifikat: "dicetak" },
       { id: "s-4", nama_lengkap: "Siswa Di Antrean Cetak", status_siswa: "aktif", status_sertifikat: "antrean" },
+      { id: "s-5", nama_lengkap: "Siswa Out / Keluar", status_siswa: "out", status_sertifikat: null },
     ];
 
     test("Ujian Internal hanya memuat siswa yang belum memiliki sertifikat, dan dapat difilter Siswa Aktif vs Alumni", () => {
       const certifiedSiswaIds = new Set(["s-3", "s-4"]);
 
-      // 1. Base Ujian Internal (hanya yang belum punya sertifikat & tidak ada di certifiedSiswaIds)
-      const ujianInternalList = dummyStudents.filter((s) => !certifiedSiswaIds.has(s.id) && s.status_sertifikat !== "dicetak");
+      // 1. Base Ujian Internal (hanya yang bukan 'out', belum punya sertifikat & tidak ada di certifiedSiswaIds)
+      const ujianInternalList = dummyStudents.filter(
+        (s) => s.status_siswa !== "out" && !certifiedSiswaIds.has(s.id) && s.status_sertifikat !== "dicetak"
+      );
       assert.equal(ujianInternalList.length, 2);
 
       // 2. Sub-filter: Siswa Aktif
@@ -403,29 +406,35 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       // 4. Memastikan siswa yang sertifikatnya sudah dicetak (seperti Rizki Fathurohmah) tidak muncul
       assert.equal(ujianInternalList.some((s) => s.id === "s-3"), false);
       assert.equal(ujianInternalList.some((s) => s.id === "s-4"), false);
+
+      // 5. Memastikan siswa yang out otomatis TIDAK ADA di ujian internal
+      assert.equal(ujianInternalList.some((s) => s.id === "s-5"), false, "Siswa out tidak boleh muncul di ujian internal");
     });
 
-    test("Dropdown Catat Sertifikat Alumni mengecualikan siswa yang sudah bersertifikat", () => {
+    test("Dropdown Catat Sertifikat Alumni mengecualikan siswa yang sudah bersertifikat dan siswa yang out", () => {
       const certifiedSiswaIds = new Set(["s-3", "s-4"]);
 
       const allStudentsInDb = [
-        { id: "s-1", nama_lengkap: "Siswa Aktif Belum Sertif" },
-        { id: "s-2", nama_lengkap: "Alumni Belum Sertif" },
-        { id: "s-3", nama_lengkap: "Alumni Sudah Dicetak" },
-        { id: "s-4", nama_lengkap: "Siswa Di Antrean Cetak" },
+        { id: "s-1", nama_lengkap: "Siswa Aktif Belum Sertif", status_siswa: "aktif" },
+        { id: "s-2", nama_lengkap: "Alumni Belum Sertif", status_siswa: "alumni" },
+        { id: "s-3", nama_lengkap: "Alumni Sudah Dicetak", status_siswa: "alumni" },
+        { id: "s-4", nama_lengkap: "Siswa Di Antrean Cetak", status_siswa: "aktif" },
+        { id: "s-5", nama_lengkap: "Siswa Out", status_siswa: "out" },
       ];
 
-      // Saat Tambah Baru (alumniCertTarget = null)
-      const availableNew = allStudentsInDb.filter((s) => !certifiedSiswaIds.has(s.id));
+      // Saat Tambah Baru (alumniCertTarget = null, harus abaikan status 'out' dan yang sudah bersertifikat)
+      const availableNew = allStudentsInDb.filter((s) => s.status_siswa !== "out" && !certifiedSiswaIds.has(s.id));
       assert.equal(availableNew.length, 2);
       assert.deepEqual(availableNew.map((s) => s.id), ["s-1", "s-2"]);
       assert.equal(availableNew.some((s) => s.id === "s-3"), false, "Siswa s-3 yang sudah dicetak tidak boleh muncul");
       assert.equal(availableNew.some((s) => s.id === "s-4"), false, "Siswa s-4 di antrean tidak boleh muncul");
+      assert.equal(availableNew.some((s) => s.id === "s-5"), false, "Siswa s-5 yang out tidak boleh muncul");
 
       // Saat Mode Edit (target s-3)
       const editTargetId = "s-3";
-      const availableEdit = allStudentsInDb.filter((s) => s.id === editTargetId || !certifiedSiswaIds.has(s.id));
+      const availableEdit = allStudentsInDb.filter((s) => s.status_siswa !== "out" && (s.id === editTargetId || !certifiedSiswaIds.has(s.id)));
       assert.equal(availableEdit.some((s) => s.id === "s-3"), true, "Siswa s-3 harus muncul saat sedang diedit");
+      assert.equal(availableEdit.some((s) => s.id === "s-5"), false, "Siswa s-5 yang out tetap tidak boleh muncul saat edit");
     });
   });
 });

@@ -39,6 +39,7 @@ async function getInitialUjianData(): Promise<{
         .select(
           "id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, biaya_pelatihan, program:master_program(id, nama, biaya)"
         )
+        .neq("status_siswa", "out")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
@@ -68,6 +69,7 @@ async function getInitialUjianData(): Promise<{
           no_hp,
           tgl_masuk,
           tgl_keluar,
+          status_siswa,
           program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari)
         )
       `),
@@ -160,6 +162,7 @@ async function getInitialUjianData(): Promise<{
         no_hp?: string;
         tgl_masuk: string;
         tgl_keluar?: string;
+        status_siswa?: string;
         program?: {
           id: string;
           kode_program: string;
@@ -169,7 +172,7 @@ async function getInitialUjianData(): Promise<{
         };
       } | null;
 
-      if (!s) return null;
+      if (!s || s.status_siswa === "out") return null;
 
       let toDateStr = s.tgl_keluar;
       if (!toDateStr && s.tgl_masuk) {

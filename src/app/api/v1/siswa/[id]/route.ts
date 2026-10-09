@@ -181,8 +181,10 @@ export async function PUT(request: NextRequest, { params }: Params) {
       return errorResponse("DATABASE_ERROR", "Gagal memperbarui data siswa.", 500, error.message);
     }
 
-    // Update atau catat nomor sertifikat alumni jika dikirim
-    if (body.no_sertifikat !== undefined) {
+    // Jika status siswa diubah menjadi 'out', otomatis hapus data sertifikat agar tidak tercatat/tercetak
+    if (updates.status_siswa === "out") {
+      await supabase.from("sertifikat").delete().eq("siswa_id", id);
+    } else if (body.no_sertifikat !== undefined) {
       const cleanNoSertif = typeof body.no_sertifikat === "string" ? body.no_sertifikat.trim() : "";
       if (cleanNoSertif) {
         await supabase

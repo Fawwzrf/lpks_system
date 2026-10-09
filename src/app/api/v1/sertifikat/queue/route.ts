@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
           no_hp,
           tgl_masuk,
           tgl_keluar,
+          status_siswa,
           program:master_program(id, kode_program, nama, biaya, estimasi_durasi_hari)
         )
       `);
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
           no_hp?: string;
           tgl_masuk: string;
           tgl_keluar?: string;
+          status_siswa?: string;
           program?: {
             id: string;
             kode_program: string;
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
           };
         } | null;
 
-        if (!s) return null;
+        if (!s || s.status_siswa === "out") return null;
 
         // Hitung tanggal to & date of issue
         let toDateStr = s.tgl_keluar;
@@ -172,12 +174,20 @@ export async function POST(request: NextRequest) {
     // 1. Verifikasi data siswa
     const { data: siswa, error: siswaErr } = await supabase
       .from("siswa")
-      .select("id, nama_lengkap, nomor_induk, program:master_program(nama)")
+      .select("id, nama_lengkap, nomor_induk, status_siswa, program:master_program(nama)")
       .eq("id", siswa_id)
       .single();
 
     if (siswaErr || !siswa) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
+    }
+
+    if (siswa.status_siswa === "out") {
+      return errorResponse(
+        "PRECONDITION_FAILED",
+        `Siswa ${siswa.nama_lengkap} berstatus "out" (mengundurkan diri) dan tidak dapat diajukan untuk penerbitan sertifikat.`,
+        422
+      );
     }
 
     // 2. Verifikasi kelulusan ujian internal

@@ -34,6 +34,14 @@ export async function POST(request: NextRequest) {
       return errorResponse("NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
+    if (siswa.status_siswa === "out") {
+      return errorResponse(
+        "PRECONDITION_FAILED",
+        `Siswa ${siswa.nama_lengkap} berstatus "out" (mengundurkan diri) dan tidak dapat diterbitkan sertifikatnya.`,
+        422
+      );
+    }
+
     // 2. Concurrency & Uniqueness check: pastikan nomor sertifikat belum dipakai oleh siswa lain
     const { data: duplicateCert } = await supabase
       .from("sertifikat")

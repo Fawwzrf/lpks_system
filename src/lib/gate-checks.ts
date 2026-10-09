@@ -96,12 +96,16 @@ export function isSiapUjian(
  */
 export function isSertifikatEligible(
   isLunas: boolean,
-  isLulusUjian: boolean
+  isLulusUjian: boolean,
+  statusSiswa?: string
 ): {
   eligible: boolean;
   alasan: string[];
 } {
   const alasan: string[] = [];
+  if (statusSiswa === "out") {
+    alasan.push("Siswa berstatus 'out' (mengundurkan diri) tidak memenuhi syarat sertifikasi.");
+  }
   if (!isLunas) {
     alasan.push("Biaya pelatihan belum lunas.");
   }
@@ -110,7 +114,7 @@ export function isSertifikatEligible(
   }
 
   return {
-    eligible: isLunas && isLulusUjian,
+    eligible: statusSiswa !== "out" && isLunas && isLulusUjian,
     alasan,
   };
 }

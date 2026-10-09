@@ -20,10 +20,14 @@ interface MockStudent {
   tgl_masuk: string;
   is_lulus_ujian: boolean;
   is_lunas: boolean;
+  status_siswa?: "aktif" | "alumni" | "out";
   status_sertifikat?: "antrean" | "dicetak" | null;
 }
 
 function canAddToQueue(s: MockStudent): { allowed: boolean; reason?: string } {
+  if (s.status_siswa === "out") {
+    return { allowed: false, reason: "Siswa berstatus 'out' (mengundurkan diri) tidak dapat diajukan sertifikat" };
+  }
   if (!s.is_lulus_ujian) {
     return { allowed: false, reason: "Ujian internal belum lulus (min 80 tiap kriteria)" };
   }
@@ -34,6 +38,21 @@ function canAddToQueue(s: MockStudent): { allowed: boolean; reason?: string } {
 }
 
 describe("Sertifikat Queue & Printing Lifecycle", () => {
+  test("harus menolak penambahan ke antrean jika siswa berstatus out", () => {
+    const student: MockStudent = {
+      id: "s-out",
+      nomor_induk: "01.1199",
+      nama_lengkap: "Siswa Mundur",
+      tgl_masuk: "2026-08-01",
+      status_siswa: "out",
+      is_lulus_ujian: true,
+      is_lunas: true,
+    };
+    const result = canAddToQueue(student);
+    assert.equal(result.allowed, false);
+    assert.ok(result.reason?.includes("mengundurkan diri"));
+  });
+
   test("harus menolak penambahan ke antrean jika siswa belum lulus ujian", () => {
     const student: MockStudent = {
       id: "s-1",
