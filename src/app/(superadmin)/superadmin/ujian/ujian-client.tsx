@@ -350,9 +350,14 @@ export function UjianClient({
     await importArsipHook.run(e, "/api/v1/excel/import?modul=arsip_alumni");
   }
 
+  // Data siswa ujian internal: HANYA siswa yang BELUM memiliki sertifikat fisik (baik di riwayat cetak maupun antrean)
+  const eligibleUjianData = useMemo(() => {
+    return data.filter((s) => !certifiedSiswaIds.has(s.id) && s.status_sertifikat !== "dicetak");
+  }, [data, certifiedSiswaIds]);
+
   // Statistik Ringkasan (hanya menghitung siswa yang belum tuntas cetak)
   const stats = useMemo(() => {
-    const activeData = data.filter((s) => s.status_sertifikat !== "dicetak");
+    const activeData = eligibleUjianData;
     const total = activeData.length;
     const aktifCount = activeData.filter((s) => s.status_siswa !== "alumni").length;
     const alumniCount = activeData.filter((s) => s.status_siswa === "alumni").length;
@@ -370,7 +375,7 @@ export function UjianClient({
     const scopedTotal = scopedData.length;
 
     return { total, aktifCount, alumniCount, scopedTotal, siapUjian, lulus, dalamBimbingan };
-  }, [data, statusSiswaSubFilter]);
+  }, [eligibleUjianData, statusSiswaSubFilter]);
 
   // Sorting nomor urut
   const getUrutan = (noInduk?: string | null) => {
@@ -390,11 +395,8 @@ export function UjianClient({
   };
 
   const filteredAndSortedData = useMemo(() => {
-    return data
+    return eligibleUjianData
       .filter((s) => {
-        // Jangan tampilkan siswa yang sertifikatnya sudah dicetak (sudah tuntas & ada di Riwayat Cetak)
-        if (s.status_sertifikat === "dicetak") return false;
-
         // Sub-filter kategori siswa: Siswa Aktif vs Alumni
         if (statusSiswaSubFilter === "aktif" && s.status_siswa === "alumni") return false;
         if (statusSiswaSubFilter === "alumni" && s.status_siswa !== "alumni") return false;
@@ -425,7 +427,7 @@ export function UjianClient({
         if (pA !== pB) return pA - pB;
         return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
       });
-  }, [data, search, statusFilter, statusSiswaSubFilter]);
+  }, [eligibleUjianData, search, statusFilter, statusSiswaSubFilter]);
 
   // Filter Riwayat Sertifikat untuk Pencarian & Verifikasi Keabsahan
   const filteredHistoryData = useMemo(() => {
@@ -773,7 +775,7 @@ export function UjianClient({
           <ClipboardCheck className="h-4 w-4 text-[#DC2626]" aria-hidden="true" />
           <span>Ujian Internal</span>
           <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-[#1F2937] text-[#D1D5DB]">
-            {data.length}
+            {eligibleUjianData.length}
           </span>
         </button>
 

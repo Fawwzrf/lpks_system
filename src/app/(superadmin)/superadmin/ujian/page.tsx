@@ -25,11 +25,10 @@ async function getInitialUjianData(): Promise<{
   try {
     const supabase = await createClient();
 
-    // Query paralel data siswa, ujian, sertifikat, transaksi, kriteria, nilai_harian, dan antrean
+    // Query paralel data siswa, ujian, transaksi, kriteria, nilai_harian, dan antrean sertifikat
     const [
       siswaRes,
       ujianRes,
-      sertifikatRes,
       txRes,
       kriteriaRes,
       nilaiRes,
@@ -45,7 +44,6 @@ async function getInitialUjianData(): Promise<{
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true }),
       supabase.from("ujian").select("*"),
-      supabase.from("sertifikat").select("siswa_id, status, tgl_cetak, tgl_antrean"),
       supabase.from("transaksi_keuangan").select("siswa_id, nominal"),
       supabase.from("master_kriteria").select("id, nama_kriteria, batas_lulus"),
       supabase.from("penilaian_harian").select("siswa_id, kriteria_id, nilai"),
@@ -77,14 +75,13 @@ async function getInitialUjianData(): Promise<{
 
     const siswaList = siswaRes.data || [];
     const ujianList = ujianRes.data || [];
-    const sertifikatList = sertifikatRes.data || [];
     const txList = txRes.data || [];
     const masterKriteria = kriteriaRes.data || [];
     const nilaiHarian = nilaiRes.data || [];
     const allQueueList = queueRes.data || [];
 
     const ujianMap = new Map(ujianList.map((u) => [u.siswa_id, u]));
-    const sertifikatMap = new Map(sertifikatList.map((st) => [st.siswa_id, st]));
+    const sertifikatMap = new Map(allQueueList.map((st) => [st.siswa_id, st]));
 
     const txMap = new Map<string, number>();
     txList.forEach((tx) => {
@@ -94,38 +91,39 @@ async function getInitialUjianData(): Promise<{
     const totalKriteria = masterKriteria.length || 5;
     const studentKriteriaPass = buildKriteriaPassMap(nilaiHarian);
 
-    const data: SiswaUjianItem[] = siswaList.map((s) => {
-      const u = ujianMap.get(s.id) || null;
-      const st = sertifikatMap.get(s.id) || null;
-      const program = s.program as unknown as { nama: string; biaya: number } | null;
-      const programBiaya = Number(program?.biaya || 0);
-      const totalBiaya =
-        s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
-          ? Number(s.biaya_pelatihan)
-          : programBiaya;
-      const totalTerbayar = txMap.get(s.id) || 0;
-      const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
-      const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
-      const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
+    const data: SiswaUjianItem[] = siswaList
+      .filter((s) => !sertifikatMap.has(s.id))
+      .map((s) => {
+        const u = ujianMap.get(s.id) || null;
+        const program = s.program as unknown as { nama: string; biaya: number } | null;
+        const programBiaya = Number(program?.biaya || 0);
+        const totalBiaya =
+          s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
+            ? Number(s.biaya_pelatihan)
+            : programBiaya;
+        const totalTerbayar = txMap.get(s.id) || 0;
+        const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
+        const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
+        const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
 
-      return {
-        id: s.id,
-        nomor_induk: s.nomor_induk,
-        nama_lengkap: s.nama_lengkap,
-        program_nama: program?.nama || "Umum",
-        tgl_masuk: s.tgl_masuk,
-        tgl_keluar: s.tgl_keluar,
-        status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
-        total_biaya: totalBiaya,
-        total_terbayar: totalTerbayar,
-        is_lunas: isLunas,
-        nilai_harian_ok: isNilaiHarianOk,
-        ujian: u,
-        status_sertifikat: st?.status as "antrean" | "dicetak" | null,
-        tgl_cetak_sertifikat: st?.tgl_cetak || null,
-        tgl_antrean_sertifikat: st?.tgl_antrean || null,
-      };
-    }).filter((s) => !s.status_sertifikat);
+        return {
+          id: s.id,
+          nomor_induk: s.nomor_induk,
+          nama_lengkap: s.nama_lengkap,
+          program_nama: program?.nama || "Umum",
+          tgl_masuk: s.tgl_masuk,
+          tgl_keluar: s.tgl_keluar,
+          status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
+          total_biaya: totalBiaya,
+          total_terbayar: totalTerbayar,
+          is_lunas: isLunas,
+          nilai_harian_ok: isNilaiHarianOk,
+          ujian: u,
+          status_sertifikat: null,
+          tgl_cetak_sertifikat: null,
+          tgl_antrean_sertifikat: null,
+        };
+      });
 
     data.sort((a, b) => {
       const getPriority = (item: typeof a) => {

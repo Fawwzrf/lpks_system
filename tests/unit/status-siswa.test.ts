@@ -384,8 +384,10 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
     ];
 
     test("Ujian Internal hanya memuat siswa yang belum memiliki sertifikat, dan dapat difilter Siswa Aktif vs Alumni", () => {
-      // 1. Base Ujian Internal (hanya yang belum punya sertifikat)
-      const ujianInternalList = dummyStudents.filter((s) => !s.status_sertifikat);
+      const certifiedSiswaIds = new Set(["s-3", "s-4"]);
+
+      // 1. Base Ujian Internal (hanya yang belum punya sertifikat & tidak ada di certifiedSiswaIds)
+      const ujianInternalList = dummyStudents.filter((s) => !certifiedSiswaIds.has(s.id) && s.status_sertifikat !== "dicetak");
       assert.equal(ujianInternalList.length, 2);
 
       // 2. Sub-filter: Siswa Aktif
@@ -397,6 +399,10 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       const alumniOnly = ujianInternalList.filter((s) => s.status_siswa === "alumni");
       assert.equal(alumniOnly.length, 1);
       assert.equal(alumniOnly[0].id, "s-2");
+
+      // 4. Memastikan siswa yang sertifikatnya sudah dicetak (seperti Rizki Fathurohmah) tidak muncul
+      assert.equal(ujianInternalList.some((s) => s.id === "s-3"), false);
+      assert.equal(ujianInternalList.some((s) => s.id === "s-4"), false);
     });
 
     test("Dropdown Catat Sertifikat Alumni mengecualikan siswa yang sudah bersertifikat", () => {

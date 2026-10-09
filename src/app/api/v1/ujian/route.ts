@@ -33,9 +33,13 @@ export async function GET() {
     const ujianMap = new Map((ujianList || []).map((u) => [u.siswa_id, u]));
 
     // 2.1 Ambil seluruh status sertifikat percetakan
-    const { data: sertifikatList } = await supabase
+    const { data: sertifikatList, error: certErr } = await supabase
       .from("sertifikat")
-      .select("siswa_id, status, tgl_cetak, tgl_antrean");
+      .select("id, siswa_id, status, tgl_cetak, tgl_antrean");
+
+    if (certErr) {
+      console.error("Gagal mengambil data sertifikat di /api/v1/ujian:", certErr);
+    }
 
     const sertifikatMap = new Map((sertifikatList || []).map((st) => [st.siswa_id, st]));
 
@@ -63,37 +67,38 @@ export async function GET() {
 
     const studentKriteriaPass = buildKriteriaPassMap(nilaiHarian || []);
 
-    const result = (siswaList || []).map((s) => {
-      const u = ujianMap.get(s.id) || null;
-      const st = sertifikatMap.get(s.id) || null;
-      const program = (s.program as unknown) as { nama: string; biaya: number } | null;
-      const programBiaya = Number(program?.biaya || 0);
-      const totalBiaya = s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
-        ? Number(s.biaya_pelatihan)
-        : programBiaya;
-      const totalTerbayar = txMap.get(s.id) || 0;
-      const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
-      const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
-      const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
+    const result = (siswaList || [])
+      .filter((s) => !sertifikatMap.has(s.id))
+      .map((s) => {
+        const u = ujianMap.get(s.id) || null;
+        const program = (s.program as unknown) as { nama: string; biaya: number } | null;
+        const programBiaya = Number(program?.biaya || 0);
+        const totalBiaya = s.biaya_pelatihan !== null && s.biaya_pelatihan !== undefined
+          ? Number(s.biaya_pelatihan)
+          : programBiaya;
+        const totalTerbayar = txMap.get(s.id) || 0;
+        const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
+        const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
+        const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
 
-      return {
-        id: s.id,
-        nomor_induk: s.nomor_induk,
-        nama_lengkap: s.nama_lengkap,
-        program_nama: program?.nama || "Umum",
-        tgl_masuk: s.tgl_masuk,
-        tgl_keluar: s.tgl_keluar,
-        status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
-        total_biaya: totalBiaya,
-        total_terbayar: totalTerbayar,
-        is_lunas: isLunas,
-        nilai_harian_ok: isNilaiHarianOk,
-        ujian: u,
-        status_sertifikat: st?.status || null,
-        tgl_cetak_sertifikat: st?.tgl_cetak || null,
-        tgl_antrean_sertifikat: st?.tgl_antrean || null,
-      };
-    }).filter((s) => !s.status_sertifikat);
+        return {
+          id: s.id,
+          nomor_induk: s.nomor_induk,
+          nama_lengkap: s.nama_lengkap,
+          program_nama: program?.nama || "Umum",
+          tgl_masuk: s.tgl_masuk,
+          tgl_keluar: s.tgl_keluar,
+          status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
+          total_biaya: totalBiaya,
+          total_terbayar: totalTerbayar,
+          is_lunas: isLunas,
+          nilai_harian_ok: isNilaiHarianOk,
+          ujian: u,
+          status_sertifikat: null,
+          tgl_cetak_sertifikat: null,
+          tgl_antrean_sertifikat: null,
+        };
+      });
 
     // Pengurutan: Siswa yang siap menjalani ujian internal diletakkan paling atas
     result.sort((a, b) => {
