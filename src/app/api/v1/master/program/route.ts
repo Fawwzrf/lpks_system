@@ -10,22 +10,23 @@ export async function GET(request: NextRequest) {
     const activeOnly = request.nextUrl.searchParams.get("active_only") === "true";
 
     const supabase = await createClient();
-    let query = supabase
+    const { data, error } = await supabase
       .from("master_program")
       .select("*")
       .order("kode_program", { ascending: true });
-
-    if (activeOnly) {
-      query = query.or("is_active.eq.true,is_active.is.null");
-    }
-
-    const { data, error } = await query;
 
     if (error) {
       return errorResponse("DATABASE_ERROR", "Gagal mengambil daftar program.", 500, error.message);
     }
 
-    return successResponse(data);
+    let result = (data || []) as Array<Record<string, unknown>>;
+    if (activeOnly) {
+      // Saring program aktif secara aman di memori.
+      // Jika kolom is_active belum dimigrasi di Postgres (undefined), seluruh program tetap tampil (graceful fallback).
+      result = result.filter((p) => p.is_active !== false);
+    }
+
+    return successResponse(result);
   } catch (err) {
     return errorResponse(
       "INTERNAL_ERROR",
@@ -48,18 +49,34 @@ export async function POST(request: NextRequest) {
       return errorResponse("VALIDATION_ERROR", "Kode program, nama, dan biaya wajib diisi.", 400);
     }
 
+    const insertPayload: Record<string, unknown> = {
+      kode_program: String(kode_program).trim(),
+      nama: String(nama).trim(),
+      biaya: parseFloat(biaya),
+      estimasi_durasi_hari: parseInt(estimasi_durasi_hari || 30, 10),
+    };
+    if (is_active !== undefined) {
+      insertPayload.is_active = Boolean(is_active);
+    }
+
     const supabase = await createClient();
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("master_program")
-      .insert({
-        kode_program: String(kode_program).trim(),
-        nama: String(nama).trim(),
-        biaya: parseFloat(biaya),
-        estimasi_durasi_hari: parseInt(estimasi_durasi_hari || 30, 10),
-        is_active: is_active !== undefined ? Boolean(is_active) : true,
-      })
+      .insert(insertPayload)
       .select()
       .single();
+
+    // Graceful fallback jika kolom is_active belum dibuat di database (Postgres error 42703)
+    if (error && error.code === "42703" && "is_active" in insertPayload) {
+      delete insertPayload.is_active;
+      const retry = await supabase
+        .from("master_program")
+        .insert(insertPayload)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === "23505") {
@@ -136,12 +153,25 @@ export async function PUT(request: NextRequest) {
       updatePayload.is_active = Boolean(is_active);
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("master_program")
       .update(updatePayload)
       .eq("id", id)
       .select()
       .single();
+
+    // Graceful fallback jika kolom is_active belum dibuat di database (Postgres error 42703)
+    if (error && error.code === "42703" && "is_active" in updatePayload) {
+      delete updatePayload.is_active;
+      const retry = await supabase
+        .from("master_program")
+        .update(updatePayload)
+        .eq("id", id)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       if (error.code === "23505") {
