@@ -16,6 +16,9 @@ import {
   RefreshCw,
   Archive,
   ArchiveRestore,
+  X,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -68,6 +71,18 @@ export default function MasterPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [copiedSql, setCopiedSql] = useState(false);
+
+  // Auto-dismiss floating toast notifications after 7 seconds
+  useEffect(() => {
+    if (!errorMsg && !successMsg) return;
+    const timer = setTimeout(() => {
+      setErrorMsg("");
+      setSuccessMsg("");
+      setCopiedSql(false);
+    }, 7000);
+    return () => clearTimeout(timer);
+  }, [errorMsg, successMsg]);
 
   // Data states
   const [programList, setProgramList] = useState<ProgramItem[]>([]);
@@ -380,20 +395,6 @@ export default function MasterPage() {
           Segarkan
         </Button>
       </div>
-
-      {/* Notifications */}
-      {errorMsg && (
-        <div className="p-3 bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] text-xs rounded-xl flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-      {successMsg && (
-        <div className="p-3 bg-[#10B981]/10 border border-[#10B981]/20 text-[#10B981] text-xs rounded-xl flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 shrink-0" />
-          <span>{successMsg}</span>
-        </div>
-      )}
 
       {/* Tab Nav */}
       <div className="flex flex-wrap gap-1 bg-[#111827] border border-[#1F2937] rounded-xl p-1">
@@ -1013,6 +1014,78 @@ export default function MasterPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Floating Bottom Notification Popup / Toast */}
+      {(errorMsg || successMsg) && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 max-w-md w-[calc(100vw-3rem)] animate-in fade-in slide-in-from-bottom-5 duration-200"
+        >
+          <div
+            className={`p-4 rounded-xl border shadow-2xl backdrop-blur-md flex items-start gap-3 transition-all ${
+              errorMsg
+                ? "bg-[#181014]/95 border-[#F43F5E]/40 text-[#F43F5E] shadow-rose-950/40"
+                : "bg-[#0B1713]/95 border-[#10B981]/40 text-[#10B981] shadow-emerald-950/40"
+            }`}
+          >
+            {errorMsg ? (
+              <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-[#F43F5E]" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-[#10B981]" />
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-[#F9FAFB]">
+                {errorMsg ? "Pemberitahuan Sistem" : "Berhasil"}
+              </p>
+              <p className="text-xs text-[#D1D5DB] mt-0.5 break-words leading-relaxed">
+                {errorMsg || successMsg}
+              </p>
+              {errorMsg && errorMsg.includes("ALTER TABLE") && (
+                <div className="mt-2.5 pt-2 border-t border-[#374151]/50 flex items-center justify-between gap-2">
+                  <code className="text-[10px] font-mono text-[#FCA5A5] bg-black/40 px-2 py-1 rounded border border-[#F43F5E]/30 truncate block max-w-[230px]">
+                    ALTER TABLE public.master_program ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        "ALTER TABLE public.master_program ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;"
+                      );
+                      setCopiedSql(true);
+                      setTimeout(() => setCopiedSql(false), 3000);
+                    }}
+                    className="flex items-center gap-1 text-[10px] font-medium bg-[#DC2626] hover:bg-[#B91C1C] text-white px-2 py-1 rounded transition-colors shrink-0"
+                  >
+                    {copiedSql ? (
+                      <>
+                        <Check className="h-3 w-3" />
+                        <span>Tersalin</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        <span>Salin SQL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className="text-[#9CA3AF] hover:text-[#F9FAFB] p-1 rounded-lg hover:bg-white/10 transition-colors shrink-0"
+              title="Tutup Notifikasi"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </aside>
+      )}
     </div>
   );
 }

@@ -37,6 +37,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+function isColumnMissingError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { code?: string; message?: string };
+  return (
+    e.code === "PGRST204" ||
+    e.code === "42703" ||
+    (typeof e.message === "string" &&
+      (e.message.includes("is_active") || e.message.includes("schema cache")))
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { errorResponse: authError } = await requireSuperadmin();
@@ -66,8 +77,8 @@ export async function POST(request: NextRequest) {
       .select()
       .single();
 
-    // Graceful fallback jika kolom is_active belum dibuat di database (Postgres error 42703)
-    if (error && error.code === "42703" && "is_active" in insertPayload) {
+    // Fallback jika kolom is_active belum dibuat di database (PGRST204 / 42703)
+    if (isColumnMissingError(error) && "is_active" in insertPayload) {
       delete insertPayload.is_active;
       const retry = await supabase
         .from("master_program")
@@ -160,17 +171,20 @@ export async function PUT(request: NextRequest) {
       .select()
       .single();
 
-    // Graceful fallback jika kolom is_active belum dibuat di database (Postgres error 42703)
-    if (error && error.code === "42703" && "is_active" in updatePayload) {
+    // Fallback edukatif jika kolom is_active belum dibuat di database (PGRST204 / 42703)
+    if (isColumnMissingError(error) && "is_active" in updatePayload) {
       delete updatePayload.is_active;
-      const retry = await supabase
+      // Coba perbarui field reguler lainnya jika ada
+      await supabase
         .from("master_program")
         .update(updatePayload)
-        .eq("id", id)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
+        .eq("id", id);
+
+      return errorResponse(
+        "MIGRATION_REQUIRED",
+        "Fitur arsip memerlukan migrasi kolom 'is_active' di Supabase. Silakan jalankan query SQL berikut di Supabase SQL Editor: ALTER TABLE public.master_program ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;",
+        400
+      );
     }
 
     if (error) {
