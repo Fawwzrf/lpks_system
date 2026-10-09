@@ -23,8 +23,8 @@ describe("Gate-Check Kelayakan & Sertifikasi Unit Tests", () => {
       assert.equal(isKeuanganLunas(8500000, 8499999), false);
     });
 
-    test("Total biaya 0 tidak valid sebagai status lunas", () => {
-      assert.equal(isKeuanganLunas(0, 0), false);
+    test("Total biaya 0 (program gratis / beasiswa) dinyatakan LUNAS", () => {
+      assert.equal(isKeuanganLunas(0, 0), true);
     });
   });
 

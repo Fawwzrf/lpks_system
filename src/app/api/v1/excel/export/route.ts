@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
           const studentTxs = txMap.get(s.id) || [];
           const terbayar = studentTxs.reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
           const sisa = Math.max(0, biaya - terbayar);
-          const isLunas = biaya > 0 && terbayar >= biaya;
+          const isLunas = biaya === 0 || terbayar >= biaya;
           const statusBayar = isLunas ? "Lunas" : (terbayar > 0 ? "Cicilan" : "Belum Bayar");
 
           // Rincian riwayat pembayaran (tanggal & nominal)

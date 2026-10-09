@@ -770,7 +770,7 @@ export function KeuanganClient({
           <div className="flex flex-col gap-1">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span className={isFull ? "text-[#10B981]" : "text-[#F59E0B]"}>
-                {formatRupiah(r.total_terbayar)}
+                {r.total_biaya === 0 ? "Gratis" : formatRupiah(r.total_terbayar)}
               </span>
               <span className="text-[10px] text-[#9CA3AF]">{r.persentase}%</span>
             </div>

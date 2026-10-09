@@ -75,11 +75,11 @@ async function getInitialKeuanganData(): Promise<{
         0
       );
       const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-      const isLunas = totalBiaya > 0 && totalTerbayar >= totalBiaya;
+      const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
       const persentase =
         totalBiaya > 0
           ? Math.min(100, Math.round((totalTerbayar / totalBiaya) * 100))
-          : 0;
+          : 100;
       const status: "Lunas" | "Cicilan" | "Belum Bayar" = isLunas
         ? "Lunas"
         : totalTerbayar > 0

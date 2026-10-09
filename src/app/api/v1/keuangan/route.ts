@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
         const studentTx = txMap.get(s.id) || [];
         const totalTerbayar = studentTx.reduce((acc, curr) => acc + Number(curr.nominal || 0), 0);
         const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-        const isLunas = totalBiaya > 0 && totalTerbayar >= totalBiaya;
-        const persentase = totalBiaya > 0 ? Math.min(100, Math.round((totalTerbayar / totalBiaya) * 100)) : 0;
+        const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
+        const persentase = totalBiaya > 0 ? Math.min(100, Math.round((totalTerbayar / totalBiaya) * 100)) : 100;
         const status = isLunas ? "Lunas" : (totalTerbayar > 0 ? "Cicilan" : "Belum Bayar");
 
         return {
@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
 
     const totalTerbayar = allTx?.reduce((acc, curr) => acc + Number(curr.nominal), 0) || 0;
     const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-    const isLunas = sisaTagihan === 0 && totalBiaya > 0;
+    const isLunas = totalBiaya === 0 || sisaTagihan === 0;
 
     return successResponse(
       {

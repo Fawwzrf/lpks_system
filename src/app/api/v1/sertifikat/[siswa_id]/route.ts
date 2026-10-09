@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     const totalTerbayar = transaksi?.reduce((acc, curr) => acc + Number(curr.nominal), 0) || 0;
     const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-    const isKeuanganLunas = sisaTagihan === 0 && totalBiaya > 0;
+    const isKeuanganLunas = totalBiaya === 0 || sisaTagihan === 0;
 
     // 3. Gate 2: Cek Status Ujian Internal (Wajib LULUS)
     const { data: ujian } = await supabase

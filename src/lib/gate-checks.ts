@@ -27,7 +27,7 @@ export const STANDAR_LULUS_MINIMAL = 80;
  * Gate 1: Cek apakah status pembayaran siswa telah lunas
  */
 export function isKeuanganLunas(totalBiaya: number, totalTerbayar: number): boolean {
-  if (totalBiaya <= 0) return false;
+  if (totalBiaya <= 0) return true;
   return totalTerbayar >= totalBiaya;
 }
 

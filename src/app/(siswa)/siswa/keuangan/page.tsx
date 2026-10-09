@@ -114,8 +114,8 @@ export default function KeuanganSiswaPage() {
   const totalTagihan = data?.total_biaya || 0;
   const sudahBayar = data?.total_terbayar || 0;
   const sisa = data?.sisa_tagihan || 0;
-  const progress = totalTagihan > 0 ? Math.min(100, Math.round((sudahBayar / totalTagihan) * 100)) : 0;
-  const lunas = data?.is_lunas || (sisa === 0 && totalTagihan > 0);
+  const progress = totalTagihan > 0 ? Math.min(100, Math.round((sudahBayar / totalTagihan) * 100)) : 100;
+  const lunas = Boolean(data?.is_lunas || sisa === 0 || totalTagihan === 0);
   const transaksi = data?.riwayat_transaksi || [];
 
   const layakSertifikat = lunas && nilaiLengkap && ujianLulus;
