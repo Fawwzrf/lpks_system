@@ -104,7 +104,7 @@ async function getInitialUjianData(): Promise<{
           ? Number(s.biaya_pelatihan)
           : programBiaya;
       const totalTerbayar = txMap.get(s.id) || 0;
-      const isLunas = totalBiaya > 0 && totalTerbayar >= totalBiaya;
+      const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
       const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
       const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
 
@@ -124,7 +124,7 @@ async function getInitialUjianData(): Promise<{
         tgl_cetak_sertifikat: st?.tgl_cetak || null,
         tgl_antrean_sertifikat: st?.tgl_antrean || null,
       };
-    }).filter((s) => s.status_sertifikat !== "dicetak");
+    }).filter((s) => !s.status_sertifikat);
 
     data.sort((a, b) => {
       const getPriority = (item: typeof a) => {

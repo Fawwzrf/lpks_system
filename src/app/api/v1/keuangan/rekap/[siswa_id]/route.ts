@@ -44,7 +44,7 @@ export async function GET(_request: NextRequest, { params }: Params) {
 
     const totalTerbayar = transaksi?.reduce((acc, curr) => acc + Number(curr.nominal), 0) || 0;
     const sisaTagihan = Math.max(0, totalBiaya - totalTerbayar);
-    const isLunas = sisaTagihan === 0 && totalBiaya > 0;
+    const isLunas = totalBiaya === 0 || sisaTagihan === 0;
 
     return successResponse({
       siswa_id,

@@ -115,5 +115,28 @@ npm run db:restore -- backups/lpks-db-backup-YYYY-MM-DDTHH-mm-ss.json
 | `npm run db:restore -- <path_file>` | Merestorasi snapshot database dari file JSON. |
 | `npm run db:prune` | Menghapus log audit yang berusia lebih dari 365 hari. |
 | `npm run db:prune -- 180` | Menghapus log audit yang berusia lebih dari 180 hari (custom cutoff). |
-| `npm test` | Menjalankan seluruh pengujian regresi otomatis (117 test cases). |
+| `npm test` | Menjalankan seluruh pengujian regresi otomatis (129 test cases, 38 suites). |
 | `npm audit` | Memeriksa kerentanan keamanan paket dependensi npm. |
+
+---
+
+## 6. Riwayat Migrasi Skema & Optimasi Background Tasks
+
+### A. Migrasi Kolom Status Arsip Program
+Untuk mendukung penyaringan program aktif di formulir pendaftaran dan mencegah dropdown kotor dari data import lama:
+```sql
+ALTER TABLE public.master_program
+ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+```
+
+### B. Optimasi Self-Healing Alumni (Non-Blocking / Fire-and-Forget)
+Pada endpoint `GET /api/v1/siswa`, transisi otomatis siswa yang `tgl_keluar`-nya telah lewat menjadi status `alumni` dijalankan dengan pola `void` query (*fire-and-forget*). Hal ini menjamin:
+- Waktu respons API tetap instan (< 100ms) tanpa menunggu penulisan update database selesai.
+- Sesuai prinsip *Ponytail* (solusi minimal dan efisien tanpa memerlukan queue worker terpisah).
+
+### C. Pre-Event / Public Demo Sanity Check
+Sebelum melakukan demonstrasi atau presentasi publik:
+1. **Verifikasi Status Supabase:** Pastikan project Supabase aktif dan tidak dalam keadaan ter-pause (*Free tier keep-alive*). Buka `/api/v1/health` di browser untuk memastikan koneksi database hijau (`200 OK`).
+2. **Katalog Master Program:** Pastikan program lama/duplikat dari hasil import Excel telah diubah statusnya menjadi **Arsip** via menu Master Data, sehingga formulir pendaftaran hanya menampilkan program aktif resmi.
+3. **Konfigurasi Radius GPS:** Jika demonstrasi dilakukan di dalam ruangan atau aula pertemuan, pastikan radius geofencing di **Master Data -> Lokasi** telah disesuaikan sementara agar siswa demo tidak terblokir presensi akibat sinyal GPS indoor yang melemah.
+4. **Verifikasi Kredensial Demo:** Pastikan akun Superadmin dan minimal 1–2 akun Siswa demo sudah dicoba login terlebih dahulu.

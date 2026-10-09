@@ -41,7 +41,7 @@ Semua modul diuji silang dengan Acceptance Criteria PRD & Roadmap Peningkatan Si
 ## Strategi Pengujian
 
 ### Tahap 2 — Pengujian Fungsional
-Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (117 test, 18 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR/NFR.
+Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (129 test, 38 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR/NFR.
 
 ### Tahap 3 — Pengujian Non-Fungsional
 - **Performance:** Lighthouse + Chrome DevTools MCP untuk CWV (LCP, INP, FID) & verifikasi Server Component Streaming
@@ -58,7 +58,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 ### Entry Criteria (Sudah Terpenuhi ✅)
 - [x] Semua 7 tahap Development sudah dikonfirmasi
 - [x] Code review & refactoring selesai
-- [x] `npm test` → 117 pass, 18 suites, 0 fail (100% pass baseline clean)
+- [x] `npm test` → 129 pass, 38 suites, 0 fail (100% pass baseline clean)
 - [x] `tsc --noEmit` → 0 error
 - [x] `npm run lint` → 0 error
 - [x] Dev server aktif (`npm run dev`)
@@ -327,13 +327,15 @@ Semua **Kriteria Penerimaan (Exit Criteria)** untuk Tahap 3 (Non-Fungsional) tel
 | **UAT-18: Idempotency Guard Transaksi Pembayaran** | Admin mengklik tombol 'Simpan Pembayaran' dua kali berturut-turut secara cepat (< 5 detik) saat koneksi lambat. | Transaksi pertama tersimpan, request kedua ditolak dengan peringatan duplikasi untuk mencegah double billing. | Response 409 `DUPLICATE_TRANSACTION` mencegah pencatatan ganda; saldo tagihan siswa tetap akurat. | ✅ PASS |
 | **UAT-19: Keunikan Nomor Sertifikat Fisik Alumni** | Admin mencatat nomor sertifikat fisik alumni yang identik dengan nomor sertifikat alumni yang sudah ada. | Sistem menolak pencatatan dan memberitahukan siapa pemilik asli nomor sertifikat tersebut. | Response 409 `DUPLICATE_CERTIFICATE_NUMBER` memblokir nomor sertifikat kembar lintas siswa. | ✅ PASS |
 | **UAT-20: Audit Trail Transaksi Keuangan & Sertifikat** | Melakukan mutasi transaksi keuangan (tambah, edit, hapus) dan penambahan antrean cetak. | Riwayat aktivitas sensitif tercatat otomatis ke tabel `audit_log` lengkap dengan ID user dan IP address. | Log audit tersimpan append-only dan fail-safe tanpa mengganggu flow transaksi pengguna. | ✅ PASS |
+| **UAT-21: Filter Program Aktif & Modal Arsip/Hapus** | Mengarsipkan program pelatihan lama dan membuka formulir pendaftaran serta filter data siswa. | Formulir pendaftaran hanya menampilkan program aktif; program arsip disembunyikan tanpa merusak data histori; modal konfirmasi menggantikan browser confirm. | Dropdown bersih dari format impor lama, aksi arsip/hapus aman dengan dialog modal modern. | ✅ PASS |
+| **UAT-22: Filter Kandidat Ujian & Beasiswa Rp 0** | Menilai ujian siswa yang belum bersertifikat vs yang sudah antre/dicetak, serta siswa beasiswa biaya Rp 0. | Siswa bersertifikat tidak lagi memenuhi tabel ujian; siswa beasiswa Rp 0 otomatis lolos gate-check Lunas. | Tabel ujian fokus hanya pada kandidat aktif; gate check kelulusan dan antrean cetak berjalan tanpa false-rejection keuangan. | ✅ PASS |
 
 ---
 
 ## 4.2. Kesimpulan Akhir UAT
 
-Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 20**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, anti-fake GPS telemetry, idempotency guard, zero-SQL grandfathering tarif, serta Server Component Streaming. 
+Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 22**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, anti-fake GPS telemetry, idempotency guard, zero-SQL grandfathering tarif, Server Component Streaming, serta siklus antrean cetak sertifikat & pengarsipan program. 
 
-Seluruh **Exit Criteria Fase Testing telah TERPENUHI**. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT**.
+Seluruh **Exit Criteria Fase Testing telah TERPENUHI**. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT & PRESENTASI PUBLIK**.
 
 

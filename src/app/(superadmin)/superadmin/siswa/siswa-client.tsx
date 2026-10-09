@@ -13,6 +13,8 @@ import { Table } from "@/components/ui/table";
 import { Modal } from "@/components/ui/modal";
 import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
+import { ColumnHeader, SortDirection } from "@/components/ui/column-header";
 import { useStreamingImport } from "@/lib/use-streaming-import";
 import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
 
@@ -66,16 +68,28 @@ export function SiswaClient({
   const [loading, setLoading] = useState(initialSiswa.length === 0);
   const [filter, setFilter] = useState<FilterStatus>("aktif");
   const [programFilter, setProgramFilter] = useState<string>("semua");
+  const [pendidikanFilter, setPendidikanFilter] = useState<string>("");
+  const [sortKey, setSortKey] = useState<string>("nomor_induk");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(15);
   const [total, setTotal] = useState(initialTotal);
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
   // In-memory cache untuk performa 0ms / no loading
   const cacheRef = useRef<Map<string, { data: SiswaItem[]; total: number }>>(
     new Map(
       initialSiswa.length > 0
-        ? [["aktif_semua__1_15", { data: initialSiswa, total: initialTotal }]]
+        ? [["aktif_semua___nomor_induk_asc__1_15", { data: initialSiswa, total: initialTotal }]]
         : []
     )
   );
@@ -121,7 +135,7 @@ export function SiswaClient({
     if (initialPrograms.length > 0) return;
     async function loadPrograms() {
       try {
-        const res = await fetch("/api/v1/master/program");
+        const res = await fetch("/api/v1/master/program?active_only=true");
         if (res.ok) {
           const json = await res.json();
           setPrograms(json.data || []);
@@ -134,7 +148,7 @@ export function SiswaClient({
   }, [initialPrograms]);
 
   const loadSiswa = useCallback(async (bypassCache = false) => {
-    const cacheKey = `${filter}_${programFilter}_${search.trim()}_${page}_${limit}`;
+    const cacheKey = `${filter}_${programFilter}_${pendidikanFilter}_${sortKey}_${sortDir}_${search.trim()}_${page}_${limit}`;
     const cached = cacheRef.current.get(cacheKey);
 
     if (cached && !bypassCache) {
@@ -151,8 +165,14 @@ export function SiswaClient({
       if (filter !== "semua") {
         url += `&status=${filter}`;
       }
-      if (programFilter !== "semua") {
+      if (programFilter && programFilter !== "semua") {
         url += `&program_id=${programFilter}`;
+      }
+      if (pendidikanFilter && pendidikanFilter !== "semua") {
+        url += `&pendidikan_terakhir=${encodeURIComponent(pendidikanFilter)}`;
+      }
+      if (sortKey) {
+        url += `&sort_by=${sortKey}&sort_dir=${sortDir || "asc"}`;
       }
       if (search.trim()) {
         url += `&search=${encodeURIComponent(search.trim())}`;
@@ -171,12 +191,12 @@ export function SiswaClient({
     } finally {
       setLoading(false);
     }
-  }, [filter, programFilter, search, page, limit]);
+  }, [filter, programFilter, pendidikanFilter, sortKey, sortDir, search, page, limit]);
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filter, programFilter, search, limit]);
+  }, [filter, programFilter, pendidikanFilter, sortKey, sortDir, search, limit]);
 
   // Hindari fetch ulang pada initial render jika sudah ada server data untuk query default
   const isInitialMount = useRef(true);
@@ -412,7 +432,15 @@ export function SiswaClient({
     },
     {
       key: "nomor_induk",
-      header: "No. Induk",
+      header: (
+        <ColumnHeader
+          title="No. Induk"
+          sortKey="nomor_induk"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (row: SiswaItem) => (
         <span className="font-mono text-[#DC2626] text-[11px] font-bold">{row.nomor_induk}</span>
       ),
@@ -478,7 +506,18 @@ export function SiswaClient({
     },
     {
       key: "program",
-      header: "Program",
+      header: (
+        <ColumnHeader
+          title="Program"
+          filterOptions={programs.map((p) => ({
+            label: `${p.kode_program} - ${p.nama}`,
+            value: p.id,
+          }))}
+          selectedFilterValue={programFilter === "semua" ? "" : programFilter}
+          onFilterChange={(val) => setProgramFilter(val || "semua")}
+          filterPlaceholder="Semua Program"
+        />
+      ),
       render: (row: SiswaItem) => (
         <span className="text-[11px] text-[#D1D5DB]">{row.program?.nama || "—"}</span>
       ),
@@ -490,17 +529,49 @@ export function SiswaClient({
     },
     {
       key: "pendidikan",
-      header: "Pend.",
+      header: (
+        <ColumnHeader
+          title="Pend."
+          filterOptions={[
+            { label: "SD", value: "SD" },
+            { label: "SMP", value: "SMP" },
+            { label: "SMA", value: "SMA" },
+            { label: "SMK", value: "SMK" },
+            { label: "D3 / Diploma", value: "D3" },
+            { label: "S1 / Sarjana", value: "S1" },
+            { label: "Ahli Teknika Tingkat V", value: "Ahli Teknika Tingkat V" },
+          ]}
+          selectedFilterValue={pendidikanFilter}
+          onFilterChange={(val) => setPendidikanFilter(val)}
+          filterPlaceholder="Semua Pendidikan"
+        />
+      ),
       render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.pendidikan_terakhir || "—"}</span>,
     },
     {
       key: "masuk",
-      header: "Masuk",
+      header: (
+        <ColumnHeader
+          title="Masuk"
+          sortKey="tgl_masuk"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_masuk || "—"}</span>,
     },
     {
       key: "keluar",
-      header: "Keluar",
+      header: (
+        <ColumnHeader
+          title="Keluar"
+          sortKey="tgl_keluar"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (row: SiswaItem) => <span className="text-[11px] text-[#9CA3AF]">{row.tgl_keluar || "—"}</span>,
     },
     {
@@ -680,22 +751,7 @@ export function SiswaClient({
           ))}
         </div>
 
-        <div className="w-[200px]">
-          <Select
-            value={programFilter}
-            onChange={(e) => setProgramFilter(e.target.value)}
-            aria-label="Filter berdasarkan program pelatihan"
-          >
-            <option value="semua">Semua Program</option>
-            {programs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.kode_program} - {p.nama}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" aria-hidden="true" />
           <input
             id="search-siswa-input"
@@ -738,49 +794,15 @@ export function SiswaClient({
             />
           </div>
 
-          <div className="flex items-center justify-between text-xs text-[#9CA3AF]">
-            <div className="flex items-center gap-2">
-              <label htmlFor="limit-select">Menampilkan</label>
-              <select
-                id="limit-select"
-                value={limit}
-                onChange={(e) => setLimit(Number(e.target.value))}
-                aria-label="Jumlah data per halaman"
-                className="bg-[#111827] border border-[#1F2937] rounded px-2 py-1 focus:outline-none focus:border-[#DC2626]"
-              >
-                <option value={10}>10</option>
-                <option value={15}>15</option>
-                <option value={20}>20</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-              <span>data per halaman</span>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                aria-label="Halaman sebelumnya"
-                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-              >
-                Sebelumnya
-              </button>
-              <span className="px-3 py-1.5 font-medium" aria-current="page">
-                Halaman {page} dari {Math.max(1, Math.ceil(total / limit))}
-              </span>
-              <button
-                type="button"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= Math.ceil(total / limit) || siswaList.length === 0}
-                aria-label="Halaman selanjutnya"
-                className="px-3 py-1.5 rounded bg-[#111827] border border-[#1F2937] hover:bg-[#1F2937] disabled:opacity-50 transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
-              >
-                Selanjutnya
-              </button>
-            </div>
-          </div>
+          <Pagination
+            currentPage={page}
+            totalPages={Math.max(1, Math.ceil(total / limit))}
+            totalItems={total}
+            pageSize={limit}
+            onPageChange={setPage}
+            onPageSizeChange={setLimit}
+            itemLabel="siswa"
+          />
         </div>
       )}
 

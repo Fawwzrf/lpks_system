@@ -28,6 +28,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton";
+import { Pagination } from "@/components/ui/pagination";
+import { ColumnHeader, SortDirection } from "@/components/ui/column-header";
 import { formatDateIndo } from "@/lib/utils";
 import {
   LineChart,
@@ -121,6 +123,23 @@ export function PenilaianClient({
   const [activeTab, setActiveTab] = useState<TabFilter>("semua");
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>("");
   const isInitialMount = React.useRef(true);
+  const [sortKey, setSortKey] = useState<string>("nomor_induk");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(15);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, selectedProgramFilter, search, sortKey, sortDir, limit]);
 
   // Modal Transkrip Siswa
   const [modalTranskripOpen, setModalTranskripOpen] = useState(false);
@@ -314,12 +333,50 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     });
   }, [items, search, selectedProgramFilter, activeTab]);
 
-  const tableData: SiswaTableItem[] = useMemo(() => {
-    return filteredItems.map((item, idx) => ({
+  const sortedItems = useMemo(() => {
+    const list = [...filteredItems];
+    list.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+      if (sortKey === "nomor_induk") {
+        valA = a.nomor_induk || "";
+        valB = b.nomor_induk || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
+          : String(valB).localeCompare(String(valA), undefined, { numeric: true });
+      }
+      if (sortKey === "nama") {
+        valA = a.nama_lengkap || "";
+        valB = b.nama_lengkap || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      }
+      if (sortKey === "hari_latihan") {
+        valA = a.total_hari || 0;
+        valB = b.total_hari || 0;
+      } else if (sortKey === "rata_rata") {
+        valA = a.rata_rata || 0;
+        valB = b.rata_rata || 0;
+      } else if (sortKey === "terakhir") {
+        valA = a.terakhir_dinilai || "";
+        valB = b.terakhir_dinilai || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      }
+      return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+    });
+    return list;
+  }, [filteredItems, sortKey, sortDir]);
+
+  const paginatedItems: SiswaTableItem[] = useMemo(() => {
+    const start = (page - 1) * limit;
+    return sortedItems.slice(start, start + limit).map((item, idx) => ({
       ...item,
-      display_no: idx + 1,
+      display_no: start + idx + 1,
     }));
-  }, [filteredItems]);
+  }, [sortedItems, page, limit]);
 
   // Statistik Ringkasan
   const stats = useMemo(() => {
@@ -359,7 +416,15 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     },
     {
       key: "nomor_induk",
-      header: "No. Induk",
+      header: (
+        <ColumnHeader
+          title="No. Induk"
+          sortKey="nomor_induk"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       className: "w-28",
       render: (r: SiswaTableItem) => (
         <span className="font-mono text-xs font-semibold text-[#DC2626]">
@@ -369,7 +434,19 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     },
     {
       key: "nama",
-      header: "Nama Siswa",
+      header: (
+        <ColumnHeader
+          title="Nama Siswa & Program"
+          sortKey="nama"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+          filterOptions={programs.map((p) => ({ label: p.nama, value: p.id }))}
+          selectedFilterValue={selectedProgramFilter}
+          onFilterChange={setSelectedProgramFilter}
+          filterPlaceholder="Semua Program"
+        />
+      ),
       render: (r: SiswaTableItem) => (
         <div className="flex flex-col">
           <span className="font-medium text-xs text-[#F9FAFB]">{r.nama_lengkap}</span>
@@ -381,7 +458,15 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     },
     {
       key: "hari_latihan",
-      header: "Hari Dinilai",
+      header: (
+        <ColumnHeader
+          title="Hari Dinilai"
+          sortKey="hari_latihan"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: SiswaTableItem) => (
         <span className="font-mono text-xs text-[#D1D5DB]">
           {r.total_hari > 0 ? `${r.total_hari} Hari` : "—"}
@@ -390,7 +475,15 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     },
     {
       key: "rata_rata",
-      header: "Rata-rata Nilai",
+      header: (
+        <ColumnHeader
+          title="Rata-rata Nilai"
+          sortKey="rata_rata"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: SiswaTableItem) => {
         if (r.total_penilaian === 0) {
           return <span className="text-xs text-[#6B7280]">—</span>;
@@ -458,7 +551,15 @@ interface SiswaTableItem extends SiswaPenilaianItem {
     },
     {
       key: "terakhir",
-      header: "Terakhir Dinilai",
+      header: (
+        <ColumnHeader
+          title="Terakhir Dinilai"
+          sortKey="terakhir"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: SiswaTableItem) => (
         <span className="font-mono text-[11px] text-[#9CA3AF]">
           {r.terakhir_dinilai ? formatDateIndo(r.terakhir_dinilai) : "—"}
@@ -637,22 +738,9 @@ interface SiswaTableItem extends SiswaPenilaianItem {
             </button>
           </div>
 
-          {/* Program Filter & Search */}
+          {/* Search Bar */}
           <div className="flex items-center gap-2 flex-1 sm:flex-initial min-w-[280px]">
-            <select
-              value={selectedProgramFilter}
-              onChange={(e) => setSelectedProgramFilter(e.target.value)}
-              className="h-9 rounded-lg border border-[#374151] bg-[#111827] px-2.5 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
-            >
-              <option value="">Semua Program</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama}
-                </option>
-              ))}
-            </select>
-
-            <div className="relative flex-1">
+            <div className="relative w-full">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" />
               <input
                 type="text"
@@ -670,11 +758,24 @@ interface SiswaTableItem extends SiswaPenilaianItem {
       {loading ? (
         <TableSkeleton rows={8} columns={9} />
       ) : (
-        <Table
-          columns={columns}
-          data={tableData}
-          emptyMessage="Tidak ada data siswa yang cocok dengan filter penilaian."
-        />
+        <div className="flex flex-col gap-4">
+          <Table
+            columns={columns}
+            data={paginatedItems}
+            emptyMessage="Tidak ada data siswa yang cocok dengan filter penilaian."
+          />
+          <Pagination
+            currentPage={page}
+            totalPages={Math.max(1, Math.ceil(sortedItems.length / limit))}
+            pageSize={limit}
+            totalItems={sortedItems.length}
+            onPageChange={setPage}
+            onPageSizeChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
       )}
 
       {/* MODAL TRANSKRIP NILAI SISWA */}

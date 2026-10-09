@@ -99,6 +99,7 @@ export default function MasterPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editItem, setEditItem] = useState<{ id: string; type: Tab } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Forms
   const [formProgram, setFormProgram] = useState({ kode: "", nama: "", biaya: "", durasi: "30", is_active: true });
@@ -331,8 +332,14 @@ export default function MasterPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!window.confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
+  function handleDelete(id: string) {
+    setConfirmDeleteId(id);
+  }
+
+  async function executeDelete() {
+    if (!confirmDeleteId) return;
+    const id = confirmDeleteId;
+    setConfirmDeleteId(null);
     setLoading(true);
     setErrorMsg("");
     setSuccessMsg("");
@@ -1086,6 +1093,33 @@ export default function MasterPage() {
           </div>
         </aside>
       )}
+
+      {/* Confirm Delete Modal */}
+      <Modal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Hapus Data"
+        description="Tindakan ini tidak dapat dibatalkan. Data yang sudah dihapus tidak bisa dipulihkan."
+        size="sm"
+      >
+        <div className="flex items-center justify-end gap-2 pt-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setConfirmDeleteId(null)}
+          >
+            Batal
+          </Button>
+          <Button
+            size="sm"
+            className="bg-[#DC2626] hover:bg-[#B91C1C]"
+            onClick={executeDelete}
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Ya, Hapus
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

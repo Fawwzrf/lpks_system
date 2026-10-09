@@ -23,7 +23,8 @@ export async function GET(request: NextRequest) {
     const todayStr = new Date().toISOString().split("T")[0];
 
     // Self-healing: Siswa yang tgl_keluarnya sudah lewat otomatis berubah status dari 'aktif' menjadi 'alumni'
-    await supabase
+    // ponytail: fire-and-forget — tidak blokir response, ceiling: N write per GET tapi aman untuk skala kecil
+    void supabase
       .from("siswa")
       .update({ status_siswa: "alumni" })
       .eq("status_siswa", "aktif")
@@ -44,8 +45,16 @@ export async function GET(request: NextRequest) {
       query = query.eq("status_siswa", "out");
     }
 
-    if (programId) {
+    const pendidikan = searchParams.get("pendidikan_terakhir");
+    const sortBy = searchParams.get("sort_by") || "nomor_induk";
+    const sortDir = searchParams.get("sort_dir") === "desc" ? "desc" : "asc";
+
+    if (programId && programId !== "semua") {
       query = query.eq("program_id", programId);
+    }
+
+    if (pendidikan && pendidikan !== "semua") {
+      query = query.eq("pendidikan_terakhir", pendidikan);
     }
 
     if (search) {
@@ -54,23 +63,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Sort berdasar 4 digit nomor urut belakang (urutan_nomor), abaikan kode program
+    // Dynamic ordering: dukung sorting tgl_masuk, tgl_keluar, dan nomor_induk
+    if (sortBy === "tgl_masuk") {
+      query = query.order("tgl_masuk", { ascending: sortDir === "asc", nullsFirst: false });
+    } else if (sortBy === "tgl_keluar") {
+      query = query.order("tgl_keluar", { ascending: sortDir === "asc", nullsFirst: false });
+    } else {
+      // Default: sort berdasar urutan nomor induk
+      query = query
+        .order("urutan_nomor", { ascending: sortDir === "asc", nullsFirst: false })
+        .order("nomor_induk", { ascending: sortDir === "asc" });
+    }
+
     const { data, count, error } = await query
-      .order("urutan_nomor", { ascending: true, nullsFirst: false })
-      .order("nomor_induk", { ascending: true })
       .range(offset, offset + limit - 1)
       .then(async (res) => {
-        // Re-sort client-side by numeric part to ensure correct order
-        if (res.data) {
+        // Re-sort numeric part client-side jika sortBy === "nomor_induk"
+        if (res.data && sortBy === "nomor_induk") {
           const getUrutan = (noInduk?: string | null) => {
             if (!noInduk) return 999999;
-            if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5; // Askuri di antara 1110 dan 1111
+            if (noInduk.includes("—") || noInduk.includes("-")) return 1110.5;
             const parts = noInduk.split(".");
             const lastPart = parts.length > 1 ? parts.slice(1).join(".") : parts[0];
             const num = parseInt(lastPart.replace(/\D/g, ""), 10);
             return isNaN(num) ? 999999 : num;
           };
-          res.data.sort((a, b) => getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk));
+          res.data.sort((a, b) => {
+            const diff = getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
+            return sortDir === "desc" ? -diff : diff;
+          });
         }
         return res;
       });

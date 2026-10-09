@@ -72,7 +72,7 @@ export async function GET() {
         ? Number(s.biaya_pelatihan)
         : programBiaya;
       const totalTerbayar = txMap.get(s.id) || 0;
-      const isLunas = totalBiaya > 0 && totalTerbayar >= totalBiaya;
+      const isLunas = totalBiaya === 0 || totalTerbayar >= totalBiaya;
       const passedKriteriaCount = studentKriteriaPass.get(s.id)?.size || 0;
       const isNilaiHarianOk = passedKriteriaCount >= totalKriteria && totalKriteria > 0;
 
@@ -92,7 +92,7 @@ export async function GET() {
         tgl_cetak_sertifikat: st?.tgl_cetak || null,
         tgl_antrean_sertifikat: st?.tgl_antrean || null,
       };
-    }).filter((s) => s.status_sertifikat !== "dicetak");
+    }).filter((s) => !s.status_sertifikat);
 
     // Pengurutan: Siswa yang siap menjalani ujian internal diletakkan paling atas
     result.sort((a, b) => {

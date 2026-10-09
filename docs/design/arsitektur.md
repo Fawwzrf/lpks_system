@@ -67,13 +67,18 @@ flowchart LR
 
 ---
 
-### Strategi Skalabilitas
+### Strategi Rendering, Caching & Performa
 
-Desain sederhana dulu, *scale-ready* belakangan:
-- Database Supabase sudah managed PostgreSQL — koneksi pooling tersedia otomatis.
-- Caching **belum diterapkan** di fase awal (50 user tidak memerlukan Redis layer). Jika load naik, tambah `unstable_cache` Next.js atau Supabase read replicas.
-- AI query menggunakan **structured-data-to-context injection** (query SQL → format JSON/teks → inject ke prompt Gemini). Tidak butuh vector DB / embedding di skala ini.
-- `ponytail:` caching skipped — 50 user aktif tidak perlu Redis. Tambah `unstable_cache` + connection pooler (PgBouncer, sudah ada di Supabase) jika MAU melebihi.
+Sistem menerapkan arsitektur hybrid yang dioptimalkan sesuai karakteristik peran pengguna:
+1. **Superadmin (Desktop Focused):**
+   - Menggunakan pola **Server Component Pre-fetching + Client Hydration** (Streaming SSR dengan `<Suspense>` fallback skeletons) pada modul bermuatan data besar: Ujian, Keuangan, Presensi, Data Siswa, dan Penilaian.
+   - Initial load cepat dari server, data tabel terhidrasi ke Client Component untuk interaktivitas instan (pencarian, sorting, modal dialog).
+2. **Portal Siswa (Mobile PWA-First Focused):**
+   - Menggunakan arsitektur **Client-Side Session Caching** (`sessionStorage` via helper `siswa-cache.ts`).
+   - Profil siswa di-fetch satu kali saat layout di-mount dan disimpan di session storage.
+   - Navigasi tab (Beranda, Presensi, Nilai, Transkrip, Keuangan) tidak lagi melakukan waterfall call redundant `/api/v1/auth/me`, melainkan mengeksekusi sub-kueri spesifik secara paralel (`Promise.allSettled`). Hasilnya: pergantian tab instan dan hemat kuota data seluler siswa.
+3. **Optimasi Background Jobs (Fire-and-Forget):**
+   - Transisi status siswa alumni terjadwal dieksekusi secara non-blocking menggunakan pola `void` async query (`ponytail: fire-and-forget`) pada endpoint siswa, sehingga kueri analitik dan listing data tidak terhambat oleh latensi penulisan ke database.
 
 ---
 

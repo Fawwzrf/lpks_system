@@ -90,6 +90,11 @@ export async function requireSuperadmin() {
 }
 
 export async function requireStudentOwnerOrAdmin(targetSiswaId: string) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(targetSiswaId)) {
+    return { user: null, errorResponse: errorResponse("VALIDATION_ERROR", "ID tidak valid.", 400) };
+  }
+
   const { user, errorResponse: authError } = await requireAuth();
   if (authError) {
     return { user: null, errorResponse: authError };

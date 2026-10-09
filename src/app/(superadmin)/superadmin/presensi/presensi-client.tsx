@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
+import { Pagination } from "@/components/ui/pagination";
+import { ColumnHeader, SortDirection } from "@/components/ui/column-header";
 import { useStreamingImport } from "@/lib/use-streaming-import";
 import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
 
@@ -92,6 +94,23 @@ export function PresensiClient({
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [programs, setPrograms] = useState<ProgramItem[]>(initialPrograms);
   const isInitialMount = React.useRef(true);
+  const [sortKey, setSortKey] = useState<string>("nomor_induk");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(15);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDate, activeTab, selectedProgramFilter, search, sortKey, sortDir, limit]);
 
   // Modal Catat Presensi Manual
   const [manualModalOpen, setManualModalOpen] = useState(false);
@@ -125,7 +144,7 @@ export function PresensiClient({
     if (programs.length > 0) return;
     async function loadPrograms() {
       try {
-        const res = await fetch("/api/v1/master/program");
+        const res = await fetch("/api/v1/master/program?active_only=true");
         if (res.ok) {
           const json = await res.json();
           setPrograms(json.data || []);
@@ -289,6 +308,47 @@ export function PresensiClient({
     return !q || nama.toLowerCase().includes(q) || noInduk.toLowerCase().includes(q);
   });
 
+  const sortedItems = React.useMemo(() => {
+    const list = [...filtered];
+    list.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+      if (sortKey === "nomor_induk") {
+        valA = a.siswa.nomor_induk || "";
+        valB = b.siswa.nomor_induk || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
+          : String(valB).localeCompare(String(valA), undefined, { numeric: true });
+      }
+      if (sortKey === "nama") {
+        valA = a.siswa.nama_lengkap || "";
+        valB = b.siswa.nama_lengkap || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      }
+      if (sortKey === "waktu") {
+        valA = a.presensi?.jam || "";
+        valB = b.presensi?.jam || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB))
+          : String(valB).localeCompare(String(valA));
+      }
+      if (sortKey === "jarak") {
+        valA = a.presensi?.jarak_meter ?? 999999;
+        valB = b.presensi?.jarak_meter ?? 999999;
+        return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+      }
+      return 0;
+    });
+    return list;
+  }, [filtered, sortKey, sortDir]);
+
+  const paginatedItems = React.useMemo(() => {
+    const start = (page - 1) * limit;
+    return sortedItems.slice(start, start + limit);
+  }, [sortedItems, page, limit]);
+
   // Hitung jumlah per status
   const countSemua = items.length;
   const countHadir = items.filter((i) => i.status === "Hadir").length;
@@ -302,12 +362,22 @@ export function PresensiClient({
       key: "no",
       header: "No",
       render: (r: PresensiAllItem) => (
-        <span className="text-[11px] text-[#9CA3AF] font-mono">{filtered.indexOf(r) + 1}</span>
+        <span className="text-[11px] text-[#9CA3AF] font-mono">
+          {(page - 1) * limit + paginatedItems.indexOf(r) + 1}
+        </span>
       ),
     },
     {
       key: "nomor_induk",
-      header: "No. Induk",
+      header: (
+        <ColumnHeader
+          title="No. Induk"
+          sortKey="nomor_induk"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: PresensiAllItem) => (
         <span className="font-mono text-xs text-[#DC2626] font-bold">
           {r.siswa.nomor_induk || "—"}
@@ -316,7 +386,19 @@ export function PresensiClient({
     },
     {
       key: "nama",
-      header: "Nama Siswa",
+      header: (
+        <ColumnHeader
+          title="Nama Siswa & Program"
+          sortKey="nama"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+          filterOptions={programs.map((p) => ({ label: `${p.nama} (${p.kode_program})`, value: p.id }))}
+          selectedFilterValue={selectedProgramFilter}
+          onFilterChange={setSelectedProgramFilter}
+          filterPlaceholder="Semua Program"
+        />
+      ),
       render: (r: PresensiAllItem) => (
         <div>
           <p className="text-xs font-semibold text-[#F9FAFB]">{r.siswa.nama_lengkap}</p>
@@ -326,7 +408,15 @@ export function PresensiClient({
     },
     {
       key: "waktu",
-      header: "Waktu",
+      header: (
+        <ColumnHeader
+          title="Waktu"
+          sortKey="waktu"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: PresensiAllItem) => (
         <span className="font-mono text-xs text-[#D1D5DB]">
           {r.presensi?.jam || "—"}
@@ -335,7 +425,15 @@ export function PresensiClient({
     },
     {
       key: "jarak",
-      header: "Jarak (GPS)",
+      header: (
+        <ColumnHeader
+          title="Jarak (GPS)"
+          sortKey="jarak"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       render: (r: PresensiAllItem) => (
         <span className="flex items-center gap-1.5 text-xs text-[#D1D5DB]">
           <MapPin className="h-3 w-3 text-[#6B7280]" aria-hidden="true" />
@@ -572,7 +670,7 @@ export function PresensiClient({
         })}
       </div>
 
-      {/* Baris Pencarian & Filter Program */}
+      {/* Baris Pencarian */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="relative w-full sm:w-72">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" aria-hidden="true" />
@@ -583,30 +681,30 @@ export function PresensiClient({
             className="h-8.5 w-full rounded-lg border border-[#1F2937] bg-[#111827] pl-8 pr-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
           />
         </div>
-
-        <select
-          value={selectedProgramFilter}
-          onChange={(e) => setSelectedProgramFilter(e.target.value)}
-          className="h-8.5 rounded-lg border border-[#1F2937] bg-[#111827] px-3 text-xs text-[#D1D5DB] focus:outline-none focus:border-[#DC2626] cursor-pointer"
-        >
-          <option value="">Semua Program Pelatihan</option>
-          {programs.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nama} ({p.kode_program})
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* Tabel Data Presensi */}
       {loading ? (
         <TableSkeleton rows={8} columns={7} />
       ) : (
-        <Table
-          columns={columns}
-          data={filtered}
-          emptyMessage={`Tidak ada siswa yang sesuai filter pada tanggal ${selectedDate}.`}
-        />
+        <div className="flex flex-col gap-4">
+          <Table
+            columns={columns}
+            data={paginatedItems}
+            emptyMessage={`Tidak ada siswa yang sesuai filter pada tanggal ${selectedDate}.`}
+          />
+          <Pagination
+            currentPage={page}
+            totalPages={Math.max(1, Math.ceil(sortedItems.length / limit))}
+            pageSize={limit}
+            totalItems={sortedItems.length}
+            onPageChange={setPage}
+            onPageSizeChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
       )}
 
       {/* ===================================================================== */}

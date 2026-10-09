@@ -29,7 +29,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { formatRupiah, formatDateIndo } from "@/lib/utils";
+import { Pagination } from "@/components/ui/pagination";
+import { ColumnHeader, SortDirection } from "@/components/ui/column-header";
+import { formatRupiah, formatDateIndo, cn } from "@/lib/utils";
 
 export interface TransaksiItem {
   id: string;
@@ -100,6 +102,25 @@ export function KeuanganClient({
     return "belum_lunas";
   });
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>("");
+  const [belumLunasSubFilter, setBelumLunasSubFilter] = useState<"semua" | "aktif" | "alumni">("semua");
+  const [sortKey, setSortKey] = useState<string>("nomor_induk");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
+  const [page, setPage] = useState<number>(1);
+  const [limit, setLimit] = useState<number>(15);
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
+  // Reset page saat filter atau sorting berubah
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, belumLunasSubFilter, selectedProgramFilter, search, sortKey, sortDir, limit]);
 
   // Modal Catat Pembayaran
   const [modalPaymentOpen, setModalPaymentOpen] = useState(false);
@@ -156,7 +177,7 @@ export function KeuanganClient({
     if (programs.length > 0) return;
     async function loadPrograms() {
       try {
-        const res = await fetch("/api/v1/master/program");
+        const res = await fetch("/api/v1/master/program?active_only=true");
         if (res.ok) {
           const json = await res.json();
           setPrograms(json.data || []);
@@ -550,7 +571,11 @@ export function KeuanganClient({
     return items.filter((item) => {
       // Filter status
       if (activeTab === "lunas" && !item.is_lunas) return false;
-      if (activeTab === "belum_lunas" && (item.is_lunas || item.status_siswa === "out" || item.status_siswa === "alumni")) return false;
+      if (activeTab === "belum_lunas") {
+        if (item.is_lunas || item.status_siswa === "out") return false;
+        if (belumLunasSubFilter === "aktif" && item.status_siswa !== "aktif") return false;
+        if (belumLunasSubFilter === "alumni" && item.status_siswa !== "alumni") return false;
+      }
       if (activeTab === "alumni" && item.status_siswa !== "alumni") return false;
       if (activeTab === "out" && !(item.status_siswa === "out" && !item.is_lunas)) return false;
 
@@ -568,7 +593,7 @@ export function KeuanganClient({
 
       return true;
     });
-  }, [items, activeTab, selectedProgramFilter, search]);
+  }, [items, activeTab, belumLunasSubFilter, selectedProgramFilter, search]);
 
   // Ringkasan Statistik
   const stats = useMemo(() => {
@@ -576,7 +601,9 @@ export function KeuanganClient({
     const lunasCount = items.filter((i) => i.is_lunas).length;
     const alumniCount = items.filter((i) => i.status_siswa === "alumni").length;
     const outUnpaidCount = items.filter((i) => i.status_siswa === "out" && !i.is_lunas).length;
-    const aktifBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa !== "out" && i.status_siswa !== "alumni").length;
+    const aktifBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa === "aktif").length;
+    const alumniBelumLunasCount = items.filter((i) => !i.is_lunas && i.status_siswa === "alumni").length;
+    const totalBelumLunasTabCount = items.filter((i) => !i.is_lunas && i.status_siswa !== "out").length;
     const belumLunasCount = items.filter((i) => !i.is_lunas).length;
     const totalTerkumpul = items.reduce((acc, i) => acc + i.total_terbayar, 0);
     const totalPiutang = items.reduce((acc, i) => acc + i.sisa_tagihan, 0);
@@ -587,17 +614,60 @@ export function KeuanganClient({
       alumniCount,
       outUnpaidCount,
       aktifBelumLunasCount,
+      alumniBelumLunasCount,
+      totalBelumLunasTabCount,
       belumLunasCount,
       totalTerkumpul,
       totalPiutang,
     };
   }, [items]);
 
+  // Client-side Sorting & Pagination
+  const sortedItems = useMemo(() => {
+    const list = [...filteredItems];
+    list.sort((a, b) => {
+      let valA: any = 0;
+      let valB: any = 0;
+      if (sortKey === "nomor_induk") {
+        valA = a.nomor_induk || "";
+        valB = b.nomor_induk || "";
+        return sortDir === "asc"
+          ? String(valA).localeCompare(String(valB), undefined, { numeric: true })
+          : String(valB).localeCompare(String(valA), undefined, { numeric: true });
+      }
+      if (sortKey === "total_biaya") {
+        valA = a.total_biaya || 0;
+        valB = b.total_biaya || 0;
+      } else if (sortKey === "total_terbayar") {
+        valA = a.total_terbayar || 0;
+        valB = b.total_terbayar || 0;
+      } else if (sortKey === "sisa_tagihan") {
+        valA = a.sisa_tagihan || 0;
+        valB = b.sisa_tagihan || 0;
+      }
+      return sortDir === "asc" ? (valA > valB ? 1 : -1) : (valA < valB ? 1 : -1);
+    });
+    return list;
+  }, [filteredItems, sortKey, sortDir]);
+
+  const paginatedItems = useMemo(() => {
+    const start = (page - 1) * limit;
+    return sortedItems.slice(start, start + limit);
+  }, [sortedItems, page, limit]);
+
   // Definisi Kolom Tabel
   const columns = [
     {
       key: "nomor_induk",
-      header: "No. Induk",
+      header: (
+        <ColumnHeader
+          title="No. Induk"
+          sortKey="nomor_induk"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       className: "w-28",
       render: (r: SiswaKeuanganItem) => (
         <span className="font-mono text-xs text-[#DC2626] font-bold">{r.nomor_induk}</span>
@@ -605,7 +675,15 @@ export function KeuanganClient({
     },
     {
       key: "nama",
-      header: "Nama Siswa & Program",
+      header: (
+        <ColumnHeader
+          title="Nama Siswa & Program"
+          filterOptions={programs.map((p) => ({ label: p.nama, value: p.id }))}
+          selectedFilterValue={selectedProgramFilter}
+          onFilterChange={setSelectedProgramFilter}
+          filterPlaceholder="Semua Program"
+        />
+      ),
       render: (r: SiswaKeuanganItem) => (
         <div>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -641,7 +719,15 @@ export function KeuanganClient({
     },
     {
       key: "biaya",
-      header: "Biaya Pelatihan",
+      header: (
+        <ColumnHeader
+          title="Biaya Pelatihan"
+          sortKey="total_biaya"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       className: "w-36",
       render: (r: SiswaKeuanganItem) => (
         <div className="flex items-center gap-1.5 group">
@@ -668,7 +754,15 @@ export function KeuanganClient({
     },
     {
       key: "terbayar",
-      header: "Terbayar",
+      header: (
+        <ColumnHeader
+          title="Terbayar"
+          sortKey="total_terbayar"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       className: "w-40",
       render: (r: SiswaKeuanganItem) => {
         const isFull = r.persentase >= 100;
@@ -694,7 +788,15 @@ export function KeuanganClient({
     },
     {
       key: "sisa",
-      header: "Sisa Tagihan",
+      header: (
+        <ColumnHeader
+          title="Sisa Tagihan"
+          sortKey="sisa_tagihan"
+          currentSortKey={sortKey}
+          currentSortDir={sortDir}
+          onSort={handleSort}
+        />
+      ),
       className: "w-36",
       render: (r: SiswaKeuanganItem) => (
         <div>
@@ -889,77 +991,107 @@ export function KeuanganClient({
       {/* Filter & Search Bar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         {/* Status Tabs */}
-        <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1 flex-wrap">
-          <button
-            onClick={() => setActiveTab("belum_lunas")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "belum_lunas"
-                ? "bg-[#DC2626] text-white"
-                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-            }`}
-          >
-            Belum Lunas ({stats.aktifBelumLunasCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("lunas")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "lunas"
-                ? "bg-[#DC2626] text-white"
-                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-            }`}
-          >
-            Lunas ({stats.lunasCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("alumni")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "alumni"
-                ? "bg-[#38BDF8] text-black font-bold"
-                : "text-[#38BDF8] hover:bg-[#38BDF8]/10"
-            }`}
-          >
-            Alumni ({stats.alumniCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("out")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "out"
-                ? "bg-[#EF4444] text-white font-bold"
-                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-            }`}
-          >
-            Out (Belum Lunas) ({stats.outUnpaidCount})
-          </button>
-          <button
-            onClick={() => setActiveTab("semua")}
-            className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-              activeTab === "semua"
-                ? "bg-[#DC2626] text-white"
-                : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-            }`}
-          >
-            Semua ({items.length})
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-1 max-w-lg">
-          {/* Program Filter */}
-          <div className="w-[180px]">
-            <Select
-              value={selectedProgramFilter}
-              onChange={(e) => setSelectedProgramFilter(e.target.value)}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex rounded-lg bg-[#111827] border border-[#1F2937] p-1 gap-1 flex-wrap">
+            <button
+              onClick={() => setActiveTab("belum_lunas")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "belum_lunas"
+                  ? "bg-[#DC2626] text-white"
+                  : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
             >
-              <option value="">Semua Program</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama}
-                </option>
-              ))}
-            </Select>
+              Belum Lunas ({stats.totalBelumLunasTabCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("lunas")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "lunas"
+                  ? "bg-[#DC2626] text-white"
+                  : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
+            >
+              Lunas ({stats.lunasCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("alumni")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "alumni"
+                  ? "bg-[#38BDF8] text-black font-bold"
+                  : "text-[#38BDF8] hover:bg-[#38BDF8]/10"
+              }`}
+            >
+              Alumni ({stats.alumniCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("out")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "out"
+                  ? "bg-[#EF4444] text-white font-bold"
+                  : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
+            >
+              Out (Belum Lunas) ({stats.outUnpaidCount})
+            </button>
+            <button
+              onClick={() => setActiveTab("semua")}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                activeTab === "semua"
+                  ? "bg-[#DC2626] text-white"
+                  : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+              }`}
+            >
+              Semua ({items.length})
+            </button>
           </div>
 
+          {/* Subfilter khusus tab Belum Lunas */}
+          {activeTab === "belum_lunas" && (
+            <div className="flex items-center gap-1 p-1 rounded-lg bg-[#0B0F17] border border-[#1F2937]">
+              <span className="text-[11px] font-medium text-[#9CA3AF] px-1.5">Opsi:</span>
+              <button
+                type="button"
+                onClick={() => setBelumLunasSubFilter("semua")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-md font-medium transition-all",
+                  belumLunasSubFilter === "semua"
+                    ? "bg-[#38BDF8] text-[#0B0F17] font-bold shadow-sm"
+                    : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                )}
+              >
+                Semua ({stats.totalBelumLunasTabCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setBelumLunasSubFilter("aktif")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-md font-medium transition-all",
+                  belumLunasSubFilter === "aktif"
+                    ? "bg-[#DC2626] text-white font-bold shadow-sm"
+                    : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                )}
+              >
+                Siswa Aktif ({stats.aktifBelumLunasCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setBelumLunasSubFilter("alumni")}
+                className={cn(
+                  "px-2 py-1 text-xs rounded-md font-medium transition-all",
+                  belumLunasSubFilter === "alumni"
+                    ? "bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40 font-bold shadow-sm"
+                    : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                )}
+              >
+                Alumni ({stats.alumniBelumLunasCount})
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2.5 w-full sm:w-72">
           {/* Search Input */}
-          <div className="relative flex-1">
+          <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" />
             <input
               type="text"
@@ -976,11 +1108,24 @@ export function KeuanganClient({
       {loading ? (
         <TableSkeleton rows={8} columns={7} />
       ) : (
-        <Table
-          columns={columns}
-          data={filteredItems}
-          emptyMessage="Tidak ada data siswa yang cocok dengan filter."
-        />
+        <div className="flex flex-col gap-4">
+          <Table
+            columns={columns}
+            data={paginatedItems}
+            emptyMessage="Tidak ada data siswa yang cocok dengan filter."
+          />
+          <Pagination
+            currentPage={page}
+            totalPages={Math.max(1, Math.ceil(sortedItems.length / limit))}
+            pageSize={limit}
+            totalItems={sortedItems.length}
+            onPageChange={setPage}
+            onPageSizeChange={(newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }}
+          />
+        </div>
       )}
 
       {/* MODAL CATAT PEMBAYARAN */}
