@@ -15,7 +15,7 @@ export async function GET() {
     // 1. Ambil seluruh siswa aktif & alumni yang belum dihapus
     const { data: siswaList, error: siswaErr } = await supabase
       .from("siswa")
-      .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, biaya_pelatihan, program:master_program(id, nama, biaya)")
+      .select("id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, biaya_pelatihan, program:master_program(id, nama, biaya)")
       .not("nik", "like", "ANON-%")
       .neq("alamat_lengkap", "[DATA DIHAPUS]")
       .order("urutan_nomor", { ascending: true, nullsFirst: false })
@@ -83,6 +83,7 @@ export async function GET() {
         program_nama: program?.nama || "Umum",
         tgl_masuk: s.tgl_masuk,
         tgl_keluar: s.tgl_keluar,
+        status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
         total_biaya: totalBiaya,
         total_terbayar: totalTerbayar,
         is_lunas: isLunas,

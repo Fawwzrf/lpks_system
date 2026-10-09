@@ -44,6 +44,7 @@ export interface SiswaUjianItem {
   program_nama: string;
   tgl_masuk?: string;
   tgl_keluar?: string | null;
+  status_siswa?: "aktif" | "alumni" | "out";
   total_biaya: number;
   total_terbayar: number;
   is_lunas: boolean;
@@ -161,6 +162,7 @@ export function UjianClient({
   const [search, setSearch] = useState("");
   const [riwayatSearch, setRiwayatSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"semua" | "siap_ujian" | "lulus" | "dalam_bimbingan">("semua");
+  const [statusSiswaSubFilter, setStatusSiswaSubFilter] = useState<"semua" | "aktif" | "alumni">("semua");
 
   // Input Nilai Modal State
   const [inputModalOpen, setInputModalOpen] = useState(false);
@@ -188,7 +190,7 @@ export function UjianClient({
   const [alumniCertError, setAlumniCertError] = useState<string | null>(null);
   const [alumniCertSuccess, setAlumniCertSuccess] = useState<string | null>(null);
   const [alumniSearchQuery, setAlumniSearchQuery] = useState("");
-  const [allStudentsList, setAllStudentsList] = useState<{ id: string; nama_lengkap: string; nomor_induk: string; program?: { nama: string } }[]>([]);
+  const [allStudentsList, setAllStudentsList] = useState<{ id: string; nama_lengkap: string; nomor_induk: string; status_siswa?: string; program?: { nama: string } }[]>([]);
   const [alumniDropdownOpen, setAlumniDropdownOpen] = useState(false);
   const alumniDropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -208,6 +210,28 @@ export function UjianClient({
   const selectedStudent = useMemo(() => {
     return allStudentsList.find((s) => s.id === alumniCertSiswaId) || null;
   }, [allStudentsList, alumniCertSiswaId]);
+
+  // Set ID siswa yang sudah memiliki data sertifikat (di riwayat cetak maupun antrean cetak)
+  const certifiedSiswaIds = useMemo(() => {
+    const set = new Set<string>();
+    historyData.forEach((h) => {
+      if (h.siswa_id) set.add(h.siswa_id);
+    });
+    queueData.forEach((q) => {
+      if (q.siswa_id) set.add(q.siswa_id);
+    });
+    return set;
+  }, [historyData, queueData]);
+
+  // Daftar siswa yang eligible untuk dicatat sertifikatnya (HANYA siswa yang BELUM memiliki sertifikat)
+  const availableStudentsForCert = useMemo(() => {
+    return allStudentsList.filter((s) => {
+      // Jika mode Edit, tetap tampilkan siswa target yang sedang diedit
+      if (alumniCertTarget && s.id === alumniCertTarget.siswa_id) return true;
+      // Siswa yang sudah mempunyai data sertifikat TIDAK MUNCUL
+      return !certifiedSiswaIds.has(s.id);
+    });
+  }, [allStudentsList, certifiedSiswaIds, alumniCertTarget]);
 
   const [searchingStudents, setSearchingStudents] = useState(false);
 
@@ -230,7 +254,7 @@ export function UjianClient({
           if (results.length > 0) {
             setAllStudentsList((prev) => {
               const existingIds = new Set(prev.map((s) => s.id));
-              const newItems = results.filter((r: { id: string }) => !existingIds.has(r.id));
+              const newItems = results.filter((r: { id: string }) => !existingIds.has(r.id) && !certifiedSiswaIds.has(r.id));
               return newItems.length > 0 ? [...prev, ...newItems] : prev;
             });
           }
@@ -243,21 +267,22 @@ export function UjianClient({
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [alumniSearchQuery, modalAlumniCertOpen, selectedStudent]);
+  }, [alumniSearchQuery, modalAlumniCertOpen, selectedStudent, certifiedSiswaIds]);
 
   const filteredStudents = useMemo(() => {
-    if (!alumniSearchQuery.trim()) return allStudentsList;
+    const baseList = availableStudentsForCert;
+    if (!alumniSearchQuery.trim()) return baseList;
     if (selectedStudent && alumniSearchQuery === `${selectedStudent.nama_lengkap} (${selectedStudent.nomor_induk || "Tanpa No. Induk"})`) {
-      return allStudentsList;
+      return baseList;
     }
     const q = alumniSearchQuery.toLowerCase();
-    return allStudentsList.filter(
+    return baseList.filter(
       (s) =>
         s.nama_lengkap.toLowerCase().includes(q) ||
         (s.nomor_induk && s.nomor_induk.toLowerCase().includes(q)) ||
         (s.program?.nama && s.program.nama.toLowerCase().includes(q))
     );
-  }, [allStudentsList, alumniSearchQuery, selectedStudent]);
+  }, [availableStudentsForCert, alumniSearchQuery, selectedStudent]);
 
   // Form fields
   const [scores, setScores] = useState({
@@ -329,11 +354,23 @@ export function UjianClient({
   const stats = useMemo(() => {
     const activeData = data.filter((s) => s.status_sertifikat !== "dicetak");
     const total = activeData.length;
-    const siapUjian = activeData.filter((s) => s.nilai_harian_ok && !s.ujian?.is_lulus).length;
-    const lulus = activeData.filter((s) => !!s.ujian?.is_lulus).length;
-    const dalamBimbingan = activeData.filter((s) => !s.nilai_harian_ok).length;
-    return { total, siapUjian, lulus, dalamBimbingan };
-  }, [data]);
+    const aktifCount = activeData.filter((s) => s.status_siswa !== "alumni").length;
+    const alumniCount = activeData.filter((s) => s.status_siswa === "alumni").length;
+
+    // Filter scoped data based on statusSiswaSubFilter for the 4 stat cards
+    const scopedData = activeData.filter((s) => {
+      if (statusSiswaSubFilter === "aktif") return s.status_siswa !== "alumni";
+      if (statusSiswaSubFilter === "alumni") return s.status_siswa === "alumni";
+      return true;
+    });
+
+    const siapUjian = scopedData.filter((s) => s.nilai_harian_ok && !s.ujian?.is_lulus).length;
+    const lulus = scopedData.filter((s) => !!s.ujian?.is_lulus).length;
+    const dalamBimbingan = scopedData.filter((s) => !s.nilai_harian_ok).length;
+    const scopedTotal = scopedData.length;
+
+    return { total, aktifCount, alumniCount, scopedTotal, siapUjian, lulus, dalamBimbingan };
+  }, [data, statusSiswaSubFilter]);
 
   // Sorting nomor urut
   const getUrutan = (noInduk?: string | null) => {
@@ -357,6 +394,10 @@ export function UjianClient({
       .filter((s) => {
         // Jangan tampilkan siswa yang sertifikatnya sudah dicetak (sudah tuntas & ada di Riwayat Cetak)
         if (s.status_sertifikat === "dicetak") return false;
+
+        // Sub-filter kategori siswa: Siswa Aktif vs Alumni
+        if (statusSiswaSubFilter === "aktif" && s.status_siswa === "alumni") return false;
+        if (statusSiswaSubFilter === "alumni" && s.status_siswa !== "alumni") return false;
 
         if (search.trim()) {
           const q = search.toLowerCase().trim();
@@ -384,7 +425,7 @@ export function UjianClient({
         if (pA !== pB) return pA - pB;
         return getUrutan(a.nomor_induk) - getUrutan(b.nomor_induk);
       });
-  }, [data, search, statusFilter]);
+  }, [data, search, statusFilter, statusSiswaSubFilter]);
 
   // Filter Riwayat Sertifikat untuk Pencarian & Verifikasi Keabsahan
   const filteredHistoryData = useMemo(() => {
@@ -475,17 +516,59 @@ export function UjianClient({
       setAlumniCertNo("");
       setAlumniCertTgl(new Date().toISOString().split("T")[0]);
 
-      // Ambil daftar seluruh siswa secara lengkap (tanpa terpotong pagination)
+      // Seed awal langsung dari data siswa yang belum bersertifikat (tanpa delay loading)
+      const initialCandidates = data
+        .filter((d) => !certifiedSiswaIds.has(d.id))
+        .map((d) => ({
+          id: d.id,
+          nama_lengkap: d.nama_lengkap,
+          nomor_induk: d.nomor_induk,
+          status_siswa: d.status_siswa,
+          program: { nama: d.program_nama },
+        }));
+      setAllStudentsList(initialCandidates);
+
+      // Ambil daftar seluruh siswa secara lengkap untuk memastikan tidak ada yang terlewat
       try {
         const res = await fetch("/api/v1/siswa?limit=all");
         if (res.ok) {
           const json = await res.json();
-          setAllStudentsList(json.data || []);
+          const allFetched: { id: string; nama_lengkap: string; nomor_induk: string; status_siswa?: string; program?: { nama: string } }[] = json.data || [];
+          // Saring hanya siswa yang belum memiliki sertifikat
+          setAllStudentsList(allFetched.filter((s) => !certifiedSiswaIds.has(s.id)));
         }
       } catch (e) {
         console.error("Gagal memuat daftar siswa:", e);
       }
     }
+    setModalAlumniCertOpen(true);
+  }
+
+  // Handler Pintasan: Buka Modal Catat Sertifikat langsung dari kartu alumni
+  function handleOpenCatatSertifikatModalForStudent(s: SiswaUjianItem) {
+    setAlumniCertTarget(null);
+    setAlumniCertSiswaId(s.id);
+    setAlumniSearchQuery(`${s.nama_lengkap} (${s.nomor_induk || "Tanpa No. Induk"})`);
+    setAlumniCertNo("");
+    setAlumniCertTgl(s.tgl_keluar ? s.tgl_keluar.split("T")[0] : new Date().toISOString().split("T")[0]);
+    setAlumniCertError(null);
+    setAlumniCertSuccess(null);
+    setAlumniDropdownOpen(false);
+
+    setAllStudentsList((prev) => {
+      if (prev.some((item) => item.id === s.id)) return prev;
+      return [
+        ...prev,
+        {
+          id: s.id,
+          nama_lengkap: s.nama_lengkap,
+          nomor_induk: s.nomor_induk,
+          status_siswa: s.status_siswa,
+          program: { nama: s.program_nama },
+        },
+      ];
+    });
+
     setModalAlumniCertOpen(true);
   }
 
@@ -768,8 +851,14 @@ export function UjianClient({
                 <Users className="h-5 w-5" aria-hidden="true" />
               </div>
               <div>
-                <p className="text-[10px] uppercase font-bold text-[#6B7280] tracking-wider">Total Siswa</p>
-                <p className="text-lg font-extrabold text-[#F9FAFB]">{stats.total} Siswa</p>
+                <p className="text-[10px] uppercase font-bold text-[#6B7280] tracking-wider">
+                  {statusSiswaSubFilter === "semua"
+                    ? "Total Siswa"
+                    : statusSiswaSubFilter === "aktif"
+                    ? "Siswa Aktif"
+                    : "Alumni"}
+                </p>
+                <p className="text-lg font-extrabold text-[#F9FAFB]">{stats.scopedTotal} Siswa</p>
               </div>
             </div>
 
@@ -807,7 +896,7 @@ export function UjianClient({
           </div>
 
           {/* Filter & Pencarian Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 flex-wrap">
             <div className="relative w-full sm:w-80">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#6B7280]" aria-hidden="true" />
               <input
@@ -819,39 +908,80 @@ export function UjianClient({
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-[#111827] border border-[#1F2937] p-1 rounded-lg w-full sm:w-auto overflow-x-auto">
-              <button
-                onClick={() => setStatusFilter("semua")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  statusFilter === "semua" ? "bg-[#DC2626] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-                }`}
-              >
-                Semua ({stats.total})
-              </button>
-              <button
-                onClick={() => setStatusFilter("siap_ujian")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  statusFilter === "siap_ujian" ? "bg-[#10B981] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-                }`}
-              >
-                Siap Ujian ({stats.siapUjian})
-              </button>
-              <button
-                onClick={() => setStatusFilter("lulus")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  statusFilter === "lulus" ? "bg-[#38BDF8] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-                }`}
-              >
-                Lulus ({stats.lulus})
-              </button>
-              <button
-                onClick={() => setStatusFilter("dalam_bimbingan")}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                  statusFilter === "dalam_bimbingan" ? "bg-[#F59E0B] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
-                }`}
-              >
-                Bimbingan ({stats.dalamBimbingan})
-              </button>
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              {/* Filter Sub-Kategori: Semua / Siswa Aktif / Alumni */}
+              <div className="flex items-center gap-1 p-1 rounded-lg bg-[#0B0F17] border border-[#1F2937]">
+                <span className="text-[11px] font-medium text-[#9CA3AF] px-1.5">Status:</span>
+                <button
+                  type="button"
+                  onClick={() => setStatusSiswaSubFilter("semua")}
+                  className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
+                    statusSiswaSubFilter === "semua"
+                      ? "bg-[#38BDF8] text-[#0B0F17] font-bold shadow-sm"
+                      : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                  }`}
+                >
+                  Semua ({stats.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusSiswaSubFilter("aktif")}
+                  className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
+                    statusSiswaSubFilter === "aktif"
+                      ? "bg-[#10B981] text-white font-bold shadow-sm"
+                      : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                  }`}
+                >
+                  Siswa Aktif ({stats.aktifCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusSiswaSubFilter("alumni")}
+                  className={`px-2.5 py-1 text-xs rounded-md font-medium transition-all ${
+                    statusSiswaSubFilter === "alumni"
+                      ? "bg-[#38BDF8] text-white font-bold shadow-sm"
+                      : "text-[#9CA3AF] hover:text-[#F9FAFB] hover:bg-[#1F2937]"
+                  }`}
+                >
+                  Alumni ({stats.alumniCount})
+                </button>
+              </div>
+
+              {/* Filter Kelayakan: Semua / Siap Ujian / Lulus / Bimbingan */}
+              <div className="flex items-center gap-1 bg-[#111827] border border-[#1F2937] p-1 rounded-lg overflow-x-auto">
+                <button
+                  onClick={() => setStatusFilter("semua")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    statusFilter === "semua" ? "bg-[#DC2626] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                  }`}
+                >
+                  Semua ({stats.scopedTotal})
+                </button>
+                <button
+                  onClick={() => setStatusFilter("siap_ujian")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    statusFilter === "siap_ujian" ? "bg-[#10B981] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                  }`}
+                >
+                  Siap Ujian ({stats.siapUjian})
+                </button>
+                <button
+                  onClick={() => setStatusFilter("lulus")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    statusFilter === "lulus" ? "bg-[#38BDF8] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                  }`}
+                >
+                  Lulus ({stats.lulus})
+                </button>
+                <button
+                  onClick={() => setStatusFilter("dalam_bimbingan")}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    statusFilter === "dalam_bimbingan" ? "bg-[#F59E0B] text-white" : "text-[#9CA3AF] hover:text-[#D1D5DB]"
+                  }`}
+                >
+                  Bimbingan ({stats.dalamBimbingan})
+                </button>
+              </div>
             </div>
           </div>
 
@@ -906,6 +1036,11 @@ export function UjianClient({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <p className="text-xs font-bold text-[#F9FAFB] truncate">{s.nama_lengkap}</p>
+                          {s.status_siswa === "alumni" && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/40">
+                              ALUMNI
+                            </span>
+                          )}
                           {isReadyForInternal && (
                             <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#10B981] bg-[#10B981]/15 border border-[#10B981]/30 px-2 py-0.5 rounded-full">
                               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
@@ -1036,6 +1171,19 @@ export function UjianClient({
                         <Plus className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         <span>{s.ujian ? "Edit Nilai Internal" : "Input Nilai Internal"}</span>
                       </Button>
+
+                      {/* Tombol Catat Sertifikat Fisik Alumni jika status alumni */}
+                      {s.status_siswa === "alumni" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full gap-1.5 text-xs border-[#38BDF8]/40 hover:bg-[#38BDF8]/15 text-[#38BDF8] font-medium"
+                          onClick={() => handleOpenCatatSertifikatModalForStudent(s)}
+                        >
+                          <FileSpreadsheet className="h-3.5 w-3.5 shrink-0" />
+                          <span>Catat No. Sertifikat (Arsip Fisik)</span>
+                        </Button>
+                      )}
 
                       {/* Tombol Tambahkan ke Antrean Percetakan */}
                       {gateSertifikat && (
@@ -1873,7 +2021,7 @@ export function UjianClient({
                 {alumniDropdownOpen && (
                   <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-[#1F2937] bg-[#0B0F17] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                     <div className="bg-[#111827] px-3 py-1.5 text-[10px] text-[#9CA3AF] uppercase font-semibold tracking-wider flex justify-between items-center border-b border-[#1F2937]">
-                      <span>Daftar Siswa ({filteredStudents.length})</span>
+                      <span>Daftar Siswa Belum Bersertifikat ({filteredStudents.length})</span>
                       <span className="text-[9px] text-[#6B7280] flex items-center gap-1.5">
                         {searchingStudents && <Loader2 className="h-3 w-3 animate-spin text-[#38BDF8]" />}
                         <span>Ketik untuk menyaring</span>
@@ -1889,7 +2037,7 @@ export function UjianClient({
                               <span>Mencari di seluruh database...</span>
                             </div>
                           ) : (
-                            <span>Tidak ada siswa yang cocok dengan &quot;{alumniSearchQuery}&quot;</span>
+                            <span>Tidak ada siswa yang cocok dengan &quot;{alumniSearchQuery}&quot; (atau siswa sudah memiliki sertifikat)</span>
                           )}
                         </div>
                       ) : (
@@ -1913,8 +2061,13 @@ export function UjianClient({
                               }`}
                             >
                               <div className="truncate pr-2">
-                                <div className={`text-xs font-semibold ${isSelected ? "text-[#38BDF8]" : "text-[#F9FAFB]"}`}>
-                                  {s.nama_lengkap}
+                                <div className={`text-xs font-semibold flex items-center gap-1.5 ${isSelected ? "text-[#38BDF8]" : "text-[#F9FAFB]"}`}>
+                                  <span>{s.nama_lengkap}</span>
+                                  {s.status_siswa === "alumni" && (
+                                    <span className="text-[9px] px-1.5 py-0.2 rounded font-bold bg-[#38BDF8]/20 text-[#38BDF8] border border-[#38BDF8]/30">
+                                      ALUMNI
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="text-[11px] text-[#9CA3AF] flex items-center gap-1.5 mt-0.5">
                                   <span className="font-mono text-[#DC2626] font-medium">

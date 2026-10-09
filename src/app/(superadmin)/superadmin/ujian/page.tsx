@@ -38,7 +38,7 @@ async function getInitialUjianData(): Promise<{
       supabase
         .from("siswa")
         .select(
-          "id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, biaya_pelatihan, program:master_program(id, nama, biaya)"
+          "id, nomor_induk, nama_lengkap, tgl_masuk, tgl_keluar, status_siswa, biaya_pelatihan, program:master_program(id, nama, biaya)"
         )
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
@@ -115,6 +115,7 @@ async function getInitialUjianData(): Promise<{
         program_nama: program?.nama || "Umum",
         tgl_masuk: s.tgl_masuk,
         tgl_keluar: s.tgl_keluar,
+        status_siswa: (s.status_siswa || "aktif") as "aktif" | "alumni" | "out",
         total_biaya: totalBiaya,
         total_terbayar: totalTerbayar,
         is_lunas: isLunas,

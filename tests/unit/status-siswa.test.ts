@@ -367,6 +367,61 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(verified, null);
     });
   });
+
+  describe("Filter Sub-Kategori Ujian Internal & Eksklusi Siswa Bersertifikat", () => {
+    interface DummySiswaUjian {
+      id: string;
+      nama_lengkap: string;
+      status_siswa: "aktif" | "alumni" | "out";
+      status_sertifikat: "antrean" | "dicetak" | null;
+    }
+
+    const dummyStudents: DummySiswaUjian[] = [
+      { id: "s-1", nama_lengkap: "Siswa Aktif Belum Sertif", status_siswa: "aktif", status_sertifikat: null },
+      { id: "s-2", nama_lengkap: "Alumni Belum Sertif", status_siswa: "alumni", status_sertifikat: null },
+      { id: "s-3", nama_lengkap: "Alumni Sudah Dicetak", status_siswa: "alumni", status_sertifikat: "dicetak" },
+      { id: "s-4", nama_lengkap: "Siswa Di Antrean Cetak", status_siswa: "aktif", status_sertifikat: "antrean" },
+    ];
+
+    test("Ujian Internal hanya memuat siswa yang belum memiliki sertifikat, dan dapat difilter Siswa Aktif vs Alumni", () => {
+      // 1. Base Ujian Internal (hanya yang belum punya sertifikat)
+      const ujianInternalList = dummyStudents.filter((s) => !s.status_sertifikat);
+      assert.equal(ujianInternalList.length, 2);
+
+      // 2. Sub-filter: Siswa Aktif
+      const aktifOnly = ujianInternalList.filter((s) => s.status_siswa !== "alumni");
+      assert.equal(aktifOnly.length, 1);
+      assert.equal(aktifOnly[0].id, "s-1");
+
+      // 3. Sub-filter: Alumni
+      const alumniOnly = ujianInternalList.filter((s) => s.status_siswa === "alumni");
+      assert.equal(alumniOnly.length, 1);
+      assert.equal(alumniOnly[0].id, "s-2");
+    });
+
+    test("Dropdown Catat Sertifikat Alumni mengecualikan siswa yang sudah bersertifikat", () => {
+      const certifiedSiswaIds = new Set(["s-3", "s-4"]);
+
+      const allStudentsInDb = [
+        { id: "s-1", nama_lengkap: "Siswa Aktif Belum Sertif" },
+        { id: "s-2", nama_lengkap: "Alumni Belum Sertif" },
+        { id: "s-3", nama_lengkap: "Alumni Sudah Dicetak" },
+        { id: "s-4", nama_lengkap: "Siswa Di Antrean Cetak" },
+      ];
+
+      // Saat Tambah Baru (alumniCertTarget = null)
+      const availableNew = allStudentsInDb.filter((s) => !certifiedSiswaIds.has(s.id));
+      assert.equal(availableNew.length, 2);
+      assert.deepEqual(availableNew.map((s) => s.id), ["s-1", "s-2"]);
+      assert.equal(availableNew.some((s) => s.id === "s-3"), false, "Siswa s-3 yang sudah dicetak tidak boleh muncul");
+      assert.equal(availableNew.some((s) => s.id === "s-4"), false, "Siswa s-4 di antrean tidak boleh muncul");
+
+      // Saat Mode Edit (target s-3)
+      const editTargetId = "s-3";
+      const availableEdit = allStudentsInDb.filter((s) => s.id === editTargetId || !certifiedSiswaIds.has(s.id));
+      assert.equal(availableEdit.some((s) => s.id === "s-3"), true, "Siswa s-3 harus muncul saat sedang diedit");
+    });
+  });
 });
 
 
