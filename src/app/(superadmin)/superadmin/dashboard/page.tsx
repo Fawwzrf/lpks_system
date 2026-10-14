@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
+import { todayStr } from "@/lib/date-utils";
 import {
   DashboardClient,
   type DashboardStats,
@@ -15,7 +16,7 @@ export const metadata = {
 };
 
 async function getInitialDashboardStats(): Promise<DashboardStats> {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const supabase = await createClient();
 
@@ -29,7 +30,7 @@ async function getInitialDashboardStats(): Promise<DashboardStats> {
       supabase
         .from("presensi")
         .select("id", { count: "exact", head: true })
-        .eq("tanggal", todayStr)
+        .eq("tanggal", today)
         .eq("status", "Hadir"),
       supabase.from("transaksi_keuangan").select("nominal"),
       supabase

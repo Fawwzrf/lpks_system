@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/server";
+import { todayStr, formatPresensiWIBTime } from "@/lib/date-utils";
 import {
   PresensiClient,
   type PresensiAllItem,
@@ -20,7 +21,7 @@ async function getInitialPresensiData(): Promise<{
   programs: ProgramItem[];
   todayStr: string;
 }> {
-  const todayStr = new Date().toISOString().split("T")[0];
+  const today = todayStr();
   try {
     const supabase = await createClient();
 
@@ -37,13 +38,13 @@ async function getInitialPresensiData(): Promise<{
         )
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .or(`tgl_keluar.is.null,tgl_keluar.gte.${todayStr}`)
+        .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true }),
       supabase
         .from("presensi")
-        .select("id, siswa_id, tanggal, jam, status, jarak_meter, keterangan, created_by")
-        .eq("tanggal", todayStr),
+        .select("id, siswa_id, tanggal, jam, status, jarak_meter, keterangan, created_by, created_at")
+        .eq("tanggal", today),
     ]);
 
     const programs: ProgramItem[] = progRes.data || [];
@@ -75,11 +76,12 @@ async function getInitialPresensiData(): Promise<{
               id: presensiRecord.id,
               siswa_id: presensiRecord.siswa_id,
               tanggal: presensiRecord.tanggal,
-              jam: presensiRecord.jam,
+              jam: formatPresensiWIBTime(presensiRecord.jam, presensiRecord.created_at, presensiRecord.status),
               jarak_meter: presensiRecord.jarak_meter,
               status: presensiRecord.status as "Hadir" | "Izin" | "Sakit" | "Alpa",
               created_by: presensiRecord.created_by,
               keterangan: presensiRecord.keterangan,
+              created_at: presensiRecord.created_at,
             }
           : null,
         status: presensiRecord
@@ -88,7 +90,7 @@ async function getInitialPresensiData(): Promise<{
       };
     });
 
-    return { items, programs, todayStr };
+    return { items, programs, todayStr: today };
   } catch (error) {
     if (
       error &&
@@ -100,7 +102,7 @@ async function getInitialPresensiData(): Promise<{
       throw error;
     }
     console.error("Gagal memuat data presensi di Server Component:", error);
-    return { items: [], programs: [], todayStr };
+    return { items: [], programs: [], todayStr: today };
   }
 }
 

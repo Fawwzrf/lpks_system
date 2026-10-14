@@ -1,5 +1,6 @@
 import { successResponse, errorResponse, requireAuth } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
+import { todayStr, formatPresensiWIBTime } from "@/lib/date-utils";
 
 export async function GET() {
   try {
@@ -19,13 +20,13 @@ export async function GET() {
       return errorResponse("STUDENT_NOT_FOUND", "Data siswa tidak ditemukan.", 404);
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const today = todayStr();
 
     const { data: presensi } = await supabase
       .from("presensi")
       .select("*")
       .eq("siswa_id", siswa.id)
-      .eq("tanggal", todayStr)
+      .eq("tanggal", today)
       .single();
 
     // Cek juga sisa kuota percobaan attempt
@@ -33,17 +34,24 @@ export async function GET() {
       .from("presensi_attempts")
       .select("attempt_count")
       .eq("siswa_id", siswa.id)
-      .eq("tanggal", todayStr)
+      .eq("tanggal", today)
       .single();
 
     const usedAttempts = attempt?.attempt_count || 0;
     const remainingAttempts = Math.max(0, 3 - usedAttempts);
 
+    const formattedPresensi = presensi
+      ? {
+          ...presensi,
+          jam: formatPresensiWIBTime(presensi.jam, presensi.created_at, presensi.status),
+        }
+      : null;
+
     return successResponse({
       sudah_absen: !!presensi,
-      presensi: presensi || null,
+      presensi: formattedPresensi,
       sisa_percobaan_hari_ini: remainingAttempts,
-      tanggal: todayStr,
+      tanggal: today,
     });
   } catch (err) {
     return errorResponse(

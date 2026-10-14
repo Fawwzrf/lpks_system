@@ -2,6 +2,13 @@ import { NextRequest } from "next/server";
 import { successResponse, errorResponse, requireAuth } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import { inspectGpsTelemetry } from "@/lib/geo";
+import {
+  getWIBDateStr,
+  getWIBTimeStr,
+  getWIBDayOfWeek,
+  formatPresensiWIBTime,
+  todayStr,
+} from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +42,7 @@ export async function GET(request: NextRequest) {
 
     // Mode all_students untuk Superadmin: kembalikan seluruh siswa aktif beserta status presensi pada tanggal tersebut
     if (user?.role === "superadmin" && viewType === "all_students") {
-      const targetDate = tanggal || new Date().toISOString().split("T")[0];
+      const targetDate = tanggal || todayStr();
 
       let siswaQuery = supabase
         .from("siswa")
@@ -57,7 +64,7 @@ export async function GET(request: NextRequest) {
 
       const { data: presensiList, error: presensiError } = await supabase
         .from("presensi")
-        .select("id, siswa_id, tanggal, jam, status, jarak_meter, keterangan, created_by")
+        .select("id, siswa_id, tanggal, jam, status, jarak_meter, keterangan, created_by, created_at")
         .eq("tanggal", targetDate);
 
       if (presensiError) {
@@ -71,10 +78,18 @@ export async function GET(request: NextRequest) {
 
       const result = allSiswa?.map((s) => {
         const presensiRecord = presensiMap.get(s.id) || null;
+        const formattedJam = presensiRecord
+          ? formatPresensiWIBTime(presensiRecord.jam, presensiRecord.created_at, presensiRecord.status)
+          : null;
         return {
           id: s.id,
           siswa: s,
-          presensi: presensiRecord,
+          presensi: presensiRecord
+            ? {
+                ...presensiRecord,
+                jam: formattedJam || presensiRecord.jam,
+              }
+            : null,
           status: presensiRecord ? presensiRecord.status : ("Belum Absen" as const),
         };
       }) || [];
@@ -96,7 +111,7 @@ export async function GET(request: NextRequest) {
     } else if (tanggal) {
       query = query.eq("tanggal", tanggal);
     } else if (user?.role === "superadmin" && !siswaId) {
-      const today = new Date().toISOString().split("T")[0];
+      const today = todayStr();
       query = query.eq("tanggal", today);
     }
 
@@ -129,7 +144,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const supabase = await createClient();
-    const todayStr = new Date().toISOString().split("T")[0];
+    const today = todayStr();
 
     // =========================================================================
     // 1. KASUS SUPERADMIN: Catat Manual / Override / Batch Alpa
@@ -137,7 +152,7 @@ export async function POST(request: NextRequest) {
     if (user?.role === "superadmin") {
       // 1A. Batch Alpa: Tandai semua siswa aktif yang belum presensi di tanggal tersebut sebagai Alpa
       if (body.action === "batch_alpa") {
-        const targetDate = body.tanggal || todayStr;
+        const targetDate = body.tanggal || today;
 
         // Ambil semua siswa aktif (belum lulus)
         const { data: activeStudents, error: studentError } = await supabase
@@ -199,7 +214,7 @@ export async function POST(request: NextRequest) {
         return errorResponse("INVALID_STATUS", `Status harus salah satu dari: ${validStatuses.join(", ")}.`, 400);
       }
 
-      const targetDate = tanggal || todayStr;
+      const targetDate = tanggal || today;
 
       // Cek apakah data presensi pada tanggal tersebut sudah ada
       const { data: existing } = await supabase
@@ -231,9 +246,8 @@ export async function POST(request: NextRequest) {
           message: `Presensi siswa berhasil diperbarui menjadi ${status}.`,
         });
       } else {
-        // Insert record baru
-        const now = new Date();
-        const timeStr = now.toTimeString().split(" ")[0];
+        // Insert record baru dengan waktu WIB
+        const timeStr = getWIBTimeStr();
 
         const { data: inserted, error: insertError } = await supabase
           .from("presensi")
@@ -279,7 +293,7 @@ export async function POST(request: NextRequest) {
     }
 
     const requestedStatus = body.status || "Hadir";
-    const targetDate = body.tanggal || todayStr;
+    const targetDate = body.tanggal || today;
 
     // Cek apakah sudah pernah presensi hari ini (Anti-Double Entry)
     const { data: existingPresensi } = await supabase
@@ -304,8 +318,7 @@ export async function POST(request: NextRequest) {
         return errorResponse("REASON_REQUIRED", "Keterangan/alasan izin atau sakit wajib diisi.", 400);
       }
 
-      const now = new Date();
-      const timeStr = now.toTimeString().split(" ")[0];
+      const timeStr = getWIBTimeStr();
 
       const { data: izinResult, error: izinError } = await supabase
         .from("presensi")
@@ -351,8 +364,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validasi hari: hanya Senin(1), Selasa(2), Rabu(3), Kamis(4), Sabtu(6)
-    const hariIni = new Date().getDay();
+    // Validasi hari: hanya Senin(1), Selasa(2), Rabu(3), Kamis(4), Sabtu(6) dalam zona WIB
+    const hariIni = getWIBDayOfWeek();
     const hariAktif = [1, 2, 3, 4, 6];
     if (!hariAktif.includes(hariIni)) {
       return errorResponse("INVALID_DAY", "Presensi hanya dapat dilakukan pada hari Senin–Kamis dan Sabtu.", 400);
@@ -363,7 +376,7 @@ export async function POST(request: NextRequest) {
       .from("presensi_attempts")
       .select("id, attempt_count")
       .eq("siswa_id", siswa.id)
-      .eq("tanggal", todayStr)
+      .eq("tanggal", today)
       .single();
 
     if (attemptRecord && attemptRecord.attempt_count >= 3) {
@@ -382,7 +395,7 @@ export async function POST(request: NextRequest) {
     } else {
       await supabase.from("presensi_attempts").insert({
         siswa_id: siswa.id,
-        tanggal: todayStr,
+        tanggal: today,
         attempt_count: 1,
       });
     }
@@ -426,9 +439,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Simpan Kehadiran
-    const now = new Date();
-    const timeStr = now.toTimeString().split(" ")[0];
+    // Simpan Kehadiran dalam Waktu WIB
+    const timeStr = getWIBTimeStr();
 
     const accuracyNote = typeof telemetry?.accuracy === "number" ? ` [GPS: ±${Math.round(telemetry.accuracy)}m]` : "";
 
@@ -436,7 +448,7 @@ export async function POST(request: NextRequest) {
       .from("presensi")
       .insert({
         siswa_id: siswa.id,
-        tanggal: todayStr,
+        tanggal: today,
         jam: timeStr,
         lat,
         lng,

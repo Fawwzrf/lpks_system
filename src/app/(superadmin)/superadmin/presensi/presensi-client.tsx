@@ -25,6 +25,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ColumnHeader, SortDirection } from "@/components/ui/column-header";
 import { useStreamingImport } from "@/lib/use-streaming-import";
 import { ImportProgressRing, ImportResultPanel } from "@/components/ui/import-result-panel";
+import { todayStr, formatPresensiWIBTime } from "@/lib/date-utils";
 
 export const STATUS_OPTIONS = ["Hadir", "Izin", "Sakit", "Alpa"] as const;
 export type StatusPresensi = typeof STATUS_OPTIONS[number];
@@ -51,6 +52,7 @@ export interface PresensiRecord {
   status: StatusPresensi;
   created_by?: string;
   keterangan?: string;
+  created_at?: string;
 }
 
 export interface PresensiAllItem {
@@ -83,7 +85,7 @@ const STATUS_CONFIG: Record<StatusPresensi | "Belum Absen", { icon: React.ReactN
 export function PresensiClient({
   initialItems = [],
   initialPrograms = [],
-  initialDate = new Date().toISOString().split("T")[0],
+  initialDate = todayStr(),
 }: PresensiClientProps) {
   const [items, setItems] = useState<PresensiAllItem[]>(initialItems);
   const [loading, setLoading] = useState(false);
@@ -328,8 +330,8 @@ export function PresensiClient({
           : String(valB).localeCompare(String(valA));
       }
       if (sortKey === "waktu") {
-        valA = a.presensi?.jam || "";
-        valB = b.presensi?.jam || "";
+        valA = a.presensi ? formatPresensiWIBTime(a.presensi.jam, a.presensi.created_at, a.presensi.status) : "";
+        valB = b.presensi ? formatPresensiWIBTime(b.presensi.jam, b.presensi.created_at, b.presensi.status) : "";
         return sortDir === "asc"
           ? String(valA).localeCompare(String(valB))
           : String(valB).localeCompare(String(valA));
@@ -410,7 +412,7 @@ export function PresensiClient({
       key: "waktu",
       header: (
         <ColumnHeader
-          title="Waktu"
+          title="Waktu (WIB)"
           sortKey="waktu"
           currentSortKey={sortKey}
           currentSortDir={sortDir}
@@ -419,7 +421,7 @@ export function PresensiClient({
       ),
       render: (r: PresensiAllItem) => (
         <span className="font-mono text-xs text-[#D1D5DB]">
-          {r.presensi?.jam || "—"}
+          {formatPresensiWIBTime(r.presensi?.jam, r.presensi?.created_at, r.presensi?.status)}
         </span>
       ),
     },

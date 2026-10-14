@@ -5,6 +5,7 @@ import { MapPin, Loader2, CheckCircle2, XCircle, AlertTriangle, Clock, Navigatio
 import { haversineDistance } from "@/lib/geo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Modal } from "@/components/ui/modal";
+import { getWIBDayOfWeek, formatPresensiWIBTime } from "@/lib/date-utils";
 
 // Default koordinat LPKS Sumbu Hidup (Cilacap) jika belum termuat dari master
 const BENGKEL_LAT = -7.69897507696962;
@@ -18,6 +19,7 @@ interface PresensiItem {
   status: "Hadir" | "Izin" | "Sakit" | "Alpa";
   jarak_meter?: number;
   keterangan?: string;
+  created_at?: string;
 }
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
@@ -35,8 +37,8 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export default function PresensiSiswaPage() {
-  // Validasi hari: Senin(1)–Kamis(4) + Sabtu(6)
-  const hariIni = new Date().getDay();
+  // Validasi hari: Senin(1)–Kamis(4) + Sabtu(6) dalam zona waktu WIB
+  const hariIni = getWIBDayOfWeek();
   const isHariAktif = [1, 2, 3, 4, 6].includes(hariIni);
   const NAMA_HARI = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
 
@@ -437,7 +439,7 @@ export default function PresensiSiswaPage() {
             </div>
           </div>
           <div className="text-[11px] font-mono text-[#10B981] bg-[#0B0F17] border border-[#10B981]/20 px-3 py-1 rounded-lg shrink-0 font-medium">
-            {todayRecord?.jam ? `Pukul ${todayRecord.jam}` : "Hari ini"}
+            {todayRecord?.jam ? `Pukul ${formatPresensiWIBTime(todayRecord.jam, todayRecord.created_at, todayRecord.status)} WIB` : "Hari ini"}
           </div>
         </div>
       ) : (
@@ -554,7 +556,9 @@ export default function PresensiSiswaPage() {
                   <p className={`text-xs font-semibold ${STATUS_COLOR[entry.status] || "text-[#10B981]"}`}>
                     {entry.status}
                   </p>
-                  <p className="text-[10px] font-mono text-[#6B7280]">{entry.jam || "—"}</p>
+                  <p className="text-[10px] font-mono text-[#6B7280]">
+                    {entry.jam ? `${formatPresensiWIBTime(entry.jam, entry.created_at, entry.status)} WIB` : "—"}
+                  </p>
                 </div>
               </li>
             ))}
