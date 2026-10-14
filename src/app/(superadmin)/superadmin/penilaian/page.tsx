@@ -42,7 +42,7 @@ async function getInitialPenilaianData(): Promise<{
         )
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .or(`tgl_keluar.is.null,tgl_keluar.gte.${today}`)
+        .eq("status_siswa", "aktif")
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true }),
     ]);

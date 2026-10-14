@@ -89,15 +89,6 @@ export async function PUT(request: NextRequest, { params }: Params) {
       }
     }
 
-    // Jika status_siswa tidak dikirim secara spesifik dan status saat ini 'aktif', periksa apakah tgl_keluar sudah lewat
-    if (body.status_siswa === undefined && siswa.status_siswa === "aktif") {
-      const checkTglKeluar = (updates.tgl_keluar !== undefined ? updates.tgl_keluar : siswa.tgl_keluar) as string | null;
-      const todayStr = new Date().toISOString().split("T")[0];
-      if (checkTglKeluar && checkTglKeluar <= todayStr) {
-        updates.status_siswa = "alumni";
-      }
-    }
-
     // Validasi & update nomor_induk jika disertakan
     if (body.nomor_induk && String(body.nomor_induk).trim()) {
       const cleanNomorInduk = String(body.nomor_induk).trim();

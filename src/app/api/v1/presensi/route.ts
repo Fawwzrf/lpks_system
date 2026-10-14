@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         .select("id, nomor_induk, nama_lengkap, program_id, program:master_program(id, kode_program, nama)")
         .not("nik", "like", "ANON-%")
         .neq("alamat_lengkap", "[DATA DIHAPUS]")
-        .or(`tgl_keluar.is.null,tgl_keluar.gte.${targetDate}`)
+        .eq("status_siswa", "aktif")
         .order("urutan_nomor", { ascending: true, nullsFirst: false })
         .order("nomor_induk", { ascending: true });
 
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           .select("id")
           .not("nik", "like", "ANON-%")
           .neq("alamat_lengkap", "[DATA DIHAPUS]")
-          .or(`tgl_keluar.is.null,tgl_keluar.gte.${targetDate}`);
+          .eq("status_siswa", "aktif");
 
         if (studentError || !activeStudents) {
           return errorResponse("DATABASE_ERROR", "Gagal memuat siswa aktif.", 500, studentError?.message);
@@ -442,8 +442,6 @@ export async function POST(request: NextRequest) {
     // Simpan Kehadiran dalam Waktu WIB
     const timeStr = getWIBTimeStr();
 
-    const accuracyNote = typeof telemetry?.accuracy === "number" ? ` [GPS: ±${Math.round(telemetry.accuracy)}m]` : "";
-
     const { data: presensiResult, error: insertError } = await supabase
       .from("presensi")
       .insert({
@@ -454,7 +452,7 @@ export async function POST(request: NextRequest) {
         lng,
         jarak_meter: calculatedDistance,
         status: "Hadir",
-        keterangan: `Presensi mandiri siswa${accuracyNote}`,
+        keterangan: "Presensi mandiri siswa",
         created_by: "siswa",
       })
       .select()

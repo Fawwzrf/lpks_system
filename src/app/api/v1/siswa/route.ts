@@ -20,16 +20,6 @@ export async function GET(request: NextRequest) {
     const isAll = rawLimit === "all" || rawLimit === "-1";
     const limit = isAll ? 5000 : Math.min(2000, Math.max(1, parseInt(rawLimit || "20", 10)));
     const offset = (page - 1) * limit;
-    const todayStr = new Date().toISOString().split("T")[0];
-
-    // Self-healing: Siswa yang tgl_keluarnya sudah lewat otomatis berubah status dari 'aktif' menjadi 'alumni'
-    // ponytail: fire-and-forget — tidak blokir response, ceiling: N write per GET tapi aman untuk skala kecil
-    void supabase
-      .from("siswa")
-      .update({ status_siswa: "alumni" })
-      .eq("status_siswa", "aktif")
-      .not("tgl_keluar", "is", null)
-      .lte("tgl_keluar", todayStr);
 
     let query = supabase
       .from("siswa")
@@ -300,9 +290,7 @@ export async function POST(request: NextRequest) {
         nisn: nisn?.trim() || null,
         tgl_masuk: finalTglMasuk,
         tgl_keluar: finalTglKeluar,
-        status_siswa: body.status_siswa && body.status_siswa !== "aktif"
-          ? body.status_siswa
-          : (finalTglKeluar && finalTglKeluar <= new Date().toISOString().split("T")[0] ? "alumni" : (body.status_siswa || "aktif")),
+        status_siswa: body.status_siswa || "aktif",
         biaya_pelatihan: body.biaya_pelatihan !== undefined && body.biaya_pelatihan !== null && body.biaya_pelatihan !== ""
           ? parseFloat(body.biaya_pelatihan)
           : defaultBiaya,

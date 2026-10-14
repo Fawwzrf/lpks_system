@@ -461,7 +461,7 @@ export function PresensiClient({
             </span>
             {r.presensi?.keterangan && (
               <span className="text-[10px] text-[#9CA3AF] italic max-w-xs truncate">
-                &quot;{r.presensi.keterangan}&quot;
+                &quot;{r.presensi.keterangan.replace(/\[GPS:[^\]]+\]/gi, "").trim() || r.presensi.keterangan}&quot;
               </span>
             )}
           </div>

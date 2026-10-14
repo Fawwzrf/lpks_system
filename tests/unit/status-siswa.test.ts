@@ -437,6 +437,46 @@ describe("Status Siswa & Filter Keuangan / Verifikasi Sertifikat Tests", () => {
       assert.equal(availableEdit.some((s) => s.id === "s-5"), false, "Siswa s-5 yang out tetap tidak boleh muncul saat edit");
     });
   });
+
+  describe("Presistensi Siswa Aktif yang Pelatihannya Diperpanjang & Sanitasi UI Presensi", () => {
+    test("Siswa aktif yang tgl_keluar lampau tetap terdaftar sebagai siswa aktif di modul presensi/penilaian", () => {
+      // Kasus user: Hilal dan Julyan yang tgl_keluarnya sudah lewat bulan Juni/September, tapi diedit kembali menjadi aktif
+      const students = [
+        { id: "1", nama: "Hilal", status_siswa: "aktif", tgl_keluar: "2026-06-08" },
+        { id: "2", nama: "Julyan", status_siswa: "aktif", tgl_keluar: "2026-09-07" },
+        { id: "3", nama: "Alumni Sungguhan", status_siswa: "alumni", tgl_keluar: "2026-05-01" },
+        { id: "4", nama: "Siswa Out", status_siswa: "out", tgl_keluar: "2026-04-01" },
+      ];
+
+      // Query modul presensi/penilaian yang benar merujuk status_siswa === 'aktif'
+      const activeForModules = students.filter((s) => s.status_siswa === "aktif");
+      assert.equal(activeForModules.length, 2);
+      assert.deepEqual(activeForModules.map((s) => s.nama), ["Hilal", "Julyan"]);
+    });
+
+    test("Sanitasi keterangan presensi menghapus tag [GPS: ±...m] agar tidak disalahartikan sebagai jarak", () => {
+      const sanitizeKeterangan = (ket?: string | null) =>
+        ket ? ket.replace(/\[GPS:[^\]]+\]/gi, "").trim() || ket : "";
+
+      assert.equal(
+        sanitizeKeterangan("Presensi mandiri siswa [GPS: ±73m]"),
+        "Presensi mandiri siswa"
+      );
+      assert.equal(
+        sanitizeKeterangan("Presensi mandiri siswa [GPS: ±93m]"),
+        "Presensi mandiri siswa"
+      );
+      assert.equal(
+        sanitizeKeterangan("Presensi mandiri siswa"),
+        "Presensi mandiri siswa"
+      );
+      assert.equal(
+        sanitizeKeterangan("Izin sakit flu"),
+        "Izin sakit flu"
+      );
+    });
+  });
 });
+
 
 

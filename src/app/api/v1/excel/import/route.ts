@@ -284,9 +284,9 @@ export async function POST(request: NextRequest) {
               }
 
               if (existingUser) {
-                // Pertahankan status 'out' jika sebelumnya sudah ditandai 'out' secara manual dan kolom status di Excel kosong
-                if (existingUser.status_siswa === "out" && !rawStatus) {
-                  statusSiswa = "out";
+                // Pertahankan status yang sudah ada di database (aktif/alumni/out) jika kolom status di Excel kosong
+                if (!rawStatus) {
+                  statusSiswa = (existingUser.status_siswa as "aktif" | "alumni" | "out") || statusSiswa;
                 }
 
                 // Perbarui biodata siswa yang sudah ada (misal perbaikan Nama Ibu, Alamat, dsb)
