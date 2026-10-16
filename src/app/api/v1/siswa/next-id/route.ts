@@ -1,6 +1,9 @@
-import { NextRequest } from "next/server";
-import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-response";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { errorResponse, requireSuperadmin } from "@/lib/api-response";
+import { getNextNomorInduk } from "@/lib/nomor-induk";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
@@ -14,52 +17,21 @@ export async function GET(request: NextRequest) {
       return errorResponse("VALIDATION_ERROR", "Parameter program_id wajib disertakan.", 400);
     }
 
-    const supabase = await createClient();
+    const result = await getNextNomorInduk(programId);
 
-    // Dapatkan kode_program
-    const { data: program } = await supabase
-      .from("master_program")
-      .select("kode_program")
-      .eq("id", programId)
-      .single();
-
-    if (!program) {
-      return errorResponse("NOT_FOUND", "Program pelatihan tidak ditemukan.", 404);
-    }
-
-    // Dapatkan semua nomor induk yang menggunakan kode_program ini untuk mencari nomor urut tertinggi
-    const { data: allSiswa, error } = await supabase
-      .from("siswa")
-      .select("nomor_induk")
-      .not("nik", "like", "ANON-%")
-      .ilike("nomor_induk", `${program.kode_program}.%`);
-
-    if (error) {
-      return errorResponse("DATABASE_ERROR", "Gagal mengambil data siswa.", 500, error.message);
-    }
-
-    let maxUrutan = 0;
-    allSiswa?.forEach((s) => {
-      if (s.nomor_induk) {
-        const parts = s.nomor_induk.split(".");
-        if (parts.length >= 2) {
-          const num = parseInt(parts[1].replace(/\D/g, ""), 10);
-          if (!isNaN(num) && num > maxUrutan) {
-            maxUrutan = num;
-          }
-        }
-      }
+    const response = NextResponse.json({
+      data: {
+        next_nomor_induk: result.next_nomor_induk,
+        next_no_urut: result.next_no_urut,
+        kode_program: result.kode_program,
+      },
     });
 
-    const nextUrutan = maxUrutan + 1;
-    const nextNoUrut = String(nextUrutan).padStart(4, "0");
-    const nextNomorInduk = `${program.kode_program}.${nextNoUrut}`;
+    response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    response.headers.set("Pragma", "no-cache");
+    response.headers.set("Expires", "0");
 
-    return successResponse({
-      next_nomor_induk: nextNomorInduk,
-      next_no_urut: nextNoUrut,
-      kode_program: program.kode_program,
-    });
+    return response;
   } catch (err) {
     return errorResponse(
       "INTERNAL_ERROR",

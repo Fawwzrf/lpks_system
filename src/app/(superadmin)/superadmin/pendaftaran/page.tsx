@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   CheckCircle2, Circle, ChevronRight, ChevronLeft,
-  Copy, Check, Eye, EyeOff, AlertTriangle, Loader2,
+  Copy, Check, Eye, EyeOff, AlertTriangle, Loader2, RefreshCw,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -102,6 +102,7 @@ export default function PendaftaranPage() {
   const [kodeProgram, setKodeProgram] = useState("");
   const [biayaPelatihan, setBiayaPelatihan] = useState("");
   const [nomorIndukError, setNomorIndukError] = useState("");
+  const [refreshingNoInduk, setRefreshingNoInduk] = useState(false);
 
   // Restore draft from sessionStorage on mount
   useEffect(() => {
@@ -165,6 +166,44 @@ export default function PendaftaranPage() {
     loadPrograms();
   }, []);
 
+  const loadNextId = useCallback(async (targetProgId?: string) => {
+    const pId = targetProgId || programId;
+    if (!pId) {
+      setNextNomorInduk(null);
+      setKodeProgram("");
+      setNoUrut("");
+      setNomorIndukError("");
+      persistDraft({ nextNomorInduk: null, kodeProgram: "", noUrut: "" });
+      return;
+    }
+    setRefreshingNoInduk(true);
+    try {
+      const res = await fetch(`/api/v1/siswa/next-id?program_id=${pId}&_t=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        const nextNomor = json.data?.next_nomor_induk || null;
+        const nextUrut = json.data?.next_no_urut || "";
+        const kodeProg = json.data?.kode_program || "";
+        setNextNomorInduk(nextNomor);
+        setKodeProgram(kodeProg);
+        setNoUrut(nextUrut);
+        setNomorIndukError("");
+        persistDraft({
+          nextNomorInduk: nextNomor,
+          kodeProgram: kodeProg,
+          noUrut: nextUrut,
+        });
+      }
+    } catch (e) {
+      console.error("Gagal memuat next nomor induk:", e);
+    } finally {
+      setRefreshingNoInduk(false);
+    }
+  }, [programId, persistDraft]);
+
   // Fetch next nomor induk when program changes
   useEffect(() => {
     if (!programId) {
@@ -175,30 +214,8 @@ export default function PendaftaranPage() {
       persistDraft({ nextNomorInduk: null, kodeProgram: "", noUrut: "" });
       return;
     }
-    async function loadNextId() {
-      try {
-        const res = await fetch(`/api/v1/siswa/next-id?program_id=${programId}`);
-        if (res.ok) {
-          const json = await res.json();
-          const nextNomor = json.data?.next_nomor_induk || null;
-          const nextUrut = json.data?.next_no_urut || "";
-          const kodeProg = json.data?.kode_program || "";
-          setNextNomorInduk(nextNomor);
-          setKodeProgram(kodeProg);
-          setNoUrut(nextUrut);
-          setNomorIndukError("");
-          persistDraft({
-            nextNomorInduk: nextNomor,
-            kodeProgram: kodeProg,
-            noUrut: nextUrut,
-          });
-        }
-      } catch (e) {
-        console.error("Gagal memuat next nomor induk:", e);
-      }
-    }
-    loadNextId();
-  }, [programId, persistDraft]);
+    loadNextId(programId);
+  }, [programId, loadNextId]);
 
   const allBerkasChecked = checkedBerkas.size === BERKAS_LIST.length;
   const selectedProgram = programs.find((p) => p.id === programId);
@@ -778,11 +795,20 @@ export default function PendaftaranPage() {
                           persistDraft({ noUrut: val });
                         }}
                         placeholder="cth: 1053 atau 0001"
-                        className={`flex-1 h-10 rounded-r-lg border bg-[#111827] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
+                        className={`flex-1 h-10 border-y border-l bg-[#111827] px-3 text-xs font-mono text-[#F9FAFB] placeholder-[#6B7280] focus:outline-none transition-colors ${
                           nomorIndukError ? "border-[#F43F5E] focus:border-[#F43F5E]" : "border-[#374151] focus:border-[#10B981]"
                         }`}
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => loadNextId()}
+                        disabled={refreshingNoInduk || !programId}
+                        title="Segarkan nomor urut otomatis terbaru dari database"
+                        className="h-10 px-3 flex items-center justify-center rounded-r-lg border border-l-0 border-[#374151] bg-[#1F2937] text-[#9CA3AF] hover:text-[#10B981] hover:bg-[#374151] transition-colors disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${refreshingNoInduk ? "animate-spin text-[#10B981]" : ""}`} />
+                      </button>
                     </div>
                     {nomorIndukError ? (
                       <p className="text-[11px] text-[#F43F5E] mt-0.5">{nomorIndukError}</p>

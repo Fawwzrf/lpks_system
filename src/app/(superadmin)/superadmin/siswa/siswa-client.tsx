@@ -337,7 +337,10 @@ export function SiswaClient({
       setTambahProgBiaya(String(candidateProg.biaya ?? ""));
       setLoadingNextNoInduk(true);
       try {
-        const res = await fetch(`/api/v1/siswa/next-id?program_id=${candidateProg.id}`);
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${candidateProg.id}&_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (res.ok) {
           const json = await res.json();
           setTambahProgNoInduk(json.data?.next_nomor_induk || "");
@@ -361,7 +364,10 @@ export function SiswaClient({
       setTambahProgBiaya(String(prog.biaya ?? ""));
       setLoadingNextNoInduk(true);
       try {
-        const res = await fetch(`/api/v1/siswa/next-id?program_id=${prog.id}`);
+        const res = await fetch(`/api/v1/siswa/next-id?program_id=${prog.id}&_t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
         if (res.ok) {
           const json = await res.json();
           setTambahProgNoInduk(json.data?.next_nomor_induk || "");

@@ -3,6 +3,7 @@ import { successResponse, errorResponse, requireSuperadmin } from "@/lib/api-res
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateStudentUsername, generateStudentPassword } from "@/lib/gate-checks";
+import { getNextNomorInduk } from "@/lib/nomor-induk";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -70,27 +71,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (nomor_induk && String(nomor_induk).trim()) {
       finalNomorInduk = String(nomor_induk).trim();
     } else {
-      // Cari nomor urut tertinggi untuk kode_program ini
-      const { data: allSiswaInProg } = await supabase
-        .from("siswa")
-        .select("nomor_induk")
-        .not("nik", "like", "ANON-%")
-        .ilike("nomor_induk", `${targetProgram.kode_program}.%`);
-
-      let maxUrutan = 0;
-      allSiswaInProg?.forEach((s) => {
-        if (s.nomor_induk) {
-          const parts = s.nomor_induk.split(".");
-          if (parts.length >= 2) {
-            const num = parseInt(parts[1].replace(/\D/g, ""), 10);
-            if (!isNaN(num) && num > maxUrutan) {
-              maxUrutan = num;
-            }
-          }
-        }
-      });
-      const nextNoUrut = String(maxUrutan + 1).padStart(4, "0");
-      finalNomorInduk = `${targetProgram.kode_program}.${nextNoUrut}`;
+      const nextResult = await getNextNomorInduk(program_id, supabase);
+      finalNomorInduk = nextResult.next_nomor_induk;
     }
 
     // Cek duplikasi nomor induk di program tujuan
