@@ -194,11 +194,23 @@ export function UjianClient({
   const [alumniDropdownOpen, setAlumniDropdownOpen] = useState(false);
   const alumniDropdownRef = React.useRef<HTMLDivElement>(null);
 
+  // Export Sertifikat Filter State
+  const [exportFilterOpen, setExportFilterOpen] = useState(false);
+  const [exportFilterType, setExportFilterType] = useState<"semua" | "tahun" | "bulan" | "custom">("semua");
+  const [exportYear, setExportYear] = useState(String(new Date().getFullYear()));
+  const [exportMonth, setExportMonth] = useState(String(new Date().getMonth() + 1));
+  const [exportStartDate, setExportStartDate] = useState("");
+  const [exportEndDate, setExportEndDate] = useState("");
+  const exportFilterRef = React.useRef<HTMLDivElement>(null);
+
   // Tutup dropdown combobox saat klik di luar elemen
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (alumniDropdownRef.current && !alumniDropdownRef.current.contains(event.target as Node)) {
         setAlumniDropdownOpen(false);
+      }
+      if (exportFilterRef.current && !exportFilterRef.current.contains(event.target as Node)) {
+        setExportFilterOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -655,6 +667,31 @@ export function UjianClient({
     } catch (err) {
       setErrorMsg("Gagal melakukan ekspor berkas percetakan.");
     }
+  }
+
+  function handleExportHistory() {
+    const params = new URLSearchParams({ modul: "sertifikat", source: "history", mark_as_printed: "false" });
+    if (exportFilterType === "tahun") {
+      params.set("year", exportYear);
+    } else if (exportFilterType === "bulan") {
+      params.set("year", exportYear);
+      params.set("month", exportMonth);
+    } else if (exportFilterType === "custom") {
+      if (!exportStartDate || !exportEndDate) {
+        setErrorMsg("Pilih tanggal mulai dan tanggal akhir untuk filter custom.");
+        return;
+      }
+      params.set("start_date", exportStartDate);
+      params.set("end_date", exportEndDate);
+    }
+    setSuccessMsg("Mengunduh data sertifikat...");
+    const link = document.createElement("a");
+    link.href = `/api/v1/excel/export?${params.toString()}`;
+    link.setAttribute("download", "");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setExportFilterOpen(false);
   }
 
   function handleOpenInput(siswa: SiswaUjianItem) {
@@ -1427,6 +1464,119 @@ export function UjianClient({
                 <FileSpreadsheet className="h-3.5 w-3.5 text-[#38BDF8]" aria-hidden="true" />
                 <span>Template Arsip</span>
               </a>
+
+              {/* Ekspor Data Sertifikat dengan Filter */}
+              <div className="relative" ref={exportFilterRef}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs border-[#F59E0B]/40 hover:bg-[#F59E0B]/10 text-[#F59E0B]"
+                  onClick={() => setExportFilterOpen((v) => !v)}
+                >
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Ekspor Data Sertifikat</span>
+                  <ChevronDown className={`h-3 w-3 transition-transform ${exportFilterOpen ? "rotate-180" : ""}`} />
+                </Button>
+
+                {exportFilterOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-72 rounded-xl border border-[#1F2937] bg-[#0B0F17] shadow-2xl p-4 flex flex-col gap-3">
+                    <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Filter Periode Export</p>
+
+                    {/* Jenis Filter */}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {(["semua", "tahun", "bulan", "custom"] as const).map((type) => (
+                        <button
+                          key={type}
+                          onClick={() => setExportFilterType(type)}
+                          className={`py-1.5 px-2 rounded-lg text-xs font-semibold border transition-all capitalize ${
+                            exportFilterType === type
+                              ? "border-[#F59E0B] bg-[#F59E0B]/15 text-[#F59E0B]"
+                              : "border-[#1F2937] text-[#9CA3AF] hover:text-white hover:border-[#374151]"
+                          }`}
+                        >
+                          {type === "semua" ? "Semua" : type === "tahun" ? "Per Tahun" : type === "bulan" ? "Per Bulan" : "Custom"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Input filter sesuai tipe */}
+                    {exportFilterType === "tahun" && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] text-[#9CA3AF]">Tahun</label>
+                        <input
+                          type="number"
+                          min="2015"
+                          max={new Date().getFullYear()}
+                          value={exportYear}
+                          onChange={(e) => setExportYear(e.target.value)}
+                          className="h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#F59E0B]"
+                        />
+                      </div>
+                    )}
+
+                    {exportFilterType === "bulan" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-[#9CA3AF]">Tahun</label>
+                          <input
+                            type="number"
+                            min="2015"
+                            max={new Date().getFullYear()}
+                            value={exportYear}
+                            onChange={(e) => setExportYear(e.target.value)}
+                            className="h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#F59E0B]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-[#9CA3AF]">Bulan</label>
+                          <select
+                            value={exportMonth}
+                            onChange={(e) => setExportMonth(e.target.value)}
+                            className="h-8 px-2 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#F59E0B]"
+                          >
+                            {["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"].map((b, i) => (
+                              <option key={i + 1} value={String(i + 1)}>{b}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {exportFilterType === "custom" && (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-[#9CA3AF]">Tanggal Mulai</label>
+                          <input
+                            type="date"
+                            value={exportStartDate}
+                            onChange={(e) => setExportStartDate(e.target.value)}
+                            className="h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#F59E0B]"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] text-[#9CA3AF]">Tanggal Akhir</label>
+                          <input
+                            type="date"
+                            value={exportEndDate}
+                            onChange={(e) => setExportEndDate(e.target.value)}
+                            className="h-8 px-3 rounded-lg border border-[#1F2937] bg-[#111827] text-xs text-[#F9FAFB] focus:outline-none focus:border-[#F59E0B]"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    <Button
+                      size="sm"
+                      className="w-full gap-1.5 text-xs bg-[#F59E0B] hover:bg-[#D97706] text-black font-bold"
+                      onClick={handleExportHistory}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      Download Excel
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               <Button
                 size="sm"
                 variant="outline"
@@ -1444,6 +1594,7 @@ export function UjianClient({
                 <Plus className="h-3.5 w-3.5" />
                 <span>Catat Sertifikat Alumni</span>
               </Button>
+
             </div>
           </div>
 

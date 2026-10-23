@@ -736,6 +736,12 @@ export async function GET(request: NextRequest) {
       const sourceParam = searchParams.get("source") || (statusParam === "semua" ? "all" : "queue"); // 'queue' | 'history' | 'all'
       const markAsPrinted = searchParams.get("mark_as_printed") !== "false";
 
+      // Filter tanggal untuk mode history
+      const yearParam = searchParams.get("year");         // e.g. "2024"
+      const monthParam = searchParams.get("month");       // e.g. "3" (1-based)
+      const startDateParam = searchParams.get("start_date"); // e.g. "2024-01-01"
+      const endDateParam = searchParams.get("end_date");     // e.g. "2024-03-31"
+
       const today = new Date().toISOString().split("T")[0];
       const now = new Date();
       const exportDateStr = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
@@ -764,11 +770,30 @@ export async function GET(request: NextRequest) {
 
       const ujianMap = new Map((ujianList || []).map((u) => [u.siswa_id, u]));
 
-      // 2.1 Ambil data antrean atau riwayat percetakan sertifikat
-      const { data: sertifikatRecords } = await supabase
+      // 2.1 Ambil data sertifikat dengan opsional filter tanggal untuk mode history
+      let sertifikatQuery = supabase
         .from("sertifikat")
         .select("siswa_id, status, no_sertifikat, tgl_antrean, tgl_cetak");
 
+      if (sourceParam === "history") {
+        sertifikatQuery = sertifikatQuery.eq("status", "dicetak");
+        if (startDateParam && endDateParam) {
+          sertifikatQuery = sertifikatQuery.gte("tgl_cetak", startDateParam).lte("tgl_cetak", endDateParam + "T23:59:59");
+        } else if (yearParam && monthParam) {
+          const y = parseInt(yearParam, 10);
+          const m = parseInt(monthParam, 10);
+          const firstDay = `${y}-${String(m).padStart(2, "0")}-01`;
+          const lastDay = new Date(y, m, 0); // last day of month
+          sertifikatQuery = sertifikatQuery.gte("tgl_cetak", firstDay).lte("tgl_cetak", `${lastDay.toISOString().split("T")[0]}T23:59:59`);
+        } else if (yearParam) {
+          sertifikatQuery = sertifikatQuery.gte("tgl_cetak", `${yearParam}-01-01`).lte("tgl_cetak", `${yearParam}-12-31T23:59:59`);
+        }
+      }
+
+      const { data: sertifikatRecords } = await sertifikatQuery;
+
+      // Map: siswa_id -> {status, tgl_cetak}
+      const sertifikatMap = new Map((sertifikatRecords || []).map((st) => [st.siswa_id, st]));
       const sertifikatStatusMap = new Map((sertifikatRecords || []).map((st) => [st.siswa_id, st.status]));
 
       // 3. Filter siswa berdasarkan sumber (antrean, riwayat, atau semua yang lulus)
@@ -783,7 +808,8 @@ export async function GET(request: NextRequest) {
             candidateList = []; // Antrean kosong
           }
         } else if (sourceParam === "history") {
-          candidateList = candidateList.filter((s) => sertifikatStatusMap.get(s.id) === "dicetak");
+          // Hanya siswa yang ada di sertifikatRecords (sudah difilter tanggal di query)
+          candidateList = candidateList.filter((s) => sertifikatMap.has(s.id));
         } else {
           // 'all': siswa yang telah lulus ujian ATAU berstatus alumni/lulus
           candidateList = candidateList.filter((s) => {
@@ -795,23 +821,50 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // 4. Urutkan dari siswa yang mendaftar paling baru (tgl_masuk DESC)
-      // "diurutkan dari sisiwa yang mendaftar paling baru, misal sisiwa mendaftar bulan september mendapat urut 001, dan yang mendaftar agustus mendapatkan urut 002"
-      candidateList.sort((a, b) => {
-        const dateA = a.tgl_masuk || "1970-01-01";
-        const dateB = b.tgl_masuk || "1970-01-01";
-        if (dateA !== dateB) {
-          return dateB.localeCompare(dateA); // Paling baru (September) di atas -> 001
-        }
-        return (b.nomor_induk || "").localeCompare(a.nomor_induk || "");
-      });
+      // 4. Urutkan
+      if (sourceParam === "history") {
+        // History: urutkan berdasarkan tanggal cetak terbaru (DESC)
+        candidateList.sort((a, b) => {
+          const tA = sertifikatMap.get(a.id)?.tgl_cetak || "";
+          const tB = sertifikatMap.get(b.id)?.tgl_cetak || "";
+          return tB.localeCompare(tA);
+        });
+      } else {
+        // Antrean/all: urutkan dari siswa yang mendaftar paling baru (tgl_masuk DESC)
+        candidateList.sort((a, b) => {
+          const dateA = a.tgl_masuk || "1970-01-01";
+          const dateB = b.tgl_masuk || "1970-01-01";
+          if (dateA !== dateB) return dateB.localeCompare(dateA);
+          return (b.nomor_induk || "").localeCompare(a.nomor_induk || "");
+        });
+      }
 
+      // Tentukan label judul dan nama file berdasarkan filter
+      const BULAN_ID = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+      let sheetTitle = "PEMBUATAN SERTIFIKAT REGULER";
+      let fileSuffix = today;
+      if (sourceParam === "history") {
+        if (startDateParam && endDateParam) {
+          sheetTitle = `DATA SERTIFIKAT ${startDateParam} s/d ${endDateParam}`;
+          fileSuffix = `${startDateParam}_sd_${endDateParam}`;
+        } else if (yearParam && monthParam) {
+          const mn = parseInt(monthParam, 10);
+          sheetTitle = `DATA SERTIFIKAT ${BULAN_ID[mn - 1] || monthParam} ${yearParam}`;
+          fileSuffix = `${yearParam}-${String(mn).padStart(2, "0")}`;
+        } else if (yearParam) {
+          sheetTitle = `DATA SERTIFIKAT TAHUN ${yearParam}`;
+          fileSuffix = yearParam;
+        } else {
+          sheetTitle = "DATA SERTIFIKAT (SEMUA)";
+          fileSuffix = today;
+        }
+      }
 
       // Format Baris Excel Sesuai Template Percetakan:
-      // Baris 1: Kolom B: Tanggal Ekspor (DD/MM/YYYY), Kolom C-I (Merge): PEMBUATAN SERTIFIKAT REGULER
+      // Baris 1: Kolom B: Tanggal Ekspor (DD/MM/YYYY), Kolom C-I (Merge): Judul
       // Baris 2: Header Kolom
       const aoa: (string | number)[][] = [
-        ["", exportDateStr, "PEMBUATAN SERTIFIKAT REGULER", "", "", "", "", "", ""],
+        ["", exportDateStr, sheetTitle, "", "", "", "", "", ""],
         ["", "NO SERTIFIKAT", "NAME", "REGISTRATION", "PLACE & DATE OF BIRTH", "PROGRAM", "STARTING FROM", "TO", "DATE OF ISSUE"]
       ];
 
@@ -928,7 +981,9 @@ export async function GET(request: NextRequest) {
       XLSX.utils.book_append_sheet(workbook, worksheet, "Sertifikat Reguler");
 
       const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
-      const filenameSertifikat = `Pembuatan_Sertifikat_Reguler_${today}.xlsx`;
+      const filenameSertifikat = sourceParam === "history"
+        ? `Data_Sertifikat_${fileSuffix}.xlsx`
+        : `Pembuatan_Sertifikat_Reguler_${today}.xlsx`;
 
       // Jika diekspor dari antrean percetakan dan opsi mark_as_printed aktif:
       // Tandai status sertifikat menjadi 'dicetak' dan jadikan siswa sebagai Alumni
