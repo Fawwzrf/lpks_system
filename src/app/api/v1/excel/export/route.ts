@@ -865,7 +865,7 @@ export async function GET(request: NextRequest) {
       // Baris 2: Header Kolom
       const aoa: (string | number)[][] = [
         ["", exportDateStr, sheetTitle, "", "", "", "", "", ""],
-        ["", "NO SERTIFIKAT", "NAME", "REGISTRATION", "PLACE & DATE OF BIRTH", "PROGRAM", "STARTING FROM", "TO", "DATE OF ISSUE"]
+        ["NO", "NO SERTIFIKAT", "NAME", "REGISTRATION", "PLACE & DATE OF BIRTH", "PROGRAM", "STARTING FROM", "TO", "DATE OF ISSUE"]
       ];
 
       candidateList.forEach((s, idx) => {
@@ -912,8 +912,9 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        // Format No Sertifikat: STF / LPKS -  SH / Bulan dalam angka romawi / tahun terbit
-        const noSertifikat = `STF / LPKS -  SH / ${romanMonth} / ${certYear}`;
+        // Ambil No Sertifikat asli dari database jika ada, jika belum ada gunakan format default
+        const certRec = sertifikatMap.get(s.id);
+        const noSertifikat = certRec?.no_sertifikat?.trim() || `STF / LPKS -  SH / ${romanMonth} / ${certYear}`;
 
         // Place & Date of Birth
         let placeAndDob = "-";
@@ -962,7 +963,7 @@ export async function GET(request: NextRequest) {
       // Lebar Kolom
       worksheet["!cols"] = [
         { wch: 8 },  // NO
-        { wch: 28 }, // NO SERTIFIKAT
+        { wch: 34 }, // NO SERTIFIKAT
         { wch: 28 }, // NAME
         { wch: 16 }, // REGISTRATION
         { wch: 32 }, // PLACE & DATE OF BIRTH
