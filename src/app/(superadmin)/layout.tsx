@@ -16,18 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
 const MAIN_NAV_ITEMS = [
-  { href: "/superadmin/dashboard",   icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/superadmin/pendaftaran", icon: UserPlus,         label: "Pendaftaran" },
-  { href: "/superadmin/siswa",       icon: Users,            label: "Data Siswa" },
-  { href: "/superadmin/presensi",    icon: MapPin,           label: "Presensi GPS" },
-  { href: "/superadmin/keuangan",    icon: Wallet,           label: "Keuangan" },
-  { href: "/superadmin/penilaian",   icon: ClipboardList,    label: "Penilaian Harian" },
-  { href: "/superadmin/ujian",       icon: Award,            label: "Ujian & Sertifikat" },
+  { href: "/superadmin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/superadmin/pendaftaran", icon: UserPlus, label: "Pendaftaran" },
+  { href: "/superadmin/siswa", icon: Users, label: "Data Siswa" },
+  { href: "/superadmin/presensi", icon: MapPin, label: "Presensi GPS" },
+  { href: "/superadmin/keuangan", icon: Wallet, label: "Keuangan" },
+  { href: "/superadmin/penilaian", icon: ClipboardList, label: "Penilaian Harian" },
+  { href: "/superadmin/ujian", icon: Award, label: "Ujian & Sertifikat" },
 ] as const;
 
 const BOTTOM_NAV_ITEMS = [
-  { href: "/superadmin/master",      icon: Settings,         label: "Master Data" },
-  { href: "/superadmin/ai",          icon: Bot,              label: "AI Showcase" },
+  { href: "/superadmin/master", icon: Settings, label: "Master Data" },
+  { href: "/superadmin/ai", icon: Bot, label: "AI Showcase" },
 ] as const;
 
 type NavItemType = (typeof MAIN_NAV_ITEMS)[number] | (typeof BOTTOM_NAV_ITEMS)[number];
@@ -103,7 +103,7 @@ function Sidebar({
         {(!collapsed || isMobile) && (
           <div className="overflow-hidden">
             <span className="text-xs font-bold text-[#F9FAFB] block truncate leading-tight">
-              {adminUser?.nama || "LPKS Sumbu Hidup"}
+              {adminUser?.nama || "Sumbu Hidup"}
             </span>
             <span className="text-[10px] text-[#6B7280] block truncate leading-tight">
               {adminUser?.email || "Superadmin"}
@@ -424,15 +424,14 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
                         className="flex items-start gap-3 p-3.5 hover:bg-[#1F2937]/50 transition-colors group text-left"
                       >
                         <div
-                          className={`p-2 rounded-lg shrink-0 mt-0.5 ${
-                            n.type === "success"
+                          className={`p-2 rounded-lg shrink-0 mt-0.5 ${n.type === "success"
                               ? "bg-[#10B981]/15 text-[#10B981]"
                               : n.type === "info"
-                              ? "bg-[#38BDF8]/15 text-[#38BDF8]"
-                              : n.type === "warning"
-                              ? "bg-[#F59E0B]/15 text-[#F59E0B]"
-                              : "bg-[#1F2937] text-[#9CA3AF]"
-                          }`}
+                                ? "bg-[#38BDF8]/15 text-[#38BDF8]"
+                                : n.type === "warning"
+                                  ? "bg-[#F59E0B]/15 text-[#F59E0B]"
+                                  : "bg-[#1F2937] text-[#9CA3AF]"
+                            }`}
                         >
                           {n.type === "success" ? (
                             <FileSpreadsheet className="h-4 w-4" />
@@ -589,11 +588,10 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
         <form onSubmit={handleChangePassword} className="flex flex-col gap-4">
           {passwordMsg && (
             <div
-              className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-                passwordMsg.type === "success"
+              className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${passwordMsg.type === "success"
                   ? "bg-[#10B981]/10 border-[#10B981]/30 text-[#10B981]"
                   : "bg-[#F43F5E]/10 border-[#F43F5E]/30 text-[#F43F5E]"
-              }`}
+                }`}
             >
               {passwordMsg.type === "success" ? (
                 <CheckCircle2 className="h-4 w-4 shrink-0" />
