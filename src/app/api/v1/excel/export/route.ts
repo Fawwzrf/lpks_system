@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { errorResponse, requireSuperadmin } from "@/lib/api-response";
 import { createClient } from "@/lib/supabase/server";
 import * as XLSX from "xlsx";
-import { NAMA_BULAN, NAMA_BULAN_UPPER, ROMAN_MONTHS, toRomanMonth, formatIndoDate, formatDDMMYYYY } from "@/lib/date-utils";
+import { NAMA_BULAN, NAMA_BULAN_UPPER, toRomanMonth } from "@/lib/date-utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
             "Email": displayEmail,
             "Pend. Terakhir": s.pendidikan_terakhir || "-",
             "NISN": s.nisn || "-",
-            "Program": ((s.program as any)?.nama) || "-",
+            "Program": ((s.program as unknown as { nama?: string })?.nama) || "-",
             "Tgl. Masuk": s.tgl_masuk || "-",
             "Tgl. Keluar": s.tgl_keluar || "-",
             "Username": s.username || "-",
@@ -273,7 +273,7 @@ export async function GET(request: NextRequest) {
       const paramProgramId = searchParams.get("program_id");
 
       const now = new Date();
-      let dates: string[] = [];
+      const dates: string[] = [];
       let periodeLabel = "";
       let monthName = "";
 
@@ -380,7 +380,7 @@ export async function GET(request: NextRequest) {
         const row: (string | number)[] = [
           s.nomor_induk || "-",
           s.nama_lengkap || "-",
-          ((s.program as any)?.nama) || "-",
+          ((s.program as unknown as { nama?: string })?.nama) || "-",
         ];
 
         dates.forEach((d) => {
@@ -450,6 +450,195 @@ export async function GET(request: NextRequest) {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
           "Content-Disposition": `attachment; filename="${filenamePresensi}"`,
+        },
+      });
+    } else if (modul === "presensi_pengurus") {
+      const searchParams = request.nextUrl.searchParams;
+      const paramBulan = searchParams.get("bulan");
+      const paramTahun = searchParams.get("tahun");
+      const paramStartDate = searchParams.get("start_date");
+      const paramEndDate = searchParams.get("end_date");
+
+      const now = new Date();
+      const dates: string[] = [];
+      let periodeLabel = "";
+      let monthName = "";
+
+      const NAMA_BULAN = NAMA_BULAN_UPPER;
+
+      if (paramStartDate && paramEndDate) {
+        const start = new Date(paramStartDate);
+        const end = new Date(paramEndDate);
+        const cur = new Date(start);
+        while (cur <= end) {
+          dates.push(cur.toISOString().split("T")[0]);
+          cur.setDate(cur.getDate() + 1);
+        }
+        periodeLabel = `${paramStartDate} s/d ${paramEndDate}`;
+        monthName = NAMA_BULAN[start.getMonth()] + " " + start.getFullYear();
+      } else {
+        const bulan = paramBulan ? parseInt(paramBulan, 10) : now.getMonth() + 1;
+        const tahun = paramTahun ? parseInt(paramTahun, 10) : now.getFullYear();
+        const daysInMonth = new Date(tahun, bulan, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = String(d).padStart(2, "0");
+          const mStr = String(bulan).padStart(2, "0");
+          dates.push(`${tahun}-${mStr}-${dStr}`);
+        }
+        monthName = `${NAMA_BULAN[bulan - 1]} ${tahun}`;
+        periodeLabel = monthName;
+      }
+
+      // Ambil daftar pengurus aktif
+      const { data: pengurusList } = await supabase
+        .from("pengurus")
+        .select("id, nip, nama_lengkap, jabatan")
+        .eq("is_active", true)
+        .order("nip", { ascending: true });
+
+      const startDate = dates[0];
+      const endDate = dates[dates.length - 1];
+
+      // Ambil semua presensi pengurus dalam rentang tanggal
+      const { data: presensiList } = await supabase
+        .from("presensi_pengurus")
+        .select("pengurus_id, tanggal, status")
+        .gte("tanggal", startDate)
+        .lte("tanggal", endDate);
+
+      const presensiMap = new Map<string, string>();
+      presensiList?.forEach((p) => {
+        presensiMap.set(`${p.pengurus_id}_${p.tanggal}`, p.status);
+      });
+
+      // Total Kolom: 4 (No, NIP, Nama, Jabatan) + dates.length + 7 (H, I, S, C, A, TL, %)
+      const totalCols = 4 + dates.length + 7;
+      const aoa: (string | number)[][] = [];
+
+      // Baris Kop Surat (Kanan Atas)
+      const headerRow1 = new Array(totalCols).fill("");
+      headerRow1[totalCols - 1] = "DAFTAR HADIR PENGURUS & INSTRUKTUR";
+      aoa.push(headerRow1);
+
+      const headerRow2 = new Array(totalCols).fill("");
+      headerRow2[totalCols - 1] = `PERIODE: ${periodeLabel}`;
+      aoa.push(headerRow2);
+
+      const headerRow3 = new Array(totalCols).fill("");
+      headerRow3[totalCols - 1] = "LKP PENGELASAN SUMBU HIDUP CILACAP";
+      aoa.push(headerRow3);
+
+      aoa.push(new Array(totalCols).fill("")); // Baris kosong pemisah
+
+      // Baris Header Tabel Bagian 1
+      const tableHeader1: (string | number)[] = ["NO.", "NIP", "NAMA PENGURUS", "JABATAN"];
+      for (let i = 0; i < dates.length; i++) {
+        tableHeader1.push(i === 0 ? monthName : "");
+      }
+      tableHeader1.push("REKAPITULASI", "", "", "", "", "", "");
+      aoa.push(tableHeader1);
+
+      // Baris Header Tabel Bagian 2
+      const tableHeader2: (string | number)[] = ["", "", "", ""];
+      dates.forEach((d) => {
+        const dayNum = parseInt(d.split("-")[2], 10);
+        tableHeader2.push(dayNum);
+      });
+      tableHeader2.push("H", "I", "S", "C", "A", "TL", "%");
+      aoa.push(tableHeader2);
+
+      // Baris Data Pengurus
+      (pengurusList || []).forEach((p, idx) => {
+        const row: (string | number)[] = [
+          idx + 1,
+          p.nip || "-",
+          p.nama_lengkap || "-",
+          p.jabatan || "-",
+        ];
+
+        let hCount = 0;
+        let iCount = 0;
+        let sCount = 0;
+        let cCount = 0;
+        let aCount = 0;
+        let tlCount = 0;
+
+        dates.forEach((d) => {
+          const key = `${p.id}_${d}`;
+          const st = presensiMap.get(key);
+          if (st === "Hadir") {
+            row.push("H");
+            hCount++;
+          } else if (st === "Izin") {
+            row.push("I");
+            iCount++;
+          } else if (st === "Sakit") {
+            row.push("S");
+            sCount++;
+          } else if (st === "Cuti") {
+            row.push("C");
+            cCount++;
+          } else if (st === "Alpa") {
+            row.push("A");
+            aCount++;
+          } else if (st === "Tugas Luar") {
+            row.push("TL");
+            tlCount++;
+          } else {
+            row.push("");
+          }
+        });
+
+        const totalMeetings = hCount + iCount + sCount + cCount + aCount + tlCount;
+        const pct = totalMeetings > 0 ? `${Math.round(((hCount + tlCount) / totalMeetings) * 100)}%` : "-";
+
+        row.push(hCount, iCount, sCount, cCount, aCount, tlCount, pct);
+        aoa.push(row);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(aoa);
+
+      // Pengaturan Cell Merges
+      worksheet["!merges"] = [
+        // Header Kop kanan atas
+        { s: { r: 0, c: totalCols - 7 }, e: { r: 0, c: totalCols - 1 } },
+        { s: { r: 1, c: totalCols - 7 }, e: { r: 1, c: totalCols - 1 } },
+        { s: { r: 2, c: totalCols - 7 }, e: { r: 2, c: totalCols - 1 } },
+        // Kolom tetap NO, NIP, NAMA PENGURUS, JABATAN (merge vertikal baris 4 dan 5)
+        { s: { r: 4, c: 0 }, e: { r: 5, c: 0 } },
+        { s: { r: 4, c: 1 }, e: { r: 5, c: 1 } },
+        { s: { r: 4, c: 2 }, e: { r: 5, c: 2 } },
+        { s: { r: 4, c: 3 }, e: { r: 5, c: 3 } },
+        // Periode Bulan (merge horizontal seluruh kolom tanggal)
+        { s: { r: 4, c: 4 }, e: { r: 4, c: 4 + dates.length - 1 } },
+        // Rekapitulasi (merge horizontal kolom rekap)
+        { s: { r: 4, c: 4 + dates.length }, e: { r: 4, c: 4 + dates.length + 6 } },
+      ];
+
+      // Pengaturan Lebar Kolom
+      const colWidths: { wch: number }[] = [
+        { wch: 5 },  // No
+        { wch: 12 }, // NIP
+        { wch: 28 }, // Nama Pengurus
+        { wch: 26 }, // Jabatan
+      ];
+      for (let i = 0; i < dates.length; i++) {
+        colWidths.push({ wch: 4 });
+      }
+      colWidths.push({ wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 5 }, { wch: 7 }); // H, I, S, C, A, TL, %
+      worksheet["!cols"] = colWidths;
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Presensi Pengurus");
+
+      const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const filenamePresensiPengurus = `Daftar_Hadir_Pengurus_${periodeLabel.replace(/[\s\/:]+/g, "_")}.xlsx`;
+
+      return new NextResponse(excelBuffer, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "Content-Disposition": `attachment; filename="${filenamePresensiPengurus}"`,
         },
       });
     } else if (modul === "penilaian") {

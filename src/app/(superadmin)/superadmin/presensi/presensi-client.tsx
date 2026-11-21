@@ -31,6 +31,37 @@ export const STATUS_OPTIONS = ["Hadir", "Izin", "Sakit", "Alpa"] as const;
 export type StatusPresensi = typeof STATUS_OPTIONS[number];
 export type TabFilter = "Semua" | StatusPresensi | "Belum Absen";
 
+export const PENGURUS_STATUS_OPTIONS = ["Hadir", "Izin", "Sakit", "Cuti", "Alpa", "Tugas Luar"] as const;
+
+export interface PengurusData {
+  id: string;
+  nip: string;
+  nama_lengkap: string;
+  jabatan: string;
+  no_hp?: string;
+  email?: string;
+  is_active: boolean;
+}
+
+export interface PresensiPengurusRecord {
+  id: string;
+  pengurus_id: string;
+  tanggal: string;
+  jam: string;
+  jarak_meter?: number;
+  status: string;
+  created_by?: string;
+  keterangan?: string;
+  created_at?: string;
+}
+
+export interface PresensiPengurusAllItem {
+  id: string;
+  pengurus: PengurusData;
+  presensi: PresensiPengurusRecord | null;
+  status: string;
+}
+
 export interface SiswaData {
   id: string;
   nomor_induk: string;
@@ -122,6 +153,12 @@ export function PresensiClient({
   const [manualSaving, setManualSaving] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
+  // Tab Utama: Siswa vs Pengurus
+  const [mainTab, setMainTab] = useState<"siswa" | "pengurus">("siswa");
+  const [pengurusItems, setPengurusItems] = useState<PresensiPengurusAllItem[]>([]);
+  const [pengurusLoading, setPengurusLoading] = useState(false);
+  const [exportTarget, setExportTarget] = useState<"siswa" | "pengurus">("siswa");
+
   // Modal Ekspor Excel
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportMode, setExportMode] = useState<"bulan" | "minggu" | "custom">("bulan");
@@ -130,6 +167,22 @@ export function PresensiClient({
   const [exportStartDate, setExportStartDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [exportEndDate, setExportEndDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [exportProgramId, setExportProgramId] = useState("");
+
+  // Load data presensi seluruh siswa pada tanggal terpilih
+  const loadPresensi = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/v1/presensi?tanggal=${selectedDate}&view_type=all_students`);
+      if (res.ok) {
+        const json = await res.json();
+        setItems(json.data || []);
+      }
+    } catch (err) {
+      console.error("Gagal memuat log presensi:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDate]);
 
   // Modal Import Excel
   const [importOpen, setImportOpen] = useState(false);
@@ -158,22 +211,6 @@ export function PresensiClient({
     loadPrograms();
   }, [programs.length]);
 
-  // Load data presensi seluruh siswa pada tanggal terpilih
-  const loadPresensi = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/v1/presensi?tanggal=${selectedDate}&view_type=all_students`);
-      if (res.ok) {
-        const json = await res.json();
-        setItems(json.data || []);
-      }
-    } catch (err) {
-      console.error("Gagal memuat log presensi:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDate]);
-
   useEffect(() => {
     // Lewati fetch awal jika data initialItems sudah disuplai dari Server Component
     if (isInitialMount.current) {
@@ -182,6 +219,55 @@ export function PresensiClient({
     }
     loadPresensi();
   }, [loadPresensi, items.length]);
+
+  // Load data presensi pengurus pada tanggal terpilih
+  const loadPengurusPresensi = useCallback(async () => {
+    setPengurusLoading(true);
+    try {
+      const res = await fetch(`/api/v1/pengurus/presensi?tanggal=${selectedDate}&view_type=all_pengurus`);
+      if (res.ok) {
+        const json = await res.json();
+        setPengurusItems(json.data || []);
+      }
+    } catch (err) {
+      console.error("Gagal memuat presensi pengurus:", err);
+    } finally {
+      setPengurusLoading(false);
+    }
+  }, [selectedDate]);
+
+  useEffect(() => {
+    if (mainTab === "pengurus") {
+      loadPengurusPresensi();
+    }
+  }, [mainTab, loadPengurusPresensi]);
+
+  // Handler Quick Action / Override Presensi Pengurus
+  async function handleSetPengurusStatus(pengurusId: string, newStatus: string, keterangan?: string) {
+    setUpdatingId(pengurusId);
+    try {
+      const res = await fetch("/api/v1/pengurus/presensi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pengurus_id: pengurusId,
+          tanggal: selectedDate,
+          status: newStatus,
+          keterangan: keterangan || null,
+        }),
+      });
+      if (res.ok) {
+        await loadPengurusPresensi();
+      } else {
+        const data = await res.json();
+        alert(data.error?.message || "Gagal memperbarui status presensi pengurus.");
+      }
+    } catch (err) {
+      console.error("Gagal mengubah status pengurus:", err);
+    } finally {
+      setUpdatingId(null);
+    }
+  }
 
   // Handler Quick Action / Override Presensi
   async function handleSetStatus(siswaId: string, newStatus: StatusPresensi, keterangan?: string) {
@@ -275,13 +361,14 @@ export function PresensiClient({
 
   // Handler Download Ekspor Excel
   function handleDownloadExport() {
-    let url = `/api/v1/excel/export?modul=presensi`;
+    const modulTarget = exportTarget === "pengurus" ? "presensi_pengurus" : "presensi";
+    let url = `/api/v1/excel/export?modul=${modulTarget}`;
     if (exportMode === "bulan") {
       url += `&bulan=${exportBulan}&tahun=${exportTahun}`;
     } else {
       url += `&start_date=${exportStartDate}&end_date=${exportEndDate}`;
     }
-    if (exportProgramId) {
+    if (exportTarget === "siswa" && exportProgramId) {
       url += `&program_id=${exportProgramId}`;
     }
     window.open(url, "_blank");
@@ -313,8 +400,8 @@ export function PresensiClient({
   const sortedItems = React.useMemo(() => {
     const list = [...filtered];
     list.sort((a, b) => {
-      let valA: any = "";
-      let valB: any = "";
+      let valA: string | number = "";
+      let valB: string | number = "";
       if (sortKey === "nomor_induk") {
         valA = a.siswa.nomor_induk || "";
         valB = b.siswa.nomor_induk || "";
@@ -542,6 +629,133 @@ export function PresensiClient({
     },
   ];
 
+  const pengurusColumns = [
+    {
+      key: "no",
+      header: "No",
+      render: (r: PresensiPengurusAllItem) => (
+        <span className="text-[11px] text-[#9CA3AF] font-mono">
+          {pengurusItems.indexOf(r) + 1}
+        </span>
+      ),
+    },
+    {
+      key: "nip",
+      header: "NIP / ID",
+      render: (r: PresensiPengurusAllItem) => (
+        <span className="font-mono text-xs text-[#DC2626] font-bold">
+          {r.pengurus.nip || "—"}
+        </span>
+      ),
+    },
+    {
+      key: "nama",
+      header: "Nama Pengurus & Jabatan",
+      render: (r: PresensiPengurusAllItem) => (
+        <div>
+          <p className="text-xs font-semibold text-[#F9FAFB]">{r.pengurus.nama_lengkap}</p>
+          <p className="text-[10px] text-[#6B7280]">{r.pengurus.jabatan}</p>
+        </div>
+      ),
+    },
+    {
+      key: "waktu",
+      header: "Waktu (WIB)",
+      render: (r: PresensiPengurusAllItem) => (
+        <span className="font-mono text-xs text-[#D1D5DB]">
+          {r.presensi ? formatPresensiWIBTime(r.presensi.jam, r.presensi.created_at, r.presensi.status) : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "jarak",
+      header: "Jarak (GPS)",
+      render: (r: PresensiPengurusAllItem) => (
+        <span className="flex items-center gap-1.5 text-xs text-[#D1D5DB]">
+          <MapPin className="h-3 w-3 text-[#6B7280]" aria-hidden="true" />
+          {r.presensi?.jarak_meter != null ? `${Math.round(r.presensi.jarak_meter)} m` : "—"}
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (r: PresensiPengurusAllItem) => {
+        const isHadir = r.status === "Hadir";
+        const isIzin = r.status === "Izin";
+        const isSakit = r.status === "Sakit";
+        const isCuti = r.status === "Cuti";
+        const isTugasLuar = r.status === "Tugas Luar";
+        const isAlpa = r.status === "Alpa";
+
+        let color = "text-[#9CA3AF]";
+        let icon = <UserX className="h-3.5 w-3.5" />;
+        if (isHadir) {
+          color = "text-[#10B981]";
+          icon = <CheckCircle2 className="h-3.5 w-3.5" />;
+        } else if (isIzin || isSakit) {
+          color = "text-[#F59E0B]";
+          icon = <AlertTriangle className="h-3.5 w-3.5" />;
+        } else if (isCuti) {
+          color = "text-[#A855F7]";
+          icon = <Calendar className="h-3.5 w-3.5" />;
+        } else if (isTugasLuar) {
+          color = "text-[#6366F1]";
+          icon = <MapPin className="h-3.5 w-3.5" />;
+        } else if (isAlpa) {
+          color = "text-[#F43F5E]";
+          icon = <XCircle className="h-3.5 w-3.5" />;
+        }
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className={`flex items-center gap-1.5 font-semibold text-xs ${color}`}>
+              {icon} {r.status}
+              {r.presensi?.created_by === "superadmin" && (
+                <Badge variant="warning" className="ml-1 text-[9px] px-1 py-0">
+                  Override
+                </Badge>
+              )}
+            </span>
+            {r.presensi?.keterangan && (
+              <span className="text-[10px] text-[#9CA3AF] italic max-w-xs truncate">
+                &quot;{r.presensi.keterangan}&quot;
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: "aksi",
+      header: "Atur Kehadiran",
+      className: "text-right",
+      render: (r: PresensiPengurusAllItem) => {
+        const isBusy = updatingId === r.pengurus.id;
+
+        return (
+          <div className="flex items-center gap-1.5 justify-end">
+            <select
+              value={r.status === "Belum Absen" ? "" : r.status}
+              disabled={isBusy}
+              onChange={(e) => handleSetPengurusStatus(r.pengurus.id, e.target.value)}
+              className="h-7 rounded-lg border border-[#374151] bg-[#0B0F17] px-2 text-[11px] text-[#D1D5DB] focus:outline-none focus:border-[#DC2626] transition-colors cursor-pointer disabled:opacity-50"
+              aria-label={`Ubah status ${r.pengurus.nama_lengkap}`}
+            >
+              <option value="" disabled>Pilih Status</option>
+              {PENGURUS_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            {isBusy && <Loader2 className="h-3 w-3 animate-spin text-[#DC2626]" />}
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-5">
       {/* Header Halaman & Action Tools */}
@@ -549,7 +763,7 @@ export function PresensiClient({
         <div>
           <h1 className="text-base font-bold text-[#F9FAFB]">Presensi GPS & Rekapitulasi Absensi</h1>
           <p className="text-xs text-[#6B7280] mt-0.5">
-            Pemantauan absensi geofencing harian siswa aktif (belum lulus), entri izin/sakit/alpa manual, dan ekspor matriks kehadiran resmi.
+            Pemantauan absensi geofencing harian siswa aktif & pengurus/instruktur, entri manual, dan ekspor matriks kehadiran resmi.
           </p>
         </div>
 
@@ -585,21 +799,58 @@ export function PresensiClient({
             Ekspor Excel Matriks
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              setManualSiswaId("");
-              setManualStatus("Hadir");
-              setManualKeterangan("");
-              setManualError(null);
-              setManualModalOpen(true);
-            }}
-            className="h-8 px-3 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Catat Manual
-          </button>
+          {mainTab === "siswa" && (
+            <button
+              type="button"
+              onClick={() => {
+                setManualSiswaId("");
+                setManualStatus("Hadir");
+                setManualKeterangan("");
+                setManualError(null);
+                setManualModalOpen(true);
+              }}
+              className="h-8 px-3 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Catat Manual
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* Tab Switcher: Siswa vs Pengurus */}
+      <div className="flex items-center gap-2 p-1 bg-[#111827] border border-[#1F2937] rounded-xl w-fit">
+        <button
+          type="button"
+          onClick={() => setMainTab("siswa")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            mainTab === "siswa"
+              ? "bg-[#DC2626] text-white shadow-sm"
+              : "text-[#9CA3AF] hover:text-white"
+          }`}
+        >
+          <span>Siswa Pelatihan</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${mainTab === "siswa" ? "bg-white/20 text-white" : "bg-[#1F2937] text-[#6B7280]"}`}>
+            {items.length}
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMainTab("pengurus");
+            loadPengurusPresensi();
+          }}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+            mainTab === "pengurus"
+              ? "bg-[#DC2626] text-white shadow-sm"
+              : "text-[#9CA3AF] hover:text-white"
+          }`}
+        >
+          <span>Pengurus & Instruktur</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${mainTab === "pengurus" ? "bg-white/20 text-white" : "bg-[#1F2937] text-[#6B7280]"}`}>
+            {pengurusItems.length}
+          </span>
+        </button>
       </div>
 
       {/* Filter Tanggal & Batch Action Alpa */}
@@ -686,27 +937,47 @@ export function PresensiClient({
       </div>
 
       {/* Tabel Data Presensi */}
-      {loading ? (
-        <TableSkeleton rows={8} columns={7} />
+      {mainTab === "siswa" ? (
+        loading ? (
+          <TableSkeleton rows={8} columns={7} />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Table
+              columns={columns}
+              data={paginatedItems}
+              emptyMessage={`Tidak ada siswa yang sesuai filter pada tanggal ${selectedDate}.`}
+            />
+            <Pagination
+              currentPage={page}
+              totalPages={Math.max(1, Math.ceil(sortedItems.length / limit))}
+              pageSize={limit}
+              totalItems={sortedItems.length}
+              onPageChange={setPage}
+              onPageSizeChange={(newLimit) => {
+                setLimit(newLimit);
+                setPage(1);
+              }}
+            />
+          </div>
+        )
       ) : (
-        <div className="flex flex-col gap-4">
-          <Table
-            columns={columns}
-            data={paginatedItems}
-            emptyMessage={`Tidak ada siswa yang sesuai filter pada tanggal ${selectedDate}.`}
-          />
-          <Pagination
-            currentPage={page}
-            totalPages={Math.max(1, Math.ceil(sortedItems.length / limit))}
-            pageSize={limit}
-            totalItems={sortedItems.length}
-            onPageChange={setPage}
-            onPageSizeChange={(newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }}
-          />
-        </div>
+        pengurusLoading ? (
+          <TableSkeleton rows={6} columns={7} />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Table
+              columns={pengurusColumns}
+              data={pengurusItems.filter((item) => {
+                const q = search.toLowerCase();
+                const nama = item.pengurus.nama_lengkap.toLowerCase();
+                const nip = (item.pengurus.nip || "").toLowerCase();
+                const jabatan = item.pengurus.jabatan.toLowerCase();
+                return !q || nama.includes(q) || nip.includes(q) || jabatan.includes(q);
+              })}
+              emptyMessage={`Tidak ada data pengurus pada tanggal ${selectedDate}.`}
+            />
+          </div>
+        )
       )}
 
       {/* ===================================================================== */}
@@ -806,11 +1077,41 @@ export function PresensiClient({
       <Modal
         open={exportModalOpen}
         onClose={() => setExportModalOpen(false)}
-        title="Ekspor Rekap Kehadiran Siswa (.xlsx)"
-        description="Format laporan sesuai format matriks resmi LKP Pengelasan Sumbu Hidup Cilacap."
+        title={exportTarget === "pengurus" ? "Ekspor Rekap Kehadiran Pengurus & Instruktur (.xlsx)" : "Ekspor Rekap Kehadiran Siswa (.xlsx)"}
+        description={exportTarget === "pengurus" ? "Format matriks presensi pengurus, instruktur, dan staf LPKS Sumbu Hidup." : "Format laporan sesuai format matriks resmi LKP Pengelasan Sumbu Hidup Cilacap."}
         size="md"
       >
         <div className="flex flex-col gap-4">
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Pilihan Target Ekspor
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setExportTarget("siswa")}
+                className={`h-8 rounded-lg border text-xs font-bold transition-all ${
+                  exportTarget === "siswa"
+                    ? "border-[#10B981] bg-[#10B981]/15 text-[#10B981]"
+                    : "border-[#374151] bg-[#111827] text-[#9CA3AF] hover:text-white"
+                }`}
+              >
+                👷 Siswa Pelatihan
+              </button>
+              <button
+                type="button"
+                onClick={() => setExportTarget("pengurus")}
+                className={`h-8 rounded-lg border text-xs font-bold transition-all ${
+                  exportTarget === "pengurus"
+                    ? "border-[#10B981] bg-[#10B981]/15 text-[#10B981]"
+                    : "border-[#374151] bg-[#111827] text-[#9CA3AF] hover:text-white"
+                }`}
+              >
+                👔 Pengurus & Instruktur
+              </button>
+            </div>
+          </div>
+
           <div>
             <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
               Pilihan Periode Laporan
@@ -893,23 +1194,25 @@ export function PresensiClient({
             </div>
           )}
 
-          <div>
-            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
-              Filter Program (Opsional)
-            </label>
-            <select
-              value={exportProgramId}
-              onChange={(e) => setExportProgramId(e.target.value)}
-              className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-2.5 text-xs text-[#F9FAFB] focus:border-[#DC2626]"
-            >
-              <option value="">Semua Program Pelatihan</option>
-              {programs.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.nama} ({p.kode_program})
-                </option>
-              ))}
-            </select>
-          </div>
+          {exportTarget === "siswa" && (
+            <div>
+              <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+                Filter Program (Opsional)
+              </label>
+              <select
+                value={exportProgramId}
+                onChange={(e) => setExportProgramId(e.target.value)}
+                className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-2.5 text-xs text-[#F9FAFB] focus:border-[#DC2626]"
+              >
+                <option value="">Semua Program Pelatihan</option>
+                {programs.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nama} ({p.kode_program})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
             <button

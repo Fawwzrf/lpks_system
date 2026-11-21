@@ -86,6 +86,18 @@ Aplikasi LPKS Sumbu Hidup adalah sistem manajemen pelatihan pengelasan terpadu b
   1. Ajukan pertanyaan natural (contoh: *"Siapa siswa SMAW 6G yang nilai capping-nya masih di bawah 80?"* atau *"Bagaimana SOP penyetelan amper las FCAW 3G?"*).
   2. AI Assistant (berbasis model Gemini Flash) membaca data terstruktur sistem dan standar pengelasan resmi untuk memberikan ringkasan analisis yang tepat.
 
+### 8. Presensi Pengurus & Ekspor Daftar Hadir Resmi (Superadmin)
+- **Cara Mengakses:** Menu Sidebar -> **Presensi** -> Klik tab **[ Pengurus & Instruktur ]**
+- **Langkah Penggunaan:**
+  1. **Tampilan Harian:** Menampilkan daftar seluruh pengurus dan instruktur aktif LPKS, NIP, Jabatan, dan status kehadiran pada tanggal terpilih.
+  2. **Presensi Mandiri / GPS:** Instruktur/pengurus dapat melakukan presensi mandiri dengan validasi koordinat GPS geofencing radius 100m.
+  3. **Manual Override:** Superadmin dapat mengubah status kehadiran pengurus (Hadir, Izin, Sakit, Cuti, Tugas Luar, Alpa) dan menambahkan keterangan resmi.
+  4. **Ekspor Spreadsheet Terisolasi:**
+     - Klik tombol **Ekspor Excel** di toolbar atas.
+     - Pilih target ekspor: **Pengurus & Instruktur**.
+     - Tentukan periode bulan dan tahun, lalu klik **Unduh Excel**.
+     - Sistem menghasilkan file spreadsheet resmi (`Daftar_Hadir_Pengurus_*.xlsx`) dengan format kop surat lembaga, tanggal 1 s/d 31, dan rekapitulasi kehadiran (H, I, S, C, A, TL, %) yang terpisah bersih dari data presensi siswa.
+
 ---
 
 ## Pemecahan Masalah Umum (Troubleshooting)

@@ -41,7 +41,7 @@ Semua modul diuji silang dengan Acceptance Criteria PRD & Roadmap Peningkatan Si
 ## Strategi Pengujian
 
 ### Tahap 2 — Pengujian Fungsional
-Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (129 test, 38 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR/NFR.
+Unit, Integration, System, dan Regression test menggunakan **Node.js Native Test Runner** (154 test, 45 test suites, 100% PASS) + **Playwright MCP** untuk E2E interaktif. Setiap Test Case (TC-xx) dilacak ke AC/FR/NFR.
 
 ### Tahap 3 — Pengujian Non-Fungsional
 - **Performance:** Lighthouse + Chrome DevTools MCP untuk CWV (LCP, INP, FID) & verifikasi Server Component Streaming
@@ -58,7 +58,7 @@ Skenario walkthrough end-to-end oleh user (user bertindak sebagai Superadmin & S
 ### Entry Criteria (Sudah Terpenuhi ✅)
 - [x] Semua 7 tahap Development sudah dikonfirmasi
 - [x] Code review & refactoring selesai
-- [x] `npm test` → 129 pass, 38 suites, 0 fail (100% pass baseline clean)
+- [x] `npm test` → 154 pass, 45 suites, 0 fail (100% pass baseline clean)
 - [x] `tsc --noEmit` → 0 error
 - [x] `npm run lint` → 0 error
 - [x] Dev server aktif (`npm run dev`)
@@ -329,12 +329,13 @@ Semua **Kriteria Penerimaan (Exit Criteria)** untuk Tahap 3 (Non-Fungsional) tel
 | **UAT-20: Audit Trail Transaksi Keuangan & Sertifikat** | Melakukan mutasi transaksi keuangan (tambah, edit, hapus) dan penambahan antrean cetak. | Riwayat aktivitas sensitif tercatat otomatis ke tabel `audit_log` lengkap dengan ID user dan IP address. | Log audit tersimpan append-only dan fail-safe tanpa mengganggu flow transaksi pengguna. | ✅ PASS |
 | **UAT-21: Filter Program Aktif & Modal Arsip/Hapus** | Mengarsipkan program pelatihan lama dan membuka formulir pendaftaran serta filter data siswa. | Formulir pendaftaran hanya menampilkan program aktif; program arsip disembunyikan tanpa merusak data histori; modal konfirmasi menggantikan browser confirm. | Dropdown bersih dari format impor lama, aksi arsip/hapus aman dengan dialog modal modern. | ✅ PASS |
 | **UAT-22: Filter Kandidat Ujian & Beasiswa Rp 0** | Menilai ujian siswa yang belum bersertifikat vs yang sudah antre/dicetak, serta siswa beasiswa biaya Rp 0. | Siswa bersertifikat tidak lagi memenuhi tabel ujian; siswa beasiswa Rp 0 otomatis lolos gate-check Lunas. | Tabel ujian fokus hanya pada kandidat aktif; gate check kelulusan dan antrean cetak berjalan tanpa false-rejection keuangan. | ✅ PASS |
+| **UAT-23: Presensi Pengurus/Instruktur & Pemisahan Ekspor Excel** | Mengakses tab Pengurus & Instruktur di `/superadmin/presensi`, melakukan presensi GPS / override status (H/I/S/C/TL/A), dan mengunduh rekapitulasi Excel. | Tabel pengurus terisolasi bersih dari presensi siswa; status presensi tersimpan ke `presensi_pengurus`; ekspor menghasilkan file `Daftar_Hadir_Pengurus_*.xlsx` berformat matriks kop resmi. | Rekap bulanan pengurus akurat, rumus kalkulasi H/I/S/C/A/TL konsisten, 0 dampak regresi terhadap 129 pengujian presensi siswa. | ✅ PASS |
 
 ---
 
 ## 4.2. Kesimpulan Akhir UAT
 
-Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 22**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, anti-fake GPS telemetry, idempotency guard, zero-SQL grandfathering tarif, Server Component Streaming, serta siklus antrean cetak sertifikat & pengarsipan program. 
+Seluruh skenario User Acceptance Testing (**UAT 01 s/d UAT 23**) telah dieksekusi dengan hasil **100% Lulus (PASS)** dan mendapat persetujuan spesifikasi format akun, alur multi-program, anti-fake GPS telemetry, idempotency guard, zero-SQL grandfathering tarif, Server Component Streaming, siklus antrean cetak sertifikat & pengarsipan program, serta pemisahan modul presensi dan ekspor spreadsheet pengurus/instruktur.
 
 Seluruh **Exit Criteria Fase Testing telah TERPENUHI**. Sistem Manajemen Pelatihan Pengelasan LPKS Sumbu Hidup dinyatakan **SIAP MELANJUTKAN KE FASE DEPLOYMENT & PRESENTASI PUBLIK**.
 
