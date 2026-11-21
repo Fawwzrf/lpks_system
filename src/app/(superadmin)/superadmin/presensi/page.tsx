@@ -6,6 +6,7 @@ import {
   PresensiClient,
   type PresensiAllItem,
   type ProgramItem,
+  type PresensiPengurusAllItem,
 } from "./presensi-client";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,12 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Rekap & Pemantauan Presensi — LPKS Sumbu Hidup",
   description:
-    "Pemantauan absensi geofencing harian siswa aktif, entri manual status kehadiran, dan ekspor matriks presensi resmi.",
+    "Pemantauan absensi geofencing harian siswa aktif & pengurus/instruktur, entri manual status kehadiran, dan ekspor matriks presensi resmi.",
 };
 
 async function getInitialPresensiData(): Promise<{
   items: PresensiAllItem[];
+  pengurusItems: PresensiPengurusAllItem[];
   programs: ProgramItem[];
   todayStr: string;
 }> {
@@ -25,8 +27,8 @@ async function getInitialPresensiData(): Promise<{
   try {
     const supabase = await createClient();
 
-    // Query paralel master program, siswa aktif & presensi hari ini
-    const [progRes, siswaRes, presensiRes] = await Promise.all([
+    // Query paralel master program, siswa aktif, presensi siswa, pengurus aktif & presensi pengurus hari ini
+    const [progRes, siswaRes, presensiRes, pengurusRes, presensiPengurusRes] = await Promise.all([
       supabase
         .from("master_program")
         .select("id, kode_program, nama")
@@ -45,15 +47,31 @@ async function getInitialPresensiData(): Promise<{
         .from("presensi")
         .select("id, siswa_id, tanggal, jam, status, jarak_meter, keterangan, created_by, created_at")
         .eq("tanggal", today),
+      supabase
+        .from("pengurus")
+        .select("id, nip, nama_lengkap, jabatan, no_hp, email, is_active")
+        .eq("is_active", true)
+        .order("nip", { ascending: true }),
+      supabase
+        .from("presensi_pengurus")
+        .select("id, pengurus_id, tanggal, jam, status, jarak_meter, keterangan, created_by, created_at")
+        .eq("tanggal", today),
     ]);
 
     const programs: ProgramItem[] = progRes.data || [];
     const allSiswa = siswaRes.data || [];
     const presensiList = presensiRes.data || [];
+    const allPengurus = pengurusRes.data || [];
+    const presensiPengurusList = presensiPengurusRes.data || [];
 
     const presensiMap = new Map<string, (typeof presensiList)[number]>();
     presensiList.forEach((p) => {
       presensiMap.set(p.siswa_id, p);
+    });
+
+    const presensiPengurusMap = new Map<string, (typeof presensiPengurusList)[number]>();
+    presensiPengurusList.forEach((p) => {
+      presensiPengurusMap.set(p.pengurus_id, p);
     });
 
     const items: PresensiAllItem[] = allSiswa.map((s) => {
@@ -90,7 +108,29 @@ async function getInitialPresensiData(): Promise<{
       };
     });
 
-    return { items, programs, todayStr: today };
+    const pengurusItems: PresensiPengurusAllItem[] = allPengurus.map((p) => {
+      const pr = presensiPengurusMap.get(p.id) || null;
+      return {
+        id: p.id,
+        pengurus: p,
+        presensi: pr
+          ? {
+              id: pr.id,
+              pengurus_id: pr.pengurus_id,
+              tanggal: pr.tanggal,
+              jam: formatPresensiWIBTime(pr.jam, pr.created_at, pr.status),
+              jarak_meter: pr.jarak_meter,
+              status: pr.status,
+              created_by: pr.created_by,
+              keterangan: pr.keterangan,
+              created_at: pr.created_at,
+            }
+          : null,
+        status: pr ? pr.status : "Belum Absen",
+      };
+    });
+
+    return { items, pengurusItems, programs, todayStr: today };
   } catch (error) {
     if (
       error &&
@@ -102,15 +142,16 @@ async function getInitialPresensiData(): Promise<{
       throw error;
     }
     console.error("Gagal memuat data presensi di Server Component:", error);
-    return { items: [], programs: [], todayStr: today };
+    return { items: [], pengurusItems: [], programs: [], todayStr: today };
   }
 }
 
 async function PresensiContent() {
-  const { items, programs, todayStr } = await getInitialPresensiData();
+  const { items, pengurusItems, programs, todayStr } = await getInitialPresensiData();
   return (
     <PresensiClient
       initialItems={items}
+      initialPengurusItems={pengurusItems}
       initialPrograms={programs}
       initialDate={todayStr}
     />

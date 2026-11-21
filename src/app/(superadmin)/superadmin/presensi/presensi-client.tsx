@@ -14,8 +14,10 @@ import {
   FileSpreadsheet,
   Plus,
   UserX,
+  UserCheck,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table } from "@/components/ui/table";
@@ -101,6 +103,7 @@ export interface ProgramItem {
 
 export interface PresensiClientProps {
   initialItems?: PresensiAllItem[];
+  initialPengurusItems?: PresensiPengurusAllItem[];
   initialPrograms?: ProgramItem[];
   initialDate?: string;
 }
@@ -115,6 +118,7 @@ const STATUS_CONFIG: Record<StatusPresensi | "Belum Absen", { icon: React.ReactN
 
 export function PresensiClient({
   initialItems = [],
+  initialPengurusItems = [],
   initialPrograms = [],
   initialDate = todayStr(),
 }: PresensiClientProps) {
@@ -123,6 +127,8 @@ export function PresensiClient({
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [activeTab, setActiveTab] = useState<TabFilter>("Semua");
+  const [pengurusTab, setPengurusTab] = useState<string>("Semua");
+  const [mainTab, setMainTab] = useState<"siswa" | "pengurus">("siswa");
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [programs, setPrograms] = useState<ProgramItem[]>(initialPrograms);
@@ -143,9 +149,9 @@ export function PresensiClient({
 
   useEffect(() => {
     setPage(1);
-  }, [selectedDate, activeTab, selectedProgramFilter, search, sortKey, sortDir, limit]);
+  }, [selectedDate, activeTab, pengurusTab, mainTab, selectedProgramFilter, search, sortKey, sortDir, limit]);
 
-  // Modal Catat Presensi Manual
+  // Modal Catat Presensi Manual Siswa
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [manualSiswaId, setManualSiswaId] = useState("");
   const [manualStatus, setManualStatus] = useState<StatusPresensi>("Hadir");
@@ -154,10 +160,28 @@ export function PresensiClient({
   const [manualError, setManualError] = useState<string | null>(null);
 
   // Tab Utama: Siswa vs Pengurus
-  const [mainTab, setMainTab] = useState<"siswa" | "pengurus">("siswa");
-  const [pengurusItems, setPengurusItems] = useState<PresensiPengurusAllItem[]>([]);
+  const [pengurusItems, setPengurusItems] = useState<PresensiPengurusAllItem[]>(initialPengurusItems);
   const [pengurusLoading, setPengurusLoading] = useState(false);
   const [exportTarget, setExportTarget] = useState<"siswa" | "pengurus">("siswa");
+
+  // Modal Tambah Pengurus Baru
+  const [tambahPengurusModalOpen, setTambahPengurusModalOpen] = useState(false);
+  const [tambahNip, setTambahNip] = useState("");
+  const [tambahNama, setTambahNama] = useState("");
+  const [tambahJabatan, setTambahJabatan] = useState("");
+  const [tambahHp, setTambahHp] = useState("");
+  const [tambahEmail, setTambahEmail] = useState("");
+  const [tambahLoading, setTambahLoading] = useState(false);
+  const [tambahError, setTambahError] = useState<string | null>(null);
+  const [seedingLoading, setSeedingLoading] = useState(false);
+
+  // Modal Catat Presensi / Cuti / Tugas Luar Pengurus
+  const [manualPengurusModalOpen, setManualPengurusModalOpen] = useState(false);
+  const [manualPengurusId, setManualPengurusId] = useState("");
+  const [manualPengurusStatus, setManualPengurusStatus] = useState<string>("Hadir");
+  const [manualPengurusKeterangan, setManualPengurusKeterangan] = useState("");
+  const [manualPengurusSaving, setManualPengurusSaving] = useState(false);
+  const [manualPengurusError, setManualPengurusError] = useState<string | null>(null);
 
   // Modal Ekspor Excel
   const [exportModalOpen, setExportModalOpen] = useState(false);
@@ -266,6 +290,133 @@ export function PresensiClient({
       console.error("Gagal mengubah status pengurus:", err);
     } finally {
       setUpdatingId(null);
+    }
+  }
+
+  // Handler Submit Tambah Pengurus Baru
+  async function handleTambahPengurusSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!tambahNip || !tambahNama || !tambahJabatan) {
+      setTambahError("NIP, Nama Lengkap, dan Jabatan wajib diisi.");
+      return;
+    }
+    setTambahLoading(true);
+    setTambahError(null);
+    try {
+      const res = await fetch("/api/v1/pengurus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nip: tambahNip.trim(),
+          nama_lengkap: tambahNama.trim(),
+          jabatan: tambahJabatan.trim(),
+          no_hp: tambahHp.trim() || null,
+          email: tambahEmail.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setTambahPengurusModalOpen(false);
+        setTambahNip("");
+        setTambahNama("");
+        setTambahJabatan("");
+        setTambahHp("");
+        setTambahEmail("");
+        await loadPengurusPresensi();
+      } else {
+        setTambahError(data.error?.message || "Gagal menambahkan pengurus.");
+      }
+    } catch {
+      setTambahError("Terjadi kesalahan jaringan.");
+    } finally {
+      setTambahLoading(false);
+    }
+  }
+
+  // Handler Muat 4 Pengurus Default LPKS
+  async function handleSeedDefaultPengurus() {
+    setSeedingLoading(true);
+    try {
+      const res = await fetch("/api/v1/pengurus", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "seed_defaults" }),
+      });
+      if (res.ok) {
+        await loadPengurusPresensi();
+      } else {
+        const data = await res.json();
+        alert(data.error?.message || "Gagal memuat pengurus default.");
+      }
+    } catch {
+      alert("Terjadi kesalahan jaringan saat memuat pengurus default.");
+    } finally {
+      setSeedingLoading(false);
+    }
+  }
+
+  // Handler Submit Override Presensi Pengurus via Modal
+  async function handleManualPengurusSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!manualPengurusId) {
+      setManualPengurusError("Silakan pilih pengurus terlebih dahulu.");
+      return;
+    }
+    setManualPengurusSaving(true);
+    setManualPengurusError(null);
+    try {
+      const res = await fetch("/api/v1/pengurus/presensi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pengurus_id: manualPengurusId,
+          tanggal: selectedDate,
+          status: manualPengurusStatus,
+          keterangan: manualPengurusKeterangan.trim() || null,
+        }),
+      });
+      if (res.ok) {
+        setManualPengurusModalOpen(false);
+        setManualPengurusId("");
+        setManualPengurusKeterangan("");
+        await loadPengurusPresensi();
+      } else {
+        const data = await res.json();
+        setManualPengurusError(data.error?.message || "Gagal mencatat presensi pengurus.");
+      }
+    } catch {
+      setManualPengurusError("Terjadi kesalahan jaringan.");
+    } finally {
+      setManualPengurusSaving(false);
+    }
+  }
+
+  // Handler Batch Alpa Pengurus
+  async function handleBatchAlpaPengurus() {
+    const unabsent = pengurusItems.filter((i) => i.status === "Belum Absen");
+    if (unabsent.length === 0) return;
+    if (!confirm(`Tandai ${unabsent.length} staf/pengurus yang belum absen sebagai Alpa?`)) return;
+    setPengurusLoading(true);
+    try {
+      await Promise.all(
+        unabsent.map((u) =>
+          fetch("/api/v1/pengurus/presensi", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pengurus_id: u.pengurus.id,
+              tanggal: selectedDate,
+              status: "Alpa",
+              keterangan: "Batch alpa oleh sistem/admin",
+            }),
+          })
+        )
+      );
+      await loadPengurusPresensi();
+    } catch {
+      alert("Gagal memproses tanda alpa massal pengurus.");
+    } finally {
+      setPengurusLoading(false);
     }
   }
 
@@ -438,13 +589,35 @@ export function PresensiClient({
     return sortedItems.slice(start, start + limit);
   }, [sortedItems, page, limit]);
 
-  // Hitung jumlah per status
+  // Hitung jumlah per status siswa
   const countSemua = items.length;
   const countHadir = items.filter((i) => i.status === "Hadir").length;
   const countIzin = items.filter((i) => i.status === "Izin").length;
   const countSakit = items.filter((i) => i.status === "Sakit").length;
   const countAlpa = items.filter((i) => i.status === "Alpa").length;
   const countBelum = items.filter((i) => i.status === "Belum Absen").length;
+
+  // Hitung jumlah per status pengurus
+  const countPengurusSemua = pengurusItems.length;
+  const countPengurusHadir = pengurusItems.filter((i) => i.status === "Hadir").length;
+  const countPengurusIzin = pengurusItems.filter((i) => i.status === "Izin").length;
+  const countPengurusSakit = pengurusItems.filter((i) => i.status === "Sakit").length;
+  const countPengurusCuti = pengurusItems.filter((i) => i.status === "Cuti").length;
+  const countPengurusTugasLuar = pengurusItems.filter((i) => i.status === "Tugas Luar").length;
+  const countPengurusAlpa = pengurusItems.filter((i) => i.status === "Alpa").length;
+  const countPengurusBelum = pengurusItems.filter((i) => i.status === "Belum Absen").length;
+
+  // Filter List Pengurus
+  const filteredPengurus = pengurusItems.filter((item) => {
+    if (pengurusTab !== "Semua") {
+      if (item.status !== pengurusTab) return false;
+    }
+    const q = search.toLowerCase();
+    const nama = item.pengurus.nama_lengkap.toLowerCase();
+    const nip = (item.pengurus.nip || "").toLowerCase();
+    const jabatan = item.pengurus.jabatan.toLowerCase();
+    return !q || nama.includes(q) || nip.includes(q) || jabatan.includes(q);
+  });
 
   const columns = [
     {
@@ -733,16 +906,70 @@ export function PresensiClient({
       render: (r: PresensiPengurusAllItem) => {
         const isBusy = updatingId === r.pengurus.id;
 
+        if (r.status === "Belum Absen") {
+          return (
+            <div className="flex items-center gap-1.5 justify-end flex-wrap">
+              {isBusy ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-[#DC2626]" />
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Hadir")}
+                    className="px-2 py-1 rounded bg-[#10B981]/15 hover:bg-[#10B981]/25 text-[#10B981] border border-[#10B981]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Hadir"
+                  >
+                    + Hadir
+                  </button>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Izin")}
+                    className="px-2 py-1 rounded bg-[#F59E0B]/15 hover:bg-[#F59E0B]/25 text-[#F59E0B] border border-[#F59E0B]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Izin"
+                  >
+                    + Izin
+                  </button>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Sakit")}
+                    className="px-2 py-1 rounded bg-[#38BDF8]/15 hover:bg-[#38BDF8]/25 text-[#38BDF8] border border-[#38BDF8]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Sakit"
+                  >
+                    + Sakit
+                  </button>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Cuti")}
+                    className="px-2 py-1 rounded bg-[#A855F7]/15 hover:bg-[#A855F7]/25 text-[#A855F7] border border-[#A855F7]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Cuti"
+                  >
+                    + Cuti
+                  </button>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Tugas Luar")}
+                    className="px-2 py-1 rounded bg-[#6366F1]/15 hover:bg-[#6366F1]/25 text-[#6366F1] border border-[#6366F1]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Tugas Luar"
+                  >
+                    + Tugas Luar
+                  </button>
+                  <button
+                    onClick={() => handleSetPengurusStatus(r.pengurus.id, "Alpa")}
+                    className="px-2 py-1 rounded bg-[#F43F5E]/15 hover:bg-[#F43F5E]/25 text-[#F43F5E] border border-[#F43F5E]/30 text-[10px] font-bold transition-all"
+                    title="Tandai Alpa"
+                  >
+                    + Alpa
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        }
+
         return (
           <div className="flex items-center gap-1.5 justify-end">
             <select
-              value={r.status === "Belum Absen" ? "" : r.status}
+              value={r.status}
               disabled={isBusy}
               onChange={(e) => handleSetPengurusStatus(r.pengurus.id, e.target.value)}
               className="h-7 rounded-lg border border-[#374151] bg-[#0B0F17] px-2 text-[11px] text-[#D1D5DB] focus:outline-none focus:border-[#DC2626] transition-colors cursor-pointer disabled:opacity-50"
               aria-label={`Ubah status ${r.pengurus.nama_lengkap}`}
             >
-              <option value="" disabled>Pilih Status</option>
               {PENGURUS_STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -799,7 +1026,7 @@ export function PresensiClient({
             Ekspor Excel Matriks
           </button>
 
-          {mainTab === "siswa" && (
+          {mainTab === "siswa" ? (
             <button
               type="button"
               onClick={() => {
@@ -814,6 +1041,41 @@ export function PresensiClient({
               <Plus className="h-3.5 w-3.5" />
               Catat Manual
             </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setManualPengurusId("");
+                  setManualPengurusStatus("Hadir");
+                  setManualPengurusKeterangan("");
+                  setManualPengurusError(null);
+                  setManualPengurusModalOpen(true);
+                }}
+                className="h-8 px-2.5 rounded-lg border border-[#374151] hover:bg-[#1F2937] text-xs font-semibold text-[#D1D5DB] hover:text-white flex items-center gap-1.5 transition-colors"
+                title="Catat presensi atau status izin/cuti pengurus secara manual"
+              >
+                <Calendar className="h-3.5 w-3.5" />
+                Catat Kehadiran / Cuti
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTambahNip("");
+                  setTambahNama("");
+                  setTambahJabatan("");
+                  setTambahHp("");
+                  setTambahEmail("");
+                  setTambahError(null);
+                  setTambahPengurusModalOpen(true);
+                }}
+                className="h-8 px-3 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Tambah Pengurus
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -865,7 +1127,7 @@ export function PresensiClient({
             className="h-8 rounded-lg border border-[#374151] bg-[#0B0F17] px-2.5 text-xs text-[#F9FAFB] focus:border-[#DC2626] focus:outline-none"
           />
           <button
-            onClick={loadPresensi}
+            onClick={mainTab === "siswa" ? loadPresensi : loadPengurusPresensi}
             className="p-1.5 rounded-lg border border-[#374151] hover:bg-[#1F2937] text-[#9CA3AF] hover:text-white transition-colors focus:outline-none focus:ring-1 focus:ring-[#DC2626]"
             title="Segarkan data tanggal ini"
             aria-label="Segarkan data presensi tanggal ini"
@@ -874,7 +1136,7 @@ export function PresensiClient({
           </button>
         </div>
 
-        {countBelum > 0 && (
+        {mainTab === "siswa" && countBelum > 0 && (
           <button
             type="button"
             onClick={() => setBatchAlpaModalOpen(true)}
@@ -884,44 +1146,95 @@ export function PresensiClient({
             Tandai {countBelum} Siswa Belum Absen sebagai Alpa
           </button>
         )}
+
+        {mainTab === "pengurus" && countPengurusBelum > 0 && (
+          <button
+            type="button"
+            onClick={handleBatchAlpaPengurus}
+            className="h-7 px-3 rounded-lg border border-[#F43F5E]/40 bg-[#F43F5E]/10 hover:bg-[#F43F5E]/20 text-[#F43F5E] text-xs font-semibold flex items-center gap-1.5 transition-all"
+          >
+            <UserX className="h-3.5 w-3.5" />
+            Tandai {countPengurusBelum} Pengurus Belum Absen sebagai Alpa
+          </button>
+        )}
       </div>
 
-      {/* Tab Filter Status Kehadiran */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-        {(
-          [
-            { label: "Semua Siswa Aktif", count: countSemua, tab: "Semua" },
-            { label: "Hadir", count: countHadir, tab: "Hadir" },
-            { label: "Izin", count: countIzin, tab: "Izin" },
-            { label: "Sakit", count: countSakit, tab: "Sakit" },
-            { label: "Alpa", count: countAlpa, tab: "Alpa" },
-            { label: "Belum Absen", count: countBelum, tab: "Belum Absen" },
-          ] as { label: string; count: number; tab: TabFilter }[]
-        ).map((t) => {
-          const isActive = activeTab === t.tab;
-          return (
-            <button
-              key={t.tab}
-              type="button"
-              onClick={() => setActiveTab(t.tab)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ${
-                isActive
-                  ? "bg-[#DC2626] text-white border-[#DC2626] shadow-sm"
-                  : "bg-[#111827] text-[#9CA3AF] hover:text-white border-[#1F2937]"
-              }`}
-            >
-              <span>{t.label}</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] ${
-                  isActive ? "bg-white/20 text-white" : "bg-[#1F2937] text-[#6B7280]"
+      {/* Tab Filter Status Kehadiran (Disesuaikan Per Tab) */}
+      {mainTab === "siswa" ? (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {(
+            [
+              { label: "Semua Siswa Aktif", count: countSemua, tab: "Semua" },
+              { label: "Hadir", count: countHadir, tab: "Hadir" },
+              { label: "Izin", count: countIzin, tab: "Izin" },
+              { label: "Sakit", count: countSakit, tab: "Sakit" },
+              { label: "Alpa", count: countAlpa, tab: "Alpa" },
+              { label: "Belum Absen", count: countBelum, tab: "Belum Absen" },
+            ] as { label: string; count: number; tab: TabFilter }[]
+          ).map((t) => {
+            const isActive = activeTab === t.tab;
+            return (
+              <button
+                key={t.tab}
+                type="button"
+                onClick={() => setActiveTab(t.tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ${
+                  isActive
+                    ? "bg-[#DC2626] text-white border-[#DC2626] shadow-sm"
+                    : "bg-[#111827] text-[#9CA3AF] hover:text-white border-[#1F2937]"
                 }`}
               >
-                {t.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+                <span>{t.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    isActive ? "bg-white/20 text-white" : "bg-[#1F2937] text-[#6B7280]"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+          {(
+            [
+              { label: "Semua Pengurus", count: countPengurusSemua, tab: "Semua" },
+              { label: "Hadir", count: countPengurusHadir, tab: "Hadir" },
+              { label: "Izin", count: countPengurusIzin, tab: "Izin" },
+              { label: "Sakit", count: countPengurusSakit, tab: "Sakit" },
+              { label: "Cuti", count: countPengurusCuti, tab: "Cuti" },
+              { label: "Tugas Luar", count: countPengurusTugasLuar, tab: "Tugas Luar" },
+              { label: "Alpa", count: countPengurusAlpa, tab: "Alpa" },
+              { label: "Belum Absen", count: countPengurusBelum, tab: "Belum Absen" },
+            ] as { label: string; count: number; tab: string }[]
+          ).map((t) => {
+            const isActive = pengurusTab === t.tab;
+            return (
+              <button
+                key={t.tab}
+                type="button"
+                onClick={() => setPengurusTab(t.tab)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center gap-1.5 border ${
+                  isActive
+                    ? "bg-[#DC2626] text-white border-[#DC2626] shadow-sm"
+                    : "bg-[#111827] text-[#9CA3AF] hover:text-white border-[#1F2937]"
+                }`}
+              >
+                <span>{t.label}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    isActive ? "bg-white/20 text-white" : "bg-[#1F2937] text-[#6B7280]"
+                  }`}
+                >
+                  {t.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Baris Pencarian */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -930,7 +1243,11 @@ export function PresensiClient({
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama atau no. induk..."
+            placeholder={
+              mainTab === "siswa"
+                ? "Cari nama atau no. induk..."
+                : "Cari nama pengurus, NIP, atau jabatan..."
+            }
             className="h-8.5 w-full rounded-lg border border-[#1F2937] bg-[#111827] pl-8 pr-3 text-xs text-[#F9FAFB] placeholder:text-[#4B5563] focus:outline-none focus:border-[#DC2626] transition-colors"
           />
         </div>
@@ -963,18 +1280,53 @@ export function PresensiClient({
       ) : (
         pengurusLoading ? (
           <TableSkeleton rows={6} columns={7} />
+        ) : pengurusItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-8 rounded-xl bg-[#111827] border border-[#1F2937] text-center">
+            <div className="h-12 w-12 rounded-full bg-[#DC2626]/10 flex items-center justify-center text-[#DC2626] mb-3">
+              <UserCheck className="h-6 w-6" />
+            </div>
+            <h3 className="text-sm font-bold text-[#F9FAFB]">Belum Ada Data Pengurus & Instruktur</h3>
+            <p className="text-xs text-[#9CA3AF] max-w-md mt-1 mb-4">
+              Sistem belum memiliki data staf atau instruktur LPKS. Anda dapat mendaftarkan pengurus baru atau memuat 4 data pengurus default LPKS Sumbu Hidup.
+            </p>
+            <div className="flex items-center gap-3 flex-wrap justify-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setTambahNip("");
+                  setTambahNama("");
+                  setTambahJabatan("");
+                  setTambahHp("");
+                  setTambahEmail("");
+                  setTambahError(null);
+                  setTambahPengurusModalOpen(true);
+                }}
+                className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Daftarkan Pengurus Baru
+              </button>
+              <button
+                type="button"
+                disabled={seedingLoading}
+                onClick={handleSeedDefaultPengurus}
+                className="h-8 px-4 rounded-lg border border-[#374151] hover:bg-[#1F2937] text-[#D1D5DB] text-xs font-semibold flex items-center gap-1.5 transition-colors disabled:opacity-50"
+              >
+                {seedingLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#DC2626]" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5 text-[#F59E0B]" />
+                )}
+                Muat 4 Pengurus Default LPKS
+              </button>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
             <Table
               columns={pengurusColumns}
-              data={pengurusItems.filter((item) => {
-                const q = search.toLowerCase();
-                const nama = item.pengurus.nama_lengkap.toLowerCase();
-                const nip = (item.pengurus.nip || "").toLowerCase();
-                const jabatan = item.pengurus.jabatan.toLowerCase();
-                return !q || nama.includes(q) || nip.includes(q) || jabatan.includes(q);
-              })}
-              emptyMessage={`Tidak ada data pengurus pada tanggal ${selectedDate}.`}
+              data={filteredPengurus}
+              emptyMessage={`Tidak ada data pengurus dengan status '${pengurusTab}' pada tanggal ${selectedDate}.`}
             />
           </div>
         )
@@ -1343,6 +1695,201 @@ export function PresensiClient({
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* ===================================================================== */}
+      {/* MODAL 5: TAMBAH / DAFTARKAN PENGURUS BARU                             */}
+      {/* ===================================================================== */}
+      <Modal
+        open={tambahPengurusModalOpen}
+        onClose={() => setTambahPengurusModalOpen(false)}
+        title="Daftarkan Pengurus / Instruktur Baru"
+        description="Tambahkan data staf atau instruktur baru untuk dicatat kehadirannya dalam sistem LPKS."
+        size="md"
+      >
+        <form onSubmit={handleTambahPengurusSubmit} className="flex flex-col gap-4">
+          {tambahError && (
+            <div className="p-2.5 rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{tambahError}</span>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+                NIP / ID Pengurus <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                value={tambahNip}
+                onChange={(e) => setTambahNip(e.target.value)}
+                placeholder="Misal: P.005"
+                required
+                className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+                Jabatan / Penugasan <span className="text-[#DC2626]">*</span>
+              </label>
+              <input
+                value={tambahJabatan}
+                onChange={(e) => setTambahJabatan(e.target.value)}
+                placeholder="Misal: Instruktur SMAW / Staf TU"
+                required
+                className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Nama Lengkap & Gelar <span className="text-[#DC2626]">*</span>
+            </label>
+            <input
+              value={tambahNama}
+              onChange={(e) => setTambahNama(e.target.value)}
+              placeholder="Misal: Bambang Triyono, S.T., C.W.I"
+              required
+              className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+                No. WhatsApp / HP
+              </label>
+              <input
+                value={tambahHp}
+                onChange={(e) => setTambahHp(e.target.value)}
+                placeholder="Misal: 0812-3456-7890"
+                className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+                Email
+              </label>
+              <input
+                type="email"
+                value={tambahEmail}
+                onChange={(e) => setTambahEmail(e.target.value)}
+                placeholder="Misal: staf@sumbuhidup.id"
+                className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <button
+              type="button"
+              onClick={() => setTambahPengurusModalOpen(false)}
+              className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={tambahLoading}
+              className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {tambahLoading && <Loader2 className="h-3 w-3 animate-spin" />}
+              Simpan Pengurus
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ===================================================================== */}
+      {/* MODAL 6: CATAT KEHADIRAN / CUTI PENGURUS MANUAL                       */}
+      {/* ===================================================================== */}
+      <Modal
+        open={manualPengurusModalOpen}
+        onClose={() => setManualPengurusModalOpen(false)}
+        title="Catat Kehadiran / Cuti Pengurus Manual"
+        description={`Mencatat entri presensi staf atau instruktur untuk tanggal ${selectedDate}.`}
+        size="md"
+      >
+        <form onSubmit={handleManualPengurusSubmit} className="flex flex-col gap-4">
+          {manualPengurusError && (
+            <div className="p-2.5 rounded-lg bg-[#F43F5E]/10 border border-[#F43F5E]/20 text-[#F43F5E] text-xs flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{manualPengurusError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Pilih Pengurus / Instruktur <span className="text-[#DC2626]">*</span>
+            </label>
+            <select
+              value={manualPengurusId}
+              onChange={(e) => setManualPengurusId(e.target.value)}
+              className="w-full h-9 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626] cursor-pointer"
+              required
+            >
+              <option value="">-- Pilih Pengurus / Instruktur --</option>
+              {pengurusItems.map((item) => (
+                <option key={item.pengurus.id} value={item.pengurus.id}>
+                  {item.pengurus.nip || "—"} — {item.pengurus.nama_lengkap} ({item.pengurus.jabatan}) [Status: {item.status}]
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Status Kehadiran <span className="text-[#DC2626]">*</span>
+            </label>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {PENGURUS_STATUS_OPTIONS.map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setManualPengurusStatus(st)}
+                  className={`h-8 rounded-lg border text-xs font-bold transition-all ${
+                    manualPengurusStatus === st
+                      ? "border-[#DC2626] bg-[#DC2626]/20 text-white"
+                      : "border-[#374151] bg-[#111827] text-[#9CA3AF] hover:text-white"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-[#D1D5DB] mb-1.5 block">
+              Keterangan / Alasan (Opsional)
+            </label>
+            <input
+              value={manualPengurusKeterangan}
+              onChange={(e) => setManualPengurusKeterangan(e.target.value)}
+              placeholder="Contoh: Cuti tahunan / Supervisi uji sertifikasi di luar kota"
+              className="w-full h-8.5 rounded-lg border border-[#374151] bg-[#0B0F17] px-3 text-xs text-[#F9FAFB] focus:outline-none focus:border-[#DC2626]"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1F2937]">
+            <button
+              type="button"
+              onClick={() => setManualPengurusModalOpen(false)}
+              className="h-8 px-3 rounded-lg border border-[#374151] text-xs text-[#9CA3AF] hover:text-white"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              disabled={manualPengurusSaving}
+              className="h-8 px-4 rounded-lg bg-[#DC2626] hover:bg-[#B91C1C] text-xs font-bold text-white flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {manualPengurusSaving && <Loader2 className="h-3 w-3 animate-spin" />}
+              Simpan Presensi Pengurus
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

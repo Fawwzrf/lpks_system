@@ -36,6 +36,28 @@ export async function POST(request: NextRequest) {
     if (authError) return authError;
 
     const body = await request.json();
+
+    if (body?.action === "seed_defaults") {
+      const DEFAULT_PENGURUS = [
+        { nip: "P.001", nama_lengkap: "Bambang Triyono, S.T., C.W.I", jabatan: "Direktur & Instruktur Kepala", no_hp: "0812-3456-0001", email: "bambang@sumbuhidup.id", is_active: true },
+        { nip: "P.002", nama_lengkap: "Eko Prasetyo, A.Md", jabatan: "Instruktur Senior SMAW & GTAW", no_hp: "0812-3456-0002", email: "eko@sumbuhidup.id", is_active: true },
+        { nip: "P.003", nama_lengkap: "Hendra Wijaya", jabatan: "Instruktur Praktek Bengkel", no_hp: "0812-3456-0003", email: "hendra@sumbuhidup.id", is_active: true },
+        { nip: "P.004", nama_lengkap: "Siti Nurhaliza, S.Ak", jabatan: "Staf Administrasi & Keuangan", no_hp: "0812-3456-0004", email: "siti@sumbuhidup.id", is_active: true }
+      ];
+
+      const supabase = await createClient();
+      const { data, error } = await supabase
+        .from("pengurus")
+        .upsert(DEFAULT_PENGURUS, { onConflict: "nip" })
+        .select();
+
+      if (error) {
+        return errorResponse("DATABASE_ERROR", "Gagal memuat data pengurus default.", 500, error.message);
+      }
+
+      return successResponse(data, { message: "4 Data pengurus default berhasil dimuat." }, 201);
+    }
+
     const { nip, nama_lengkap, jabatan, no_hp, email } = body || {};
 
     if (!nip || !nama_lengkap || !jabatan) {
